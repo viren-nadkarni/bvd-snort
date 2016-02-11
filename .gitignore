@@ -100,5 +100,13 @@ src/uncovered.txt
 build/
 *.pyc
 
+# vim stuff
+[._]*.s[a-w][a-z]
+[._]s[a-w][a-z]
+Session.vim
+.netrwhist
+*~
+tags
+
 *CMakeFiles
 *cmake_install.cmake

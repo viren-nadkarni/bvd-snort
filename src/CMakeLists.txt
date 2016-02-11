@@ -9,6 +9,7 @@ set(EXTERNAL_LIBRARIES
     ${HWLOC_LIBRARIES}
     ${LIBLZMA_LIBRARIES}
     ${LUAJIT_LIBRARIES}
+    ${OpenCL_LIBRARY}
     ${OPENSSL_CRYPTO_LIBRARY}
     ${PCAP_LIBRARIES}
     ${PCRE_LIBRARIES}
@@ -22,6 +23,7 @@ set(EXTERNAL_INCLUDES
     ${DAQ_INCLUDE_DIR}
     ${DNET_INCLUDE_DIR}
     ${HWLOC_INCLUDE_DIRS}
+    ${OpenCL_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
     ${PCAP_INCLUDE_DIR}
     ${PCRE_INCLUDE_DIR}
@@ -126,6 +128,7 @@ target_link_libraries( snort
     ips_actions
     events
     hash
+    ${OpenCL_LIBRARY}
     log
     packet_io
     helpers
