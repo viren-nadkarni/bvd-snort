@@ -1121,7 +1121,7 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 
 		// ADDED -----------------------------------------------------------------
 		
-		std::ofstream out("se_out.txt");
+		std::ofstream out("/home/odroid/Documents/Clort/se_init_out.txt");
 		std::streambuf *coutbuf = std::cout.rdbuf();
 		std::cout.rdbuf(out.rdbuf());
 
@@ -1151,7 +1151,7 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 		p->queue = cl::CommandQueue(p->context,p->default_device);
 
 		// Read source file
-		std::ifstream sourceFile("findMatches.cl");
+		std::ifstream sourceFile("/home/odroid/Documents/Clort/findMatches.cl");
 		std::string sourceCode(
 			std::istreambuf_iterator<char>(sourceFile),
 		    (std::istreambuf_iterator<char>()));
@@ -1747,13 +1747,41 @@ int acsm_search_dfa_full(
 
     T = Tx;
     Tend = Tx + n;
-	printf("print in the beginning");
+
+	acstate_t * point;
+    int k;
+    acstate_t ** NextState = acsm->acsmNextState;
+    printf("--- | | ---|");
+
+    for (k=2;k<258;k++){
+    	if ((k>60) && (k<128))
+	    printf(" %c ",k-2);
+	else
+	    printf("   ");
+    }
+    printf("\n");
+
+
+    for(k=0;k<acsm->acsmNumStates;k++){
+
+	    point=NextState[k];
+	    printf("--- %d %d ---|",point[0],point[1]);
+	    int j=0;
+	    for (j=2;j<258;j++){
+		printf(" %d ",point[j]);
+	    }
+	    printf("\n\n\n");
+    }
 
     if (current_state == nullptr)
         return 0;
 
     state = *current_state;
 
+	std::ofstream out("/home/odroid/Documents/Clort/se_out.txt");
+	std::streambuf *coutbuf = std::cout.rdbuf();
+	std::cout.rdbuf(out.rdbuf());
+	std::cout << "Input is " << Tx  << "\n";
     switch (acsm->sizeofstate)
     {
     case 1:
@@ -1793,11 +1821,6 @@ int acsm_search_dfa_full(
     }
 
     *current_state = state;
-	printf("print is working before buffer");
-	std::ofstream out("se_out.txt");
-	std::streambuf *coutbuf = std::cout.rdbuf();
-	std::cout.rdbuf(out.rdbuf());
-
 	cl_int err;
 
     // Create memory buffers
@@ -1807,57 +1830,70 @@ int acsm_search_dfa_full(
 	cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, sizeof(int));
 	cl::Buffer resultBuffer = cl::Buffer(acsm->context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
 
-	int * length = &n;
-	printf("print is working after buffer");
+	int length = n;
+
     // Copy lists A and B to the memory buffers
     err = acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
 	if(err != CL_SUCCESS){
-		printf("Error state");
 		std::cout << "Error state";
 	}
     err = acsm->queue.enqueueWriteBuffer(xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
 	if(err != CL_SUCCESS){
-		printf("Error xlat");
 		std::cout << "Error xlat ";
 	}
-	err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), Tx);
+	err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), T);
 	if(err != CL_SUCCESS){
 		std::cout << "Error text";
-		printf("Error text");
 	}
-	err = acsm->queue.enqueueWriteBuffer(lengthBuffer, CL_TRUE, 0, sizeof(int), length);
+	err = acsm->queue.enqueueWriteBuffer(lengthBuffer, CL_TRUE, 0, sizeof(int), &length);
 	if(err != CL_SUCCESS){
 		std::cout << "Error length";
-		printf("Error length");
 	}
 
     // Set arguments to kernel
-    acsm->kernel.setArg(0, stateBuffer);
-    acsm->kernel.setArg(1, xlatBuffer);
-    acsm->kernel.setArg(2, textBuffer);
-	acsm->kernel.setArg(3, lengthBuffer);
-	acsm->kernel.setArg(4, resultBuffer);
+    err = acsm->kernel.setArg(0, stateBuffer);
+	if(err != CL_SUCCESS){
+		std::cout << "Error in setarg stateBuffer %d \n" << err;
+	}
+    err = acsm->kernel.setArg(1, xlatBuffer);
+	if(err != CL_SUCCESS){
+		std::cout << "Error in setarg xlatBuffer %d \n" << err;
+	}    
+	err = acsm->kernel.setArg(2, textBuffer);
+	if(err != CL_SUCCESS){
+		std::cout << "Error in setarg textBuffer %d \n" <<err;
+	}
+	err = acsm->kernel.setArg(3, lengthBuffer);
+	if(err != CL_SUCCESS){
+		std::cout << "Error in setarg lengthBuffer %d \n" << err;
+	}
+	err = acsm->kernel.setArg(4, resultBuffer);
 
+	if(err != CL_SUCCESS){
+		std::cout << "Error in setarg resultBuffer %d \n" << err;
+	}
+	
     // Run the kernel on specific ND range
 	cl::NDRange global(10);
     cl::NDRange local(1);
-    acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
+    err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
+	if(err != CL_SUCCESS){
+		std::cout << "Error in enqueue " << err << "\n";
+	}
 
     int C[10];
 
 	acsm->queue.finish();
     acsm->queue.enqueueReadBuffer(resultBuffer, CL_TRUE, 0, 10 * sizeof(int), C);
  	
-	
-
 	int count = 0;
     for(int i = 0; i < 10; i ++)
 	{
-    	count += C[i]; 
-    }	
-	if(count != nfound){
-		std::cout << "result was not equal";
-	}
+    	count += C[i];
+    }
+	std::cout << "Total found GPU" << count << "\n";
+	std::cout << "Found CPU " << nfound << "\n";
+	std::cout.flush();
 	std::cout.rdbuf(coutbuf);
     return nfound;
 }
@@ -2293,7 +2329,7 @@ static void Print_DFA(ACSM_STRUCT2* acsm)
                 if ( state != 0 && state != ACSM_FAIL_STATE2 )
                 {
                     if ( isascii(i) && isprint(i) )
-                        printf("%3c->%-5d\t",i,state);
+                        printf("%3d->%-5d\t",i,state);
                     else
                         printf("%3d->%-5d\t",i,state);
                 }
