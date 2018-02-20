@@ -145,7 +145,6 @@ bool Analyzer::handle_command()
 void Analyzer::analyze()
 {
     // The main analyzer loop is terminated by a command returning false or an error during acquire
-    cout << "Thread can write to stdout";
     while (!exit_requested)
     {
         if (handle_command())
