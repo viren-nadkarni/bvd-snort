@@ -876,7 +876,7 @@ int main(int argc, char* argv[])
         prompt = s;
 	
 	// ADDED -----------------------------------------------------------------
-
+	/*
 	//get default plattform
 	std::vector<cl::Platform> all_platforms;
     cl::Platform::get(&all_platforms);
@@ -952,7 +952,7 @@ int main(int argc, char* argv[])
     for(int i = 0; i < 10; i ++)
 	{
     	std::cout << A[i] << " + " << B[i] << " = " << C[i] << std::endl; 
-    }
+    }*/
 
 	// ADDED END -------------------------------------------------------------	
 	

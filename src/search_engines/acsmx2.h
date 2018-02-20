@@ -24,6 +24,12 @@
 
 // Version 2.0
 
+#ifndef CL
+#include "CL/cl.hpp"	//Added
+#define CL
+#endif
+#include <vector>
+
 #include <cstdint>
 
 #include "search_common.h"
@@ -64,6 +70,7 @@ struct ACSM_PATTERN2
     int n;
     int nocase;
     int negative;
+
 };
 
 /*
@@ -128,6 +135,17 @@ struct ACSM_STRUCT2
 
     bool dfa_enabled()
     { return dfa; }
+
+	//OpenCL var
+	std::vector<cl::Platform> all_platforms;
+	cl::Platform default_platform;
+	std::vector<cl::Device> all_devices;
+	cl::Device default_device;
+	cl::Context context;
+	cl::CommandQueue queue;
+	cl::Program program;
+	cl::Kernel kernel;
+	cl::Program::Sources sources;
 };
 
 /*

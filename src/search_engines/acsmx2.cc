@@ -124,6 +124,10 @@
 #include "utils/stats.h"
 #include "utils/util.h"
 
+//Added
+#include <iostream>     // std::cout
+#include <fstream>      // std::ifstream
+
 #define printf LogMessage
 
 #define MEMASSERT(p,s) if (!(p)) { FatalError("ACSM-No Memory: %s\n",s); }
@@ -1114,6 +1118,58 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
         p->acsmSparseMaxRowNodes = 256;
         p->acsmSparseMaxZcnt = 10;
         p->dfa = false;
+
+		// ADDED -----------------------------------------------------------------
+		
+		std::ofstream out("se_out.txt");
+		std::streambuf *coutbuf = std::cout.rdbuf();
+		std::cout.rdbuf(out.rdbuf());
+
+		//get default plattform
+    	cl::Platform::get(&(p->all_platforms));
+		if(p->all_platforms.size()==0){
+        	std::cout<<"No platforms \n";
+    	}
+
+		p->default_platform=p->all_platforms[0];
+
+		//get default device of the default platform, also print how many found
+		
+		
+		p->default_platform.getDevices(CL_DEVICE_TYPE_GPU, &(p->all_devices));
+
+		if(p->all_devices.size()==0){
+		   std::cout<<"No devices \n";
+		}
+
+		p->default_device=p->all_devices[0];
+		std::cout<< "GPUs on Odriod: " << p->all_devices.size()<<"\n";
+		std::cout<< "Using device: "<< p->default_device.getInfo<CL_DEVICE_NAME>()<<"\n";
+
+		p->context = cl::Context(p->default_device);	//cl::Context context({default_device}); Are curly brackets needed??
+
+		p->queue = cl::CommandQueue(p->context,p->default_device);
+
+		// Read source file
+		std::ifstream sourceFile("part1.cl");
+		std::string sourceCode(
+			std::istreambuf_iterator<char>(sourceFile),
+		    (std::istreambuf_iterator<char>()));
+		
+		p->sources.push_back({sourceCode.c_str(),sourceCode.length()}); //curly brackets needed around arguments?
+
+		//std::cout << sources;
+
+		p->program = cl::Program(p->context,p->sources);
+		if(p->program.build({p->default_device})!=CL_SUCCESS){
+		    std::cout<<" Error building: "<<p->program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(p->default_device)<<"\n";		    
+		}
+
+		p->kernel = cl::Kernel(p->program, "part1");
+
+		std::cout.rdbuf(coutbuf);
+
+	// ADDED END -------------------------------------------------------------
     }
 
     return p;
@@ -1722,6 +1778,43 @@ int acsm_search_dfa_full(
     }
 
     *current_state = state;
+
+	int A[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    int B[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+    // Create memory buffers
+    cl::Buffer bufferA = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 10 * sizeof(int));
+    cl::Buffer bufferB = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 10 * sizeof(int));
+    cl::Buffer bufferC = cl::Buffer(acsm->context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
+
+    // Copy lists A and B to the memory buffers
+    acsm->queue.enqueueWriteBuffer(bufferA, CL_TRUE, 0, 10 * sizeof(int), A);
+    acsm->queue.enqueueWriteBuffer(bufferB, CL_TRUE, 0, 10 * sizeof(int), B);
+
+    // Set arguments to kernel
+    acsm->kernel.setArg(0, bufferA);
+    acsm->kernel.setArg(1, bufferB);
+    acsm->kernel.setArg(2, bufferC);
+
+    // Run the kernel on specific ND range
+	cl::NDRange global(10);
+    cl::NDRange local(1);
+    acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
+
+    int C[10];
+
+	acsm->queue.finish();
+    acsm->queue.enqueueReadBuffer(bufferC, CL_TRUE, 0, 10 * sizeof(int), C);
+ 	
+	std::ofstream out("se_out.txt");
+	std::streambuf *coutbuf = std::cout.rdbuf();
+	std::cout.rdbuf(out.rdbuf());
+
+    for(int i = 0; i < 10; i ++)
+	{
+    	std::cout << A[i] << " + " << B[i] << " = " << C[i] << std::endl; 
+    }	
+	std::cout.rdbuf(coutbuf);
     return nfound;
 }
 
@@ -1827,6 +1920,44 @@ int acsm_search_dfa_full_all(
     }
 
     *current_state = state;
+	
+	int A[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    int B[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+    // Create memory buffers
+    cl::Buffer bufferA = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 10 * sizeof(int));
+    cl::Buffer bufferB = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 10 * sizeof(int));
+    cl::Buffer bufferC = cl::Buffer(acsm->context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
+
+    // Copy lists A and B to the memory buffers
+    acsm->queue.enqueueWriteBuffer(bufferA, CL_TRUE, 0, 10 * sizeof(int), A);
+    acsm->queue.enqueueWriteBuffer(bufferB, CL_TRUE, 0, 10 * sizeof(int), B);
+
+    // Set arguments to kernel
+    acsm->kernel.setArg(0, bufferA);
+    acsm->kernel.setArg(1, bufferB);
+    acsm->kernel.setArg(2, bufferC);
+
+    // Run the kernel on specific ND range
+	cl::NDRange global(10);
+    cl::NDRange local(1);
+    acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
+
+    int C[10];
+
+	acsm->queue.finish();
+    acsm->queue.enqueueReadBuffer(bufferC, CL_TRUE, 0, 10 * sizeof(int), C);
+ 	
+	std::ofstream out("se_out.txt");
+	std::streambuf *coutbuf = std::cout.rdbuf();
+	std::cout.rdbuf(out.rdbuf());
+
+    for(int i = 0; i < 10; i ++)
+	{
+    	std::cout << A[i] << " + " << B[i] << " = " << C[i] << std::endl; 
+    }	
+	std::cout.rdbuf(coutbuf);
+	
     return nfound;
 }
 
