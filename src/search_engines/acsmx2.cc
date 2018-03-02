@@ -1151,7 +1151,7 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 		p->queue = cl::CommandQueue(p->context,p->default_device);
 
 		// Read source file
-		std::ifstream sourceFile("part1.cl");
+		std::ifstream sourceFile("findMatches.cl");
 		std::string sourceCode(
 			std::istreambuf_iterator<char>(sourceFile),
 		    (std::istreambuf_iterator<char>()));
@@ -1165,7 +1165,7 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 		    std::cout<<" Error building: "<<p->program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(p->default_device)<<"\n";		    
 		}
 
-		p->kernel = cl::Kernel(p->program, "part1");
+		p->kernel = cl::Kernel(p->program, "findMatches");
 
 		std::cout.rdbuf(coutbuf);
 
@@ -1427,7 +1427,21 @@ int acsmCompile2(
 
     if ( acsm->agent )
         acsmBuildMatchStateTrees2(sc, acsm);
-
+	
+	//Build list array
+    acstate_t* p;
+    acstate_t** NextState = acsm->acsmNextState;
+	acsm->stateArray = new int [acsm->acsmNumStates*258];
+	for (int i=0; i<acsm->acsmNumStates; i++)
+    {
+		 p = NextState[i];
+        if ( !p )
+            continue;
+		for (int j=0; j<acsm->acsmAlphabetSize+2; j++ )
+        {
+			acsm->stateArray[(i * acsm->acsmAlphabetSize+2) + j] = p[j];
+        }
+	}
     return 0;
 }
 
@@ -1733,6 +1747,7 @@ int acsm_search_dfa_full(
 
     T = Tx;
     Tend = Tx + n;
+	printf("print in the beginning");
 
     if (current_state == nullptr)
         return 0;
@@ -1773,28 +1788,55 @@ int acsm_search_dfa_full(
         if (match(mlist->udata, mlist->rule_option_tree, index, context, mlist->neg_list) > 0)
         {
             *current_state = state;
-            return nfound;
+            //return nfound;
         }
     }
 
     *current_state = state;
+	printf("print is working before buffer");
+	std::ofstream out("se_out.txt");
+	std::streambuf *coutbuf = std::cout.rdbuf();
+	std::cout.rdbuf(out.rdbuf());
 
-	int A[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    int B[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+	cl_int err;
 
     // Create memory buffers
-    cl::Buffer bufferA = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 10 * sizeof(int));
-    cl::Buffer bufferB = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 10 * sizeof(int));
-    cl::Buffer bufferC = cl::Buffer(acsm->context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
+    cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
+    cl::Buffer xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 256 * sizeof(uint8_t));
+    cl::Buffer textBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, n * sizeof(uint8_t));
+	cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, sizeof(int));
+	cl::Buffer resultBuffer = cl::Buffer(acsm->context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
 
+	int * length = &n;
+	printf("print is working after buffer");
     // Copy lists A and B to the memory buffers
-    acsm->queue.enqueueWriteBuffer(bufferA, CL_TRUE, 0, 10 * sizeof(int), A);
-    acsm->queue.enqueueWriteBuffer(bufferB, CL_TRUE, 0, 10 * sizeof(int), B);
+    err = acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
+	if(err != CL_SUCCESS){
+		printf("Error state");
+		std::cout << "Error state";
+	}
+    err = acsm->queue.enqueueWriteBuffer(xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
+	if(err != CL_SUCCESS){
+		printf("Error xlat");
+		std::cout << "Error xlat ";
+	}
+	err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), Tx);
+	if(err != CL_SUCCESS){
+		std::cout << "Error text";
+		printf("Error text");
+	}
+	err = acsm->queue.enqueueWriteBuffer(lengthBuffer, CL_TRUE, 0, sizeof(int), length);
+	if(err != CL_SUCCESS){
+		std::cout << "Error length";
+		printf("Error length");
+	}
 
     // Set arguments to kernel
-    acsm->kernel.setArg(0, bufferA);
-    acsm->kernel.setArg(1, bufferB);
-    acsm->kernel.setArg(2, bufferC);
+    acsm->kernel.setArg(0, stateBuffer);
+    acsm->kernel.setArg(1, xlatBuffer);
+    acsm->kernel.setArg(2, textBuffer);
+	acsm->kernel.setArg(3, lengthBuffer);
+	acsm->kernel.setArg(4, resultBuffer);
 
     // Run the kernel on specific ND range
 	cl::NDRange global(10);
@@ -1804,16 +1846,18 @@ int acsm_search_dfa_full(
     int C[10];
 
 	acsm->queue.finish();
-    acsm->queue.enqueueReadBuffer(bufferC, CL_TRUE, 0, 10 * sizeof(int), C);
+    acsm->queue.enqueueReadBuffer(resultBuffer, CL_TRUE, 0, 10 * sizeof(int), C);
  	
-	std::ofstream out("se_out.txt");
-	std::streambuf *coutbuf = std::cout.rdbuf();
-	std::cout.rdbuf(out.rdbuf());
+	
 
+	int count = 0;
     for(int i = 0; i < 10; i ++)
 	{
-    	std::cout << A[i] << " + " << B[i] << " = " << C[i] << std::endl; 
+    	count += C[i]; 
     }	
+	if(count != nfound){
+		std::cout << "result was not equal";
+	}
 	std::cout.rdbuf(coutbuf);
     return nfound;
 }
@@ -1882,7 +1926,28 @@ int acsm_search_dfa_full_all(
     {
         uint8_t* ps;
         uint8_t** NextState = (uint8_t**)acsm->acsmNextState;
-        AC_SEARCH_ALL;
+        //AC_SEARCH;
+		for (; T < Tend; T++ )
+    	{
+		    ps = NextState[ state ];
+		    sindex = xlatcase[T[0]];
+		    if (ps[1])
+		    {
+		        mlist = MatchList[state];
+		        if (mlist)
+		        {
+		            index = T - Tx;
+		            nfound++;
+		            if (match (mlist->udata, mlist->rule_option_tree, index, context,
+		                mlist->neg_list) > 0)
+		            {
+		                *current_state = state;
+		                return nfound; \
+		            }
+		        }
+		    }
+		    state = ps[2u + sindex];
+    	}
     }
     break;
     case 2:
@@ -1921,22 +1986,24 @@ int acsm_search_dfa_full_all(
 
     *current_state = state;
 	
-	int A[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    int B[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-    // Create memory buffers
-    cl::Buffer bufferA = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 10 * sizeof(int));
-    cl::Buffer bufferB = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 10 * sizeof(int));
-    cl::Buffer bufferC = cl::Buffer(acsm->context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
-
+	// Create memory buffers
+    cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
+    cl::Buffer xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 256 * sizeof(uint8_t));
+    cl::Buffer textBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, n * sizeof(uint8_t));
+	cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, sizeof(int));
+	cl::Buffer resultBuffer = cl::Buffer(acsm->context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
+	int * length = &n;
     // Copy lists A and B to the memory buffers
-    acsm->queue.enqueueWriteBuffer(bufferA, CL_TRUE, 0, 10 * sizeof(int), A);
-    acsm->queue.enqueueWriteBuffer(bufferB, CL_TRUE, 0, 10 * sizeof(int), B);
+    acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
+    acsm->queue.enqueueWriteBuffer(xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
+	acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), Tx);
+	acsm->queue.enqueueWriteBuffer(lengthBuffer, CL_TRUE, 0, sizeof(int), length);
 
     // Set arguments to kernel
-    acsm->kernel.setArg(0, bufferA);
-    acsm->kernel.setArg(1, bufferB);
-    acsm->kernel.setArg(2, bufferC);
+    acsm->kernel.setArg(0, stateBuffer);
+    acsm->kernel.setArg(1, xlatBuffer);
+    acsm->kernel.setArg(2, textBuffer);
+	acsm->kernel.setArg(3, lengthBuffer);
 
     // Run the kernel on specific ND range
 	cl::NDRange global(10);
@@ -1946,16 +2013,20 @@ int acsm_search_dfa_full_all(
     int C[10];
 
 	acsm->queue.finish();
-    acsm->queue.enqueueReadBuffer(bufferC, CL_TRUE, 0, 10 * sizeof(int), C);
+    acsm->queue.enqueueReadBuffer(resultBuffer, CL_TRUE, 0, 10 * sizeof(int), C);
  	
 	std::ofstream out("se_out.txt");
 	std::streambuf *coutbuf = std::cout.rdbuf();
 	std::cout.rdbuf(out.rdbuf());
 
+	int count = 0;
     for(int i = 0; i < 10; i ++)
 	{
-    	std::cout << A[i] << " + " << B[i] << " = " << C[i] << std::endl; 
+    	count += C[i]; 
     }	
+	if(count != nfound){
+		std::cout << "result was not equal";
+	}
 	std::cout.rdbuf(coutbuf);
 	
     return nfound;

@@ -136,6 +136,8 @@ struct ACSM_STRUCT2
     bool dfa_enabled()
     { return dfa; }
 
+	
+	int * stateArray;
 	//OpenCL var
 	std::vector<cl::Platform> all_platforms;
 	cl::Platform default_platform;
