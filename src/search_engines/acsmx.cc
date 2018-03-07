@@ -60,6 +60,10 @@
 #include "main/thread.h"
 #include "utils/util.h"
 
+//Added
+#include <iostream>     // std::cout
+#include <fstream>      // std::ifstream
+
 #define MEMASSERT(p,s) if (!(p)) { fprintf(stderr,"ACSM-No Memory: %s\n",s); exit(0); }
 
 static int max_memory = 0;
@@ -282,6 +286,58 @@ ACSM_STRUCT* acsmNew(const MpseAgent* agent)
     if (p)
     {
         p->agent = agent;
+
+        // ADDED -----------------------------------------------------------------
+        
+        std::ofstream out("/home/odroid/Documents/Clort/se_init_out.txt");
+        std::streambuf *coutbuf = std::cout.rdbuf();
+        std::cout.rdbuf(out.rdbuf());
+
+        //get default plattform
+        cl::Platform::get(&(p->all_platforms));
+        if(p->all_platforms.size()==0){
+            std::cout<<"No platforms \n";
+        }
+
+        p->default_platform=p->all_platforms[0];
+
+        //get default device of the default platform, also print how many found
+        
+        
+        p->default_platform.getDevices(CL_DEVICE_TYPE_GPU, &(p->all_devices));
+
+        if(p->all_devices.size()==0){
+           std::cout<<"No devices \n";
+        }
+
+        p->default_device=p->all_devices[0];
+        std::cout<< "GPUs on Odriod: " << p->all_devices.size()<<"\n";
+        std::cout<< "Using device: "<< p->default_device.getInfo<CL_DEVICE_NAME>()<<"\n";
+
+        p->context = cl::Context(p->default_device);    //cl::Context context({default_device}); Are curly brackets needed??
+
+        p->queue = cl::CommandQueue(p->context,p->default_device);
+
+        // Read source file
+        std::ifstream sourceFile("/home/odroid/Documents/Clort/findMatches.cl");
+        std::string sourceCode(
+            std::istreambuf_iterator<char>(sourceFile),
+            (std::istreambuf_iterator<char>()));
+        
+        p->sources.push_back({sourceCode.c_str(),sourceCode.length()}); //curly brackets needed around arguments?
+
+        //std::cout << sources;
+
+        p->program = cl::Program(p->context,p->sources);
+        if(p->program.build({p->default_device})!=CL_SUCCESS){
+            std::cout<<" Error building: "<<p->program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(p->default_device)<<"\n";         
+        }
+
+        p->kernel = cl::Kernel(p->program, "findMatches");
+
+        std::cout.rdbuf(coutbuf);
+
+        // ADDED END -------------------------------------------------------------
     }
     return p;
 }
@@ -411,6 +467,32 @@ int acsmCompile(
     if ( acsm->agent )
         acsmBuildMatchStateTrees(sc, acsm);
 
+    //Build list array
+    acsm->stateArray = new int [acsm->acsmMaxStates*(acsm->ALPHABET_SIZE+1)];
+    int next;
+    ACSM_PATTERN* mlist;
+    for (int k = 0; k < acsm->acsmMaxStates; k++)
+    {
+        for (int i = 0; i < ALPHABET_SIZE+1; i++)
+        {
+            if(i % 257){
+                acsm->stateArray[k*i] = acsm->acsmStateTable[k].NextState[i];
+            }
+            else{
+                mlist = acsm->acsmStateTable[i].MatchList;
+                if(mlist){
+                    acsm->stateArray[k*i] = 1;
+                }
+                //int countPatterns = 0;
+                //while (mlist)
+                //{
+                //    mlist = mlist->next;
+                //    countPatterns++;
+                //}
+                
+        }
+    }
+
     return 0;
 }
 
@@ -461,6 +543,77 @@ int acsmSearch(
         }
     }
     *current_state = state;
+
+    cl_int err;
+    // Create memory buffers
+    cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
+    cl::Buffer xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 256 * sizeof(uint8_t));
+    cl::Buffer textBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, n * sizeof(uint8_t));
+    cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, sizeof(int));
+    cl::Buffer resultBuffer = cl::Buffer(acsm->context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
+
+    int length = n;
+
+    // Copy lists A and B to the memory buffers
+    err = acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmMaxStates*257*sizeof(int), acsm->stateArray);
+    if(err != CL_SUCCESS){
+        printf("Error state");
+    }
+    err = acsm->queue.enqueueWriteBuffer(xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
+    if(err != CL_SUCCESS){
+        printf("Error xlat ");
+    }
+    err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), T);
+    if(err != CL_SUCCESS){
+        printf("Error text");
+    }
+    err = acsm->queue.enqueueWriteBuffer(lengthBuffer, CL_TRUE, 0, sizeof(int), &length);
+    if(err != CL_SUCCESS){
+       printf("Error length");
+    }
+
+    // Set arguments to kernel
+    err = acsm->kernel.setArg(0, stateBuffer);
+    if(err != CL_SUCCESS){
+        printf("Error in setarg stateBuffer %d \n", err);
+    }
+    err = acsm->kernel.setArg(1, xlatBuffer);
+    if(err != CL_SUCCESS){
+        printf("Error in setarg xlatBuffer %d \n", err);
+    }    
+    err = acsm->kernel.setArg(2, textBuffer);
+    if(err != CL_SUCCESS){
+        printf("Error in setarg textBuffer %d \n" , err);
+    }
+    err = acsm->kernel.setArg(3, lengthBuffer);
+    if(err != CL_SUCCESS){
+        printf("Error in setarg lengthBuffer %d \n", err);
+    }
+    err = acsm->kernel.setArg(4, resultBuffer);
+    if(err != CL_SUCCESS){
+        printf("Error in setarg resultBuffer %d \n", err);
+    }
+    
+    // Run the kernel on specific ND range
+    cl::NDRange global(10);
+    cl::NDRange local(1);
+    err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
+    if(err != CL_SUCCESS){
+        printf("Error in enqueue %d \n", err);
+    }
+
+    int C[10];
+
+    acsm->queue.finish();
+    acsm->queue.enqueueReadBuffer(resultBuffer, CL_TRUE, 0, 10 * sizeof(int), C);
+    
+    int count = 0;
+    for(int i = 0; i < 10; i ++)
+    {
+        count += C[i];
+    }
+    printf("Total found GPU: %d \n", count);
+    printf("Total found CPU: %d \n", nfound);
     return nfound;
 }
 

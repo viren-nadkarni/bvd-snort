@@ -29,6 +29,14 @@
 
 #include "search_common.h"
 
+//Added
+#ifndef CL
+#include "CL/cl.hpp"    //Added
+#define CL
+#endif
+#include <vector>
+//Added end
+
 #define ALPHABET_SIZE    256
 #define ACSM_FAIL_STATE   (-1)
 
@@ -82,6 +90,18 @@ struct ACSM_STRUCT
 
     int numPatterns;
     const MpseAgent* agent;
+
+    //Added
+    int * stateArray;
+    std::vector<cl::Platform> all_platforms;
+    cl::Platform default_platform;
+    std::vector<cl::Device> all_devices;
+    cl::Device default_device;
+    cl::Context context;
+    cl::CommandQueue queue;
+    cl::Program program;
+    cl::Kernel kernel;
+    cl::Program::Sources sources;
 };
 
 /*
