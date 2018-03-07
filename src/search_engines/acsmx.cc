@@ -468,27 +468,28 @@ int acsmCompile(
         acsmBuildMatchStateTrees(sc, acsm);
 
     //Build list array
-    acsm->stateArray = new int [acsm->acsmMaxStates*(acsm->ALPHABET_SIZE+1)];
+    acsm->stateArray = new int [acsm->acsmMaxStates*(ALPHABET_SIZE+1)];
     int next;
     ACSM_PATTERN* mlist;
     for (int k = 0; k < acsm->acsmMaxStates; k++)
     {
         for (int i = 0; i < ALPHABET_SIZE+1; i++)
         {
-            if(i % 257){
-                acsm->stateArray[k*i] = acsm->acsmStateTable[k].NextState[i];
+            if(i){
+                acsm->stateArray[(k*257)+i] = acsm->acsmStateTable[k].NextState[i];
             }
             else{
                 mlist = acsm->acsmStateTable[i].MatchList;
                 if(mlist){
-                    acsm->stateArray[k*i] = 1;
+                    acsm->stateArray[(k*257)+i] = 1;
                 }
                 //int countPatterns = 0;
                 //while (mlist)
                 //{
                 //    mlist = mlist->next;
                 //    countPatterns++;
-                //}
+                //
+			}
                 
         }
     }
@@ -538,7 +539,7 @@ int acsmSearch(
                 mlist->neg_list) > 0)
             {
                 *current_state = state;
-                return nfound;
+                //return nfound;
             }
         }
     }
@@ -546,7 +547,7 @@ int acsmSearch(
 
     cl_int err;
     // Create memory buffers
-    cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
+    cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmMaxStates*257*sizeof(int));
     cl::Buffer xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 256 * sizeof(uint8_t));
     cl::Buffer textBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, n * sizeof(uint8_t));
     cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, sizeof(int));
@@ -563,7 +564,7 @@ int acsmSearch(
     if(err != CL_SUCCESS){
         printf("Error xlat ");
     }
-    err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), T);
+    err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), Tx);
     if(err != CL_SUCCESS){
         printf("Error text");
     }
@@ -608,11 +609,15 @@ int acsmSearch(
     acsm->queue.enqueueReadBuffer(resultBuffer, CL_TRUE, 0, 10 * sizeof(int), C);
     
     int count = 0;
-    for(int i = 0; i < 10; i ++)
+    /*
+	for(int i = 0; i < 10; i ++)
     {
         count += C[i];
-    }
-    printf("Total found GPU: %d \n", count);
+    }*/
+	printf("C[0] = %d \n",C[0]);
+	printf("C[1] = %d \n",C[1]);
+
+    //printf("Total found GPU: %d \n", count);
     printf("Total found CPU: %d \n", nfound);
     return nfound;
 }
