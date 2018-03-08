@@ -46,7 +46,7 @@ public:
 
     void set_opt(int flag) override
     {
-        acsmCompressStates(obj, flag);
+        //acsmCompressStates(obj, flag);
         obj->enable_dfa();
     }
 

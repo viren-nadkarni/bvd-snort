@@ -526,12 +526,14 @@ int acsmSearch(
 
     state = *current_state;
 
+
     for (; T < Tend; T++)
     {
         state = StateTable[state].NextState[*T];
 
         if ( StateTable[state].MatchList != nullptr )
         {
+			printf("found a match \n");
             mlist = StateTable[state].MatchList;
             index = T + 1 - Tc;
             nfound++;
@@ -539,11 +541,15 @@ int acsmSearch(
                 mlist->neg_list) > 0)
             {
                 *current_state = state;
-                //return nfound;
+				printf("inside match function \n");             
+			   //return nfound;
             }
         }
     }
     *current_state = state;
+
+
+
 
     cl_int err;
     // Create memory buffers
