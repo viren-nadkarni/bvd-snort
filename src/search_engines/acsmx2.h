@@ -172,6 +172,9 @@ int acsm_search_dfa_sparse(
 int acsm_search_dfa_banded(
     ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
+int acsm_search_dfa_full_gpu(
+    ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
+
 int acsm_search_dfa_full(
     ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 

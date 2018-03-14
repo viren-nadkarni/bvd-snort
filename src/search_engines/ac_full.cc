@@ -64,10 +64,16 @@ public:
         const uint8_t* T, int n, MpseMatch match,
         void* context, int* current_state) override
     {
-        if ( obj->dfa_enabled() )
-            return acsm_search_dfa_full(obj, T, n, match, context, current_state);
+		if(1){		//ADDED - Change to 0 to not run GPU matching
+			return acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
+		}
+		else
+		{
+        	if ( obj->dfa_enabled() )
+         	   return acsm_search_dfa_full(obj, T, n, match, context, current_state);
 
-        return acsm_search_nfa(obj, T, n, match, context, current_state);
+        	return acsm_search_nfa(obj, T, n, match, context, current_state);
+		}
     }
 
     int search_all(
