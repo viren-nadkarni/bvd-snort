@@ -127,6 +127,7 @@
 //Added
 #include <iostream>     // std::cout
 #include <fstream>      // std::ifstream
+#include <cstring>
 
 #define printf LogMessage
 
@@ -1448,7 +1449,10 @@ int acsmCompile2(
 			acsm->stateArray[(i * 258) + j] = p[j];
         }
 	}
-	//acsmPrintDetailInfo2(acsm);	
+	int buffsize = 10;
+	acsm->acsmBuffer = new ACSM_BUFFER_OBJ[buffsize];
+	acsm->packetsInBuff = 0;
+	acsm->packetsBuffMax = buffsize;
     return 0;
 
 }
@@ -1705,13 +1709,12 @@ int acsm_search_dfa_sparse(
 void acsmx2_print_qinfo()
 {
 }
-
+//ADDED
 int acsm_search_dfa_full_gpu(
     ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
     void* context, int* current_state
     )
 {
-	printf("THIS IS THE GPU ONLY FUNC \n");
     ACSM_PATTERN2* mlist;
     //const uint8_t* Tend;
     //const uint8_t* T;
@@ -1731,12 +1734,30 @@ int acsm_search_dfa_full_gpu(
 
     state = *current_state;
 	
-	//ADDED
+	if(acsm->packetsInBuff != acsm->packetsBuffMax)
+	{
+		acsm->acsmBuffer[acsm->packetsInBuff].Tx = Tx;
+		acsm->acsmBuffer[acsm->packetsInBuff].n = n;
+		acsm->acsmBuffer[acsm->packetsInBuff].context  = (OtnxMatchData*)context;
+		acsm->acsmBuffer[acsm->packetsInBuff].current_state = current_state;
+		acsm->nTotal += n;	
+		acsm->packetsInBuff++;
+		return  0;
+	}
 	int resultArray[n] = { 0 };
 	int * len = &n;
-	const uint8_t* text;
-	text = Tx;
+	const uint8_t* text = Tx;
 	cl_int err;
+
+	//Create string buffer and concatenate each packet into one
+	uint8_t buffText[acsm->nTotal] = {};
+	int counter =  0;
+	for(int i = 0; i<acsm->packetsInBuff;i++){
+		for(int j = 0; j<(acsm->acsmBuffer[i].n); j++){
+			buffText[counter++] = acsm->acsmBuffer[i].Tx[j];
+		}
+	}
+	buffText[counter] = '\0';
 
     // Create memory buffers
     cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));

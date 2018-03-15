@@ -34,6 +34,9 @@
 
 #include "search_common.h"
 
+//TEST
+#include "./detection/fp_detect.h"
+
 #define MAX_ALPHABET_SIZE 256
 
 /*
@@ -98,6 +101,15 @@ enum
     ACF_SPARSE_BANDS,
 };
 
+/*-------------added-------------*/
+struct ACSM_BUFFER_OBJ
+{
+	const uint8_t* Tx;
+	int n;
+    OtnxMatchData* context;
+	int* current_state;
+};
+
 /*
 *   Aho-Corasick State Machine Struct - one per group of patterns
 */
@@ -106,6 +118,7 @@ struct ACSM_STRUCT2
     ACSM_PATTERN2* acsmPatterns;
     acstate_t* acsmFailState;
     ACSM_PATTERN2** acsmMatchList;
+;
 
     /* list of transitions in each state, this is used to build the nfa & dfa
        after construction we convert to sparse or full format matrix and free
@@ -136,7 +149,10 @@ struct ACSM_STRUCT2
     bool dfa_enabled()
     { return dfa; }
 
-	
+	ACSM_BUFFER_OBJ* acsmBuffer;
+	int packetsInBuff;
+	int packetsBuffMax;
+	int nTotal;
 	int * stateArray;
 	//OpenCL var
 	std::vector<cl::Platform> all_platforms;
