@@ -1738,11 +1738,15 @@ int acsm_search_dfa_full_gpu(
 	{
 		acsm->acsmBuffer[acsm->packetsInBuff].Tx = Tx;
 		acsm->acsmBuffer[acsm->packetsInBuff].n = n;
-		acsm->acsmBuffer[acsm->packetsInBuff].context  = (OtnxMatchData*)context;
+		acsm->acsmBuffer[acsm->packetsInBuff].p  = (Packet*)((OtnxMatchData*)context)->p;
 		acsm->acsmBuffer[acsm->packetsInBuff].current_state = current_state;
 		acsm->nTotal += n;	
 		acsm->packetsInBuff++;
 		return  0;
+	}
+
+	for(int i=0; i < acsm->packetsInBuff; i++){
+		printf("State packet %d : %d",  i, *(acsm->acsmBuffer[i].current_state));
 	}
 	int resultArray[n] = { 0 };
 	int * len = &n;

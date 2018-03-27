@@ -36,6 +36,7 @@
 
 //TEST
 #include "./detection/fp_detect.h"
+#include "./protocols/packet.h"
 
 #define MAX_ALPHABET_SIZE 256
 
@@ -106,7 +107,7 @@ struct ACSM_BUFFER_OBJ
 {
 	const uint8_t* Tx;
 	int n;
-    OtnxMatchData* context;
+    Packet* p;
 	int* current_state;
 };
 
