@@ -139,6 +139,13 @@ struct ACSM_STRUCT2
 	
 	int * stateArray;
 	//OpenCL var
+
+	int is_init;
+	int is_init_2;
+
+    cl::Buffer stateBuffer;
+    cl::Buffer xlatBuffer;
+
 	std::vector<cl::Platform> all_platforms;
 	cl::Platform default_platform;
 	std::vector<cl::Device> all_devices;

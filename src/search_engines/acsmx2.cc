@@ -127,6 +127,7 @@
 //Added
 #include <iostream>     // std::cout
 #include <fstream>      // std::ifstream
+#include <ctime> 		//std::Clock
 
 #define printf LogMessage
 
@@ -1448,7 +1449,28 @@ int acsmCompile2(
 			acsm->stateArray[(i * 258) + j] = p[j];
         }
 	}
-	//acsmPrintDetailInfo2(acsm);	
+	acsm->is_init = 0;
+
+	/*cl_int err;
+	cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
+    cl::Buffer xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 256 * sizeof(uint8_t));
+
+	err = acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
+	if(err != CL_SUCCESS){
+		printf("Error state");
+	}
+    err = acsm->queue.enqueueWriteBuffer(xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
+	if(err != CL_SUCCESS){
+		printf("Error xlat");
+	}
+	err = acsm->kernel.setArg(0, stateBuffer);
+	if(err != CL_SUCCESS){
+		printf("Error in setarg stateBuffer %d \n", err);
+	}
+    err = acsm->kernel.setArg(1, xlatBuffer);
+	if(err != CL_SUCCESS){
+		printf("Error in setarg xlat %d \n", err);
+	}*/
     return 0;
 
 }
@@ -1711,20 +1733,9 @@ int acsm_search_dfa_full_gpu(
     void* context, int* current_state
     )
 {
-	printf("THIS IS THE GPU ONLY FUNC \n");
     ACSM_PATTERN2* mlist;
-    //const uint8_t* Tend;
-    //const uint8_t* T;
-
-    //int index;
-    //int sindex;
-    //int nfound = 0;
     acstate_t state;
     ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
-
-    //T = Tx;
-
-    //Tend = Tx + n;
 
     if (current_state == nullptr)
         return 0;
@@ -1738,22 +1749,41 @@ int acsm_search_dfa_full_gpu(
 	text = Tx;
 	cl_int err;
 
+	clock_t timer;
+	timer = clock();
     // Create memory buffers
-    cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
-    cl::Buffer xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 256 * sizeof(uint8_t));
-    cl::Buffer textBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, n * sizeof(uint8_t));
+	if(acsm->is_init == 0) {
+	  	  acsm->stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
+	  	  acsm->xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 256 * sizeof(uint8_t));
+		  err = acsm->queue.enqueueWriteBuffer(acsm->stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
+		  if(err != CL_SUCCESS){
+			  printf("Error state");
+			}
+			err = acsm->queue.enqueueWriteBuffer(acsm->xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
+			if(err != CL_SUCCESS){
+				printf("Error xlat");
+			}
+			acsm->is_init = 1;
+	 }    
+	cl::Buffer textBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, n * sizeof(uint8_t));
 	cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, sizeof(int*));
 	cl::Buffer matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE, n*sizeof(int));
-
+	//printf("Buffers created after %f seconds \n", ((float)(clock()-timer))/CLOCKS_PER_SEC);
+	timer = clock();
 	//Kan vi lägga state och xlat efter compile?
-    err = acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
-	if(err != CL_SUCCESS){
-		printf("Error state");
+
+	/*if(acsm->is_init == 0) {
+		err = acsm->queue.enqueueWriteBuffer(acsm->stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
+		if(err != CL_SUCCESS){
+			printf("Error state");
+		}
+		err = acsm->queue.enqueueWriteBuffer(acsm->xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
+		if(err != CL_SUCCESS){
+			printf("Error xlat");
+		}
+		acsm->is_init = 1;
 	}
-    err = acsm->queue.enqueueWriteBuffer(xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
-	if(err != CL_SUCCESS){
-		printf("Error xlat");
-	}
+*/
 	err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), text);
 	if(err != CL_SUCCESS){
 		printf("Error text");
@@ -1766,16 +1796,17 @@ int acsm_search_dfa_full_gpu(
 	if(err != CL_SUCCESS){
 		printf("Error resultArray");
 	}
-
+	//printf("Buffers enqueued after %f ms \n", ((float)((clock()-timer)*1000))/CLOCKS_PER_SEC);
+	//timer = clock();
     // Set arguments to kernel
-    err = acsm->kernel.setArg(0, stateBuffer);
+    err = acsm->kernel.setArg(0, acsm->stateBuffer);
 	if(err != CL_SUCCESS){
 		printf("Error in setarg stateBuffer %d \n", err);
 	}
-    err = acsm->kernel.setArg(1, xlatBuffer);
+    err = acsm->kernel.setArg(1, acsm->xlatBuffer);
 	if(err != CL_SUCCESS){
 		printf("Error in setarg xlat %d \n", err);
-	}    
+	}
 	err = acsm->kernel.setArg(2, textBuffer);
 	if(err != CL_SUCCESS){
 		printf("Error in setarg text %d \n", err);
@@ -1788,17 +1819,22 @@ int acsm_search_dfa_full_gpu(
 	if(err != CL_SUCCESS){
 		printf("Error in setarg result %d \n", err);
 	}
-	
+	//printf("Kernels set after %f ms \n", ((float)((clock()-timer)*1000))/CLOCKS_PER_SEC);
+	//timer = clock();
     // Run the kernel on specific ND range
-	cl::NDRange global(5);
+	int threads = n/30;
+	cl::NDRange global(threads);
     cl::NDRange local(1);
     err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
 	if(err != CL_SUCCESS){
 		printf("Error in enque %d \n", err);
 	}
-
 	acsm->queue.finish();
+	//printf("GPU finished after %f ms \n", ((float)((clock()-timer)*1000))/CLOCKS_PER_SEC);
+	//timer = clock();
     acsm->queue.enqueueReadBuffer(matchBuffer, CL_TRUE, 0, n * sizeof(int), resultArray);
+	//printf("Read to device after %f ms \n", ((float)((clock()-timer)*1000))/CLOCKS_PER_SEC);
+	//timer = clock();
 	//Run match for found patterns
 	if(resultArray[0]){
 		int countFound = 0;
@@ -1818,6 +1854,7 @@ int acsm_search_dfa_full_gpu(
 			}
 		}
 	}
+	//printf("Parsed results after %f ms \n", ((float)((clock()-timer)*1000))/CLOCKS_PER_SEC);
     return resultArray[0];
 }
 /*
@@ -1872,7 +1909,6 @@ int acsm_search_dfa_full(
     T = Tx;
 	text = Tx;
     Tend = Tx + n;
-	printf("THIS IS CPU ONLY FUNC\n");
     if (current_state == nullptr)
         return 0;
 
