@@ -1449,10 +1449,11 @@ int acsmCompile2(
 			acsm->stateArray[(i * 258) + j] = p[j];
         }
 	}
-	int buffsize = 10;
-	acsm->acsmBuffer = new ACSM_BUFFER_OBJ[buffsize];
-	acsm->packetsInBuff = 0;
-	acsm->packetsBuffMax = buffsize;
+	acsm->nTotal = 0;
+	//int buffsize = 10;
+	//acsm->acsmBuffer = new ACSM_BUFFER_OBJ[buffsize];
+	//acsm->packetsInBuff = 0;
+	//acsm->packetsBuffMax = buffsize;
     return 0;
 
 }
@@ -1726,18 +1727,19 @@ int acsm_search_dfa_full_gpu(
 	
 	if(acsm->nTotal < 240000)
 	{
-		memcpy(acsm->TxArray[nTotal], Tx, n);
+		memcpy(&acsm->TxArray[acsm->nTotal], &Tx, n);
 		acsm->nTotal += n;	
 		return  0;
 	}
+	printf("ntotal = %d \n",acsm->nTotal);
 
-	int resultArray[n] = { 0 };
-	int * len = &n;
-	const uint8_t* text = Tx;
+	int resultArray[acsm->nTotal] = { 0 };
+	int * len = &acsm->nTotal;
+	//const uint8_t* text = Tx;
 	cl_int err;
 
 	//Create string buffer and concatenate each packet into one
-	uint8_t buffText[acsm->nTotal] = {};
+	/*uint8_t buffText[acsm->nTotal] = {};
 	int counter =  0;
 	for(int i = 0; i<acsm->packetsInBuff;i++){
 		for(int j = 0; j<(acsm->acsmBuffer[i].n); j++){
@@ -1746,12 +1748,14 @@ int acsm_search_dfa_full_gpu(
 	}
 	buffText[counter] = '\0';
 
+	*/
+
     // Create memory buffers
     cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
     cl::Buffer xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, 256 * sizeof(uint8_t));
-    cl::Buffer textBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, n * sizeof(uint8_t));
+    cl::Buffer textBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->nTotal * sizeof(uint8_t));
 	cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, sizeof(int*));
-	cl::Buffer matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE, n*sizeof(int));
+	cl::Buffer matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE, acsm->nTotal*sizeof(int));
 
 	//Kan vi lägga state och xlat efter compile?
     err = acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
@@ -1762,7 +1766,7 @@ int acsm_search_dfa_full_gpu(
 	if(err != CL_SUCCESS){
 		printf("Error xlat");
 	}
-	err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, n * sizeof(uint8_t), text);
+	err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, acsm->nTotal * sizeof(uint8_t), acsm->TxArray);
 	if(err != CL_SUCCESS){
 		printf("Error text");
 	}
@@ -1770,7 +1774,7 @@ int acsm_search_dfa_full_gpu(
 	if(err != CL_SUCCESS){
 		printf("Error length");
 	}
-	err = acsm->queue.enqueueWriteBuffer(matchBuffer, CL_TRUE, 0, n*sizeof(int), resultArray);
+	err = acsm->queue.enqueueWriteBuffer(matchBuffer, CL_TRUE, 0, acsm->nTotal*sizeof(int), resultArray);
 	if(err != CL_SUCCESS){
 		printf("Error resultArray");
 	}
@@ -1806,9 +1810,9 @@ int acsm_search_dfa_full_gpu(
 	}
 
 	acsm->queue.finish();
-    acsm->queue.enqueueReadBuffer(matchBuffer, CL_TRUE, 0, n * sizeof(int), resultArray);
+    acsm->queue.enqueueReadBuffer(matchBuffer, CL_TRUE, 0, acsm->nTotal * sizeof(int), resultArray);
 	//Run match for found patterns
-	if(resultArray[0]){
+	/* if(resultArray[0]){
 		int countFound = 0;
 		for(int i = 1; i<n && countFound<resultArray[0]; i++){
 			if(resultArray[i])
@@ -1825,7 +1829,8 @@ int acsm_search_dfa_full_gpu(
 				}
 			}
 		}
-	}
+	} */
+	printf("%d : matches was found \n", resultArray[0]);
     return resultArray[0];
 }
 /*
