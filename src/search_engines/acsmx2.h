@@ -150,9 +150,11 @@ struct ACSM_STRUCT2
     bool dfa_enabled()
     { return dfa; }
 
-	ACSM_BUFFER_OBJ* acsmBuffer;
-	int packetsInBuff;
-	int packetsBuffMax;
+	//ACSM_BUFFER_OBJ* acsmBuffer;     Buffering for packets, not used atm
+	//int packetsInBuff;
+	//int packetsBuffMax;
+
+    uint8_t TxArray[250000] = {};
 	int nTotal;
 	int * stateArray;
 	//OpenCL var

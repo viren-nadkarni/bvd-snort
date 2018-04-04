@@ -1716,38 +1716,21 @@ int acsm_search_dfa_full_gpu(
     )
 {
     ACSM_PATTERN2* mlist;
-    //const uint8_t* Tend;
-    //const uint8_t* T;
-
-    //int index;
-    //int sindex;
-    //int nfound = 0;
     acstate_t state;
     ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
-
-    //T = Tx;
-
-    //Tend = Tx + n;
 
     if (current_state == nullptr)
         return 0;
 
     state = *current_state;
 	
-	if(acsm->packetsInBuff != acsm->packetsBuffMax)
+	if(acsm->nTotal < 240000)
 	{
-		acsm->acsmBuffer[acsm->packetsInBuff].Tx = Tx;
-		acsm->acsmBuffer[acsm->packetsInBuff].n = n;
-		acsm->acsmBuffer[acsm->packetsInBuff].p  = (Packet*)((OtnxMatchData*)context)->p;
-		acsm->acsmBuffer[acsm->packetsInBuff].current_state = current_state;
+		memcpy(acsm->TxArray[nTotal], Tx, n);
 		acsm->nTotal += n;	
-		acsm->packetsInBuff++;
 		return  0;
 	}
 
-	for(int i=0; i < acsm->packetsInBuff; i++){
-		printf("State packet %d : %d",  i, *(acsm->acsmBuffer[i].current_state));
-	}
 	int resultArray[n] = { 0 };
 	int * len = &n;
 	const uint8_t* text = Tx;
