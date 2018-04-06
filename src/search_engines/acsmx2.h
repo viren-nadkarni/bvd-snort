@@ -154,9 +154,10 @@ struct ACSM_STRUCT2
 	//int packetsInBuff;
 	//int packetsBuffMax;
 
-    uint8_t TxArray[250000] = {};
+    uint8_t TxArray[250000] = {0};
 	int nTotal;
 	int * stateArray;
+	int isInit;
 	//OpenCL var
 	std::vector<cl::Platform> all_platforms;
 	cl::Platform default_platform;

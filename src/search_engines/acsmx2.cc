@@ -128,6 +128,7 @@
 #include <iostream>     // std::cout
 #include <fstream>      // std::ifstream
 #include <cstring>
+#include <time.h>
 
 #define printf LogMessage
 
@@ -1450,11 +1451,8 @@ int acsmCompile2(
         }
 	}
 	acsm->nTotal = 0;
-	//int buffsize = 10;
-	//acsm->acsmBuffer = new ACSM_BUFFER_OBJ[buffsize];
-	//acsm->packetsInBuff = 0;
-	//acsm->packetsBuffMax = buffsize;
-    return 0;
+	acsm->isInit = 0;
+	return 0;
 
 }
 
@@ -1715,7 +1713,7 @@ int acsm_search_dfa_full_gpu(
     ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
     void* context, int* current_state
     )
-{
+{	
     ACSM_PATTERN2* mlist;
     acstate_t state;
     ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
@@ -1727,28 +1725,18 @@ int acsm_search_dfa_full_gpu(
 	
 	if(acsm->nTotal < 240000)
 	{
-		memcpy(&acsm->TxArray[acsm->nTotal], &Tx, n);
+		uint8_t* TxArrayPtr = &(acsm->TxArray[acsm->nTotal]);
+		memcpy(TxArrayPtr, Tx, sizeof(uint8_t)*n);
 		acsm->nTotal += n;	
 		return  0;
 	}
-	printf("ntotal = %d \n",acsm->nTotal);
+	
+	clock_t timer;
+	timer = clock();
 
 	int resultArray[acsm->nTotal] = { 0 };
 	int * len = &acsm->nTotal;
-	//const uint8_t* text = Tx;
 	cl_int err;
-
-	//Create string buffer and concatenate each packet into one
-	/*uint8_t buffText[acsm->nTotal] = {};
-	int counter =  0;
-	for(int i = 0; i<acsm->packetsInBuff;i++){
-		for(int j = 0; j<(acsm->acsmBuffer[i].n); j++){
-			buffText[counter++] = acsm->acsmBuffer[i].Tx[j];
-		}
-	}
-	buffText[counter] = '\0';
-
-	*/
 
     // Create memory buffers
     cl::Buffer stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY, acsm->acsmNumStates*258*sizeof(int));
@@ -1758,13 +1746,15 @@ int acsm_search_dfa_full_gpu(
 	cl::Buffer matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE, acsm->nTotal*sizeof(int));
 
 	//Kan vi lägga state och xlat efter compile?
-    err = acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
-	if(err != CL_SUCCESS){
-		printf("Error state");
-	}
-    err = acsm->queue.enqueueWriteBuffer(xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
-	if(err != CL_SUCCESS){
-		printf("Error xlat");
+	if(!acsm->isInit){
+		err = acsm->queue.enqueueWriteBuffer(stateBuffer, CL_TRUE, 0, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
+		if(err != CL_SUCCESS){
+			printf("Error state");
+		}
+		err = acsm->queue.enqueueWriteBuffer(xlatBuffer, CL_TRUE, 0, 256 * sizeof(uint8_t), xlatcase);
+		if(err != CL_SUCCESS){
+			printf("Error xlat");
+ 		}
 	}
 	err = acsm->queue.enqueueWriteBuffer(textBuffer, CL_TRUE, 0, acsm->nTotal * sizeof(uint8_t), acsm->TxArray);
 	if(err != CL_SUCCESS){
@@ -1802,7 +1792,7 @@ int acsm_search_dfa_full_gpu(
 	}
 	
     // Run the kernel on specific ND range
-	cl::NDRange global(5);
+	cl::NDRange global(400);
     cl::NDRange local(1);
     err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
 	if(err != CL_SUCCESS){
@@ -1821,7 +1811,7 @@ int acsm_search_dfa_full_gpu(
 				mlist = MatchList[resultArray[i]];
 		        if (mlist)	
 				{
-					if (match(mlist->udata, mlist->rule_option_tree, i, context, mlist->neg_list) > 0) 
+					if (match(mlist->udata, mlist->rule_option_trgee, i, context, mlist->neg_list) > 0) 
 					{ 
 						*current_state = resultArray[i]; 
 						return countFound; 
@@ -1830,7 +1820,18 @@ int acsm_search_dfa_full_gpu(
 			}
 		}
 	} */
-	printf("%d : matches was found \n", resultArray[0]);
+	clock_t t;
+	t = clock() - timer;
+	printf("It took %f seconds on GPU \n", ((float)t)/CLOCKS_PER_SEC);
+	printf("%d : matches was found on GPU\n", resultArray[0]);
+	timer = clock();
+	int countCPU = acsm_search_dfa_full(acsm, acsm->TxArray, acsm->nTotal, match, context, current_state);
+	t = clock() - timer;
+	printf("%d : matches was found on CPU \n", countCPU); 
+	printf("It took %f seconds on CPU \n", ((float)t)/CLOCKS_PER_SEC);
+
+	memset(acsm->TxArray, 0, 250000);
+    acsm->nTotal = 0;
     return resultArray[0];
 }
 /*
@@ -1885,7 +1886,6 @@ int acsm_search_dfa_full(
     T = Tx;
 	text = Tx;
     Tend = Tx + n;
-	printf("THIS IS CPU ONLY FUNC\n");
     if (current_state == nullptr)
         return 0;
 

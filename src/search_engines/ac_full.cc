@@ -25,6 +25,8 @@
 
 #include "acsmx2.h"
 
+#include <time.h>
+
 //-------------------------------------------------------------------------
 // "ac_full"
 //-------------------------------------------------------------------------
@@ -65,7 +67,12 @@ public:
         void* context, int* current_state) override
     {
 		if(1){		//ADDED - Change to 0 to not run GPU matching
+			//int gpu = acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
+			//int cpu = acsm_search_dfa_full(obj, T, n, match, context, current_state);
+			//if(cpu)
+			//	printf("Cpu found : %d\n", cpu);
 			return acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
+			//return cpu;
 		}
 		else
 		{
