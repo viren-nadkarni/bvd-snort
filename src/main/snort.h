@@ -57,7 +57,7 @@ public:
 
     static DAQ_Verdict process_packet(
         Packet*, const DAQ_PktHdr_t*, const uint8_t* pkt, bool is_frag=false);
-
+	static int packet_flush();
     static DAQ_Verdict packet_callback(void*, const DAQ_PktHdr_t*, const uint8_t*);
 
     static void inspect(Packet*);

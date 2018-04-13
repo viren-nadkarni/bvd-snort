@@ -158,9 +158,9 @@ void Analyzer::analyze()
             this_thread::sleep_for(ms);
             continue;
         }
-        if (daq_instance->acquire(0, main_func))
+        if (daq_instance->acquire(0, main_func)){
             break;
-
+		}
         // FIXIT-L acquire(0) makes idle processing unlikely under high traffic
         // because it won't return until no packets, signal, etc.  that means
         // the idle processing may not be useful or that we need a hook to do

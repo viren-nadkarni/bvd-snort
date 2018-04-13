@@ -34,9 +34,10 @@
 
 #include "search_common.h"
 
+#include <time.h>
 //TEST
-#include "./detection/fp_detect.h"
-#include "./protocols/packet.h"
+//#include "./detection/fp_detect.h"
+//#include "./protocols/packet.h"
 
 #define MAX_ALPHABET_SIZE 256
 
@@ -102,15 +103,6 @@ enum
     ACF_SPARSE_BANDS,
 };
 
-/*-------------added-------------*/
-struct ACSM_BUFFER_OBJ
-{
-	const uint8_t* Tx;
-	int n;
-    Packet* p;
-	int* current_state;
-};
-
 /*
 *   Aho-Corasick State Machine Struct - one per group of patterns
 */
@@ -154,11 +146,19 @@ struct ACSM_STRUCT2
 	//int packetsInBuff;
 	//int packetsBuffMax;
 
-    uint8_t TxArray[250000] = {0};
+	int buffSize;
+    uint8_t* TxArray;
+	int * resultArray;
 	int nTotal;
 	int * stateArray;
-	int isInit;
+
+	clock_t timer;
 	//OpenCL var
+
+	cl::Buffer stateBuffer;
+	cl::Buffer xlatBuffer;	
+	cl::Buffer matchBuffer;
+
 	std::vector<cl::Platform> all_platforms;
 	cl::Platform default_platform;
 	std::vector<cl::Device> all_devices;
