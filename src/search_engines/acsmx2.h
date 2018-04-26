@@ -152,9 +152,10 @@ struct ACSM_STRUCT2
 	int nTotal;
 	int * stateArray;
 
-	clock_t timer;
-	//OpenCL var
+	uint8_t* mapPtr;
 
+	//OpenCL var
+	cl::Buffer testBuffer;
 	cl::Buffer stateBuffer;
 	cl::Buffer xlatBuffer;	
 	cl::Buffer matchBuffer;
