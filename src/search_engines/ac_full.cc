@@ -115,8 +115,8 @@ static Mpse* acf_ctor(
 
 static void acf_dtor(Mpse* p)
 {
-	//int state = 0;
-	//p->search(nullptr, 0, nullptr, nullptr, &state);
+	int state = 0;
+	p->search(nullptr, 0, nullptr, nullptr, &state);
 	//printf("total found : %d \n", p->search(nullptr, 0, nullptr, nullptr, &state));
     delete p;
 }
