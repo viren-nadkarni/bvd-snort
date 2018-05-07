@@ -41,6 +41,8 @@
 
 #define MAX_ALPHABET_SIZE 256
 
+#define USE_GPU 1
+
 /*
    FAIL STATE for 1,2,or 4 bytes for state transitions
    Uncomment this define to use 32 bit state values
@@ -146,19 +148,28 @@ struct ACSM_STRUCT2
 	//int packetsInBuff;
 	//int packetsBuffMax;
 
+	uint8_t* textBuffer;
+	int totalFound;
+	int totalFoundCPU;
 	int buffSize;
     uint8_t* TxArray;
 	int * resultArray;
 	int nTotal;
 	int * stateArray;
 
+	int currentBuffer;
+
 	uint8_t* mapPtr;
+	uint8_t* mapPtr2;
 
 	//OpenCL var
-	cl::Buffer testBuffer;
+	cl::Buffer textBuffer1;
+	cl::Buffer textBuffer2;
 	cl::Buffer stateBuffer;
 	cl::Buffer xlatBuffer;	
 	cl::Buffer matchBuffer;
+
+	cl::Event* bufferEvent;
 
 	std::vector<cl::Platform> all_platforms;
 	cl::Platform default_platform;
@@ -195,6 +206,9 @@ int acsm_search_dfa_banded(
 
 int acsm_search_dfa_full_gpu(
     ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
+
+int acsm_search_dfa_full_cpu(
+ 	ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
 
 int acsm_search_dfa_full(
     ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);

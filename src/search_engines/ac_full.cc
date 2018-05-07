@@ -66,8 +66,16 @@ public:
         const uint8_t* T, int n, MpseMatch match,
         void* context, int* current_state) override
     {
-		if(1){		//ADDED - Change to 0 to not run GPU matching
-			return acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
+		if(1){		//ADDED - Change to 0 to run default matching
+			
+			if(USE_GPU)
+			{
+				return acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
+			}
+			else
+			{
+				return acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);
+			}
 		}
 		else
 		{
@@ -109,6 +117,7 @@ static void acf_dtor(Mpse* p)
 {
 	int state = 0;
 	p->search(nullptr, 0, nullptr, nullptr, &state);
+	//printf("total found : %d \n", p->search(nullptr, 0, nullptr, nullptr, &state));
     delete p;
 }
 
