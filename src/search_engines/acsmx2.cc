@@ -1150,6 +1150,7 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 		}
 
 		p->default_device=p->all_devices[0];
+
 		//printf("GPUs on Odriod: " << p->all_devices.size()<<"\n";
 		//printf("Using device: "<< p->default_device.getInfo<CL_DEVICE_NAME>()<<"\n";
 
@@ -1727,15 +1728,15 @@ int acsm_search_dfa_full_gpu(
     )
 {	
     //ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
-	
     if (current_state == nullptr)
         return 0;
 
 	//First time the state machine is used, Initiate buffers
 	if(!acsm->buffSize && n > 0)
 	{
+		acsm->searchLaunched = 0;
 		acsm->currentBuffer = 1;
-		acsm->buffSize  = 1500000;
+		acsm->buffSize  = 1000000;
 		acsm->textBuffer1 = cl::Buffer(acsm->context,CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,sizeof(uint8_t)*acsm->buffSize);	
 		acsm->textBuffer2 = cl::Buffer(acsm->context,CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,sizeof(uint8_t)*acsm->buffSize);	
 		acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer1,CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
@@ -1743,11 +1744,11 @@ int acsm_search_dfa_full_gpu(
 	}
 
 	//If the buffer is not full, store the payload data in the buffer and return 0
-	if(acsm->nTotal < (acsm->buffSize-2000) && n > 0)
+	if(acsm->nTotal < (acsm->buffSize-3000) && n > 0)
 	{
 		if(acsm->currentBuffer==1){
 			memcpy(&(acsm->mapPtr[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
-			acsm->nTotal += n;	
+			acsm->nTotal += n;
 			return  0;	
 		}
 		else{
@@ -1757,7 +1758,6 @@ int acsm_search_dfa_full_gpu(
 		}
 			
 	}
-	acsm->bufferEvent->wait();	//FIX
 	//Adding current packet to the buffer
 	if(acsm->currentBuffer==1){
 		memcpy(&(acsm->mapPtr[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
@@ -1768,20 +1768,27 @@ int acsm_search_dfa_full_gpu(
 	else{
 		memcpy(&(acsm->mapPtr2[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
 		acsm->nTotal += n;	
-		acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr);
+		acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
 		acsm->kernel.setArg(2, acsm->textBuffer2);
 	}
 	//Used for flushing, return if there is no objects to flush
 	if(!(acsm->nTotal))
 		return 0;
-	
+	if(acsm->searchLaunched){
+		acsm->queue.finish();
+		//printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
+		acsm->totalFound += acsm->resultMap[0];
+		//Handle results
+		memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
+		acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
+		acsm->searchLaunched = 0;
+	}
+	clock_t timer = clock();
 	int * len = &acsm->nTotal;
 	cl_int err;
 
     // Create memory buffers
 	cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(int*), len, &err);
-	
-	//cl::Buffer matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, acsm->acsmNumStates*sizeof(int));
 	if(err != CL_SUCCESS){
 		printf("Error in buffer %d \n", err);
 	}
@@ -1795,44 +1802,39 @@ int acsm_search_dfa_full_gpu(
 	if(err != CL_SUCCESS){
 		printf("Error in setarg result %d \n", err);
 	}
-	clock_t timer = clock();
     // Run the kernel on specific ND range
-	cl::NDRange global(768);
+	cl::NDRange global(512);
     cl::NDRange local(1);
     err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
-	if(err != CL_SUCCESS){
-		printf("Error in enque %d \n", err);
-	}
-
-	//printf("the search took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
-	int * resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ, 0, acsm->acsmNumStates*sizeof(int));
-	acsm->queue.finish();
+	acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ, 0, acsm->acsmNumStates*sizeof(int));
 	
-	//printf("Found: %d matches on GPU \n",resultMap[0]);
-	acsm->totalFound += resultMap[0];
-	//Handle results
-	memset(&(resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
-	acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, resultMap);
-
-	//acsm->queue.enqueueUnmapMemObject(acsm->testBuffer, acsm->mapPtr);
-
-    acsm->nTotal = 0;
 	if(acsm->currentBuffer==1){
 		acsm->currentBuffer=2;
-		acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer1,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize, NULL, acsm->bufferEvent);
+		acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer1,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
 	}
 	else{
 		acsm->currentBuffer=1;
-		acsm->mapPtr2 = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer2,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize, NULL, acsm->bufferEvent);
+		acsm->mapPtr2 = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer2,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
 	}
+	acsm->queue.flush();
+	acsm->searchLaunched = 1;
+    acsm->nTotal = 0;
+	
 	if(!n)
 	{
-		//printf("total found CPU : %d \n", acsm->totalFoundCPU);
+		acsm->queue.finish();
+		//printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
+		acsm->totalFound += acsm->resultMap[0];
+		//Handle results
+		memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
+		acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
+		acsm->searchLaunched = 0;
         //printf("total found GPU : %d \n", acsm->totalFound);
 		acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
 		acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
 		//printf("ACSM terminates after %f \n", ((float)clock()-acsm->timer)/CLOCKS_PER_SEC);
 	}
+	//printf("Exiting GPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
     return acsm->totalFound;
 }
 
@@ -1861,7 +1863,7 @@ int acsm_search_dfa_full_cpu(
 		acsm->nTotal += n;	
 		return  0;
 	}
-
+	clock_t timer = clock();
 	memcpy(&(acsm->textBuffer[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
 	acsm->nTotal += n;
 
@@ -1883,7 +1885,7 @@ int acsm_search_dfa_full_cpu(
 	int counter = 0;
     acstate_t* ps;
     acstate_t** NextState = acsm->acsmNextState;
-	clock_t timer = clock();
+
     for (; T < Tend; T++ ) 
 	{	 
 	    ps = NextState[ state ]; 
@@ -1895,7 +1897,7 @@ int acsm_search_dfa_full_cpu(
 	    } 
     state = ps[2u + sindex]; 
 	}
-	printf("the search on CPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
+	
 
 	resultArray[0] += counter;
 
@@ -1905,6 +1907,7 @@ int acsm_search_dfa_full_cpu(
     acsm->nTotal = 0;
     acsm->totalFound += resultArray[0];
 
+	printf("the search on CPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
     //*current_state = state;
     return acsm->totalFound;
 }

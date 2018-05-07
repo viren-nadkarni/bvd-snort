@@ -158,7 +158,8 @@ struct ACSM_STRUCT2
 	int * stateArray;
 
 	int currentBuffer;
-
+	int searchLaunched;
+	int * resultMap;
 	uint8_t* mapPtr;
 	uint8_t* mapPtr2;
 
