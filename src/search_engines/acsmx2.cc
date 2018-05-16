@@ -1773,7 +1773,7 @@ int acsm_search_dfa_full_gpu(
 	}
 	if(acsm->searchLaunched){
 		acsm->queue.finish();
-		printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
+		//printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
 		acsm->totalFound += acsm->resultMap[0];
 		//Handle results
 		memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
@@ -1824,7 +1824,7 @@ int acsm_search_dfa_full_gpu(
 	if(!n)
 	{
 		acsm->queue.finish();
-		printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
+		//printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
 		acsm->totalFound += acsm->resultMap[0];
 		//Handle results
 		memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
@@ -1906,7 +1906,7 @@ int acsm_search_dfa_full_cpu(
     acsm->nTotal = 0;
     acsm->totalFound += resultArray[0];
 
-	printf("the search on CPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
+	//printf("the search on CPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
     //*current_state = state;
     return acsm->totalFound;
 }

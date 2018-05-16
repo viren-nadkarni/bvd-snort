@@ -41,7 +41,7 @@
 
 #define MAX_ALPHABET_SIZE 256
 
-#define USE_GPU 1
+#define USE_GPU 0
 
 /*
    FAIL STATE for 1,2,or 4 bytes for state transitions
