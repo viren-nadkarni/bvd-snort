@@ -68,14 +68,19 @@ public:
     {
 		if(1){		//ADDED - Change to 0 to run default matching
 			
-			if(USE_GPU)
+			if(USE_GPU == 1)
 			{
+				return acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
+			}
+			else if(USE_GPU == 2) {
 				return acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
 			}
 			else
 			{
 				return acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);
 			}
+
+		
 		}
 		else
 		{

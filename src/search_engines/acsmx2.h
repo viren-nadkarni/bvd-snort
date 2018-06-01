@@ -41,7 +41,7 @@
 
 #define MAX_ALPHABET_SIZE 256
 
-#define USE_GPU 0
+#define USE_GPU 2
 
 /*
    FAIL STATE for 1,2,or 4 bytes for state transitions
@@ -206,6 +206,9 @@ int acsm_search_dfa_banded(
     ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_full_gpu(
+    ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
+
+int acsm_search_dfa_full_gpu_singleBuff(
     ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
 
 int acsm_search_dfa_full_cpu(
