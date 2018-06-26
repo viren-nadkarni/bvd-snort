@@ -27,6 +27,8 @@
 
 #include <time.h>
 
+#include "../my_util.h"
+
 //-------------------------------------------------------------------------
 // "ac_full"
 //-------------------------------------------------------------------------
@@ -68,16 +70,23 @@ public:
     {
 		if(1){		//ADDED - Change to 0 to run default matching
 			
+      int temp_matches=0;
 			if(USE_GPU == 1)
 			{
-				return acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
+				temp_matches =  acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
+        my_total_matches += temp_matches;
+        return temp_matches;
 			}
 			else if(USE_GPU == 2) {
-				return acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
+				temp_matches = acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
+        my_total_matches += temp_matches;
+        return temp_matches;
 			}
 			else
 			{
-				return acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);
+				temp_matches = acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);
+        my_total_matches += temp_matches;
+        return temp_matches;
 			}
 
 		

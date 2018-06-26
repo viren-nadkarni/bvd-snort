@@ -58,6 +58,7 @@
 #include <iostream>     // std::cout
 #include <fstream>      // std::ifstream
 
+#include "my_util.h"
 // ADDED END -------------------------------------------------------------
 
 #ifdef UNIT_TEST
@@ -73,6 +74,7 @@
 #endif
 
 //-------------------------------------------------------------------------
+unsigned long my_total_matches = 0;
 
 static bool exit_requested = false;
 static int main_exit_code = 0;
@@ -791,7 +793,8 @@ static void handle(Pig& pig, unsigned& swine, unsigned& pending_privileges)
 static void main_loop()
 {
     unsigned swine = 0, pending_privileges = 0;
-
+    my_total_matches = 0;
+    printf("\n Main loop started\n ");
     if (SnortConfig::change_privileges())
         pending_privileges = max_pigs;
 
@@ -834,6 +837,8 @@ static void main_loop()
         }
         service_check();
     }
+    printf("\n Main loop finished\n ");
+    printf("### Total Matches reported:  %lu\n",my_total_matches);
 }
 
 static void snort_main()
@@ -962,7 +967,7 @@ int main(int argc, char* argv[])
         snort_main();
 
     Snort::cleanup();
-
+    printf("###final total matches reported: %lu\n",my_total_matches);
     return main_exit_code;
 }
 

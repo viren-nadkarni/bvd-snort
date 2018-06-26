@@ -1159,7 +1159,7 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 		p->queue = cl::CommandQueue(p->context,p->default_device);
 
 		// Read source file
-		std::ifstream sourceFile("/home/odroid/Documents/Clort/findMatches.cl");
+		std::ifstream sourceFile("findMatches.cl");
 		std::string sourceCode(
 			std::istreambuf_iterator<char>(sourceFile),
 		    (std::istreambuf_iterator<char>()));
