@@ -42,7 +42,7 @@
 #define MAX_ALPHABET_SIZE 256
 
 #define USE_GPU 2
-
+#define KERNEL_SIZE 768
 /*
    FAIL STATE for 1,2,or 4 bytes for state transitions
    Uncomment this define to use 32 bit state values
@@ -160,6 +160,7 @@ struct ACSM_STRUCT2
 	int currentBuffer;
 	int searchLaunched;
 	int * resultMap;
+	int * countsMap;
 	uint8_t* mapPtr;
 	uint8_t* mapPtr2;
 
@@ -169,6 +170,7 @@ struct ACSM_STRUCT2
 	cl::Buffer stateBuffer;
 	cl::Buffer xlatBuffer;	
 	cl::Buffer matchBuffer;
+	cl::Buffer countsBuffer;
 
 	cl::Event* bufferEvent;
 
