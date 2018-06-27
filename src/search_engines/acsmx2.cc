@@ -606,6 +606,7 @@ static void AddMatchListEntry(ACSM_STRUCT2* acsm, int state, ACSM_PATTERN2* px)
     p->next = acsm->acsmMatchList[state];
 
     acsm->acsmMatchList[state] = p;
+    acsm->acsmLenList[state] = p->n;
 }
 
 static void AddPatternStates(ACSM_STRUCT2* acsm, ACSM_PATTERN2* p)
@@ -1319,6 +1320,7 @@ static inline int _acsmCompile2(ACSM_STRUCT2* acsm)
         (ACSM_PATTERN2**)AC_MALLOC(sizeof(ACSM_PATTERN2*) * acsm->acsmMaxStates,
             ACSM2_MEMORY_TYPE__MATCHLIST);
     MEMASSERT(acsm->acsmMatchList, "_acsmCompile2");
+    acsm->acsmLenList = (int *) calloc(acsm->acsmMaxStates,sizeof(int));
 
     /* Initialize state zero as a branch */
     acsm->acsmNumStates = 0;
@@ -1464,6 +1466,7 @@ int acsmCompile2(
 	acsm->matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, acsm->acsmNumStates*sizeof(int));
 
 	acsm->countsBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, KERNEL_SIZE*sizeof(int));
+	acsm->matchLenBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, acsm->acsmMaxStates*sizeof(int), acsm->acsmLenList);
 	if(err != CL_SUCCESS)
 		printf("Error CL compile");
 	}
@@ -1809,6 +1812,7 @@ int acsm_search_dfa_full_gpu(
 	err = acsm->kernel.setArg(3, lengthBuffer);
 	err = acsm->kernel.setArg(4, acsm->matchBuffer);
 	err = acsm->kernel.setArg(5, acsm->countsBuffer);
+	err = acsm->kernel.setArg(6, acsm->matchLenBuffer);
 	if(err != CL_SUCCESS){
 		printf("Error in setarg result %d \n", err);
 	}
@@ -1907,6 +1911,7 @@ int acsm_search_dfa_full_gpu_singleBuff(
 	err = acsm->kernel.setArg(3, lengthBuffer);
 	err = acsm->kernel.setArg(4, acsm->matchBuffer);
 	err = acsm->kernel.setArg(5, acsm->countsBuffer);
+	err = acsm->kernel.setArg(6, acsm->matchLenBuffer);
 	if(err != CL_SUCCESS){
 		printf("Error in setarg %d \n", err);
 	}

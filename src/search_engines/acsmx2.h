@@ -122,6 +122,8 @@ struct ACSM_STRUCT2
     acstate_t** acsmNextState;
     const MpseAgent* agent;
 
+    int * acsmLenList;
+
     int acsmMaxStates;
     int acsmNumStates;
 
@@ -171,6 +173,7 @@ struct ACSM_STRUCT2
 	cl::Buffer xlatBuffer;	
 	cl::Buffer matchBuffer;
 	cl::Buffer countsBuffer;
+	cl::Buffer matchLenBuffer;
 
 	cl::Event* bufferEvent;
 
