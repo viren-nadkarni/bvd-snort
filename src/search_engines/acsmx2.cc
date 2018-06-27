@@ -1782,16 +1782,16 @@ int acsm_search_dfa_full_gpu(
     for (int i=0;i<KERNEL_SIZE;i++){
       c+=acsm->countsMap[i];
     }
-    acsm->totalFound += c;
+    acsm->totalFound = c;
 		memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
 		acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
 	  acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
 		acsm->searchLaunched = 0;
 	}
 	//Used for flushing, return if there is no objects to flush
-	if(!(acsm->nTotal))
-		return 0;
-	
+	if(!(acsm->nTotal)){
+    return 0;
+  }
 	clock_t timer = clock();
 	int * len = &acsm->nTotal;
 	cl_int err;
@@ -1814,8 +1814,11 @@ int acsm_search_dfa_full_gpu(
 	}
     // Run the kernel on specific ND range
 	cl::NDRange global(KERNEL_SIZE);
-    cl::NDRange local(1);
-    err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
+  cl::NDRange local(1);
+  err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
+	if(err != CL_SUCCESS){
+		printf("Error in kernel execution! %d \n", err);
+	}
 	acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ, 0, acsm->acsmNumStates*sizeof(int));
   acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(acsm->countsBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
 	
@@ -1827,7 +1830,7 @@ int acsm_search_dfa_full_gpu(
 		acsm->currentBuffer=1;
 		acsm->mapPtr2 = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer2,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
 	}
-	acsm->queue.flush();
+  acsm->queue.flush();
 	acsm->searchLaunched = 1;
   acsm->nTotal = 0;
 	
@@ -1926,7 +1929,7 @@ int acsm_search_dfa_full_gpu_singleBuff(
     c+=acsm->countsMap[i];
   }
 	//acsm->totalFound += acsm->resultMap[0];
-	acsm->totalFound += c;
+	acsm->totalFound = c;
   memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
 	//memset(&(acsm->countsMap[0]),0,KERNEL_SIZE*sizeof(int));
 	acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
@@ -1963,7 +1966,7 @@ int acsm_search_dfa_full_cpu(
 		acsm->textBuffer = new uint8_t[acsm->buffSize]{0};
 	}
 
-	if(acsm->nTotal < (acsm->buffSize-2000) && n > 0)
+	if(acsm->nTotal < (acsm->buffSize-3000) && n > 0)
 	{
 		memcpy(&(acsm->textBuffer[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
 		acsm->nTotal += n;	
@@ -2004,14 +2007,13 @@ int acsm_search_dfa_full_cpu(
     state = ps[2u + sindex]; 
 	}
 	
-
-	resultArray[0] += counter;
+  resultArray[0] += counter;
 
 
     //printf("CPU  Found: %d  matches on cpu \n",resultArray[0]);
 	//printf("executing pattern matching on cpu");
     acsm->nTotal = 0;
-    acsm->totalFound += resultArray[0];
+    acsm->totalFound = resultArray[0];
 
 	//printf("the search on CPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
     //*current_state = state;
