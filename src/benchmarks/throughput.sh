@@ -20,6 +20,11 @@ patterns=(\
 datasets=(\
 	/home/odroid/Downloads/smallFlows.pcap \
 	/home/odroid/Downloads/bigFlows.pcap \
+	/home/odroid/Downloads/testbed-12jun_1.pcap \
+	/home/odroid/Downloads/testbed-12jun_2.pcap \
+	/home/odroid/Downloads/testbed-12jun_3.pcap \
+	/home/odroid/Downloads/testbed-12jun_4.pcap \
+	/home/odroid/Downloads/testbed-13jun_1.pcap \
 	)
 
 
