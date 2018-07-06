@@ -98,3 +98,4 @@ coverage.info
 coverage.txt
 src/uncovered.txt
 build/
+*.pyc

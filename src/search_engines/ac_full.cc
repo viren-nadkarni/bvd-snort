@@ -82,6 +82,11 @@ public:
         my_total_matches += temp_matches;
         return temp_matches;
 			}
+			else if(USE_GPU == 3) {
+				temp_matches = acsm_search_dfa_full(obj, T, n, match, context, current_state);
+        my_total_matches += temp_matches;
+        return temp_matches;
+			}
 			else
 			{
 				temp_matches = acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);

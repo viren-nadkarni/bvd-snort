@@ -10,7 +10,7 @@ log_name="throughput."$(date +%Y-%m-%d_%H:%M)".log"
 config="/home/odroid/Downloads/clort.lua"
 
 echo $log_dir"/"$log_name
-versions=(0 1 2)
+versions=(0 1 2 3)
 #0-CPU, 1-GPU single, 2-GPU double
 
 patterns=(\
@@ -31,7 +31,7 @@ datasets=(\
 for ver in "${versions[@]}"
 do
 	cd $src_dir
-	sed -i -e "s/USE_GPU [0-2]/USE_GPU $ver/g" acsmx2.h
+	sed -i -e "s/USE_GPU [0-9]/USE_GPU $ver/g" acsmx2.h
 	cd $make_dir
 	make -j 8 install || exit 1
 	cd $exec_dir
