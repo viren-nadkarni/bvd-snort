@@ -15,6 +15,7 @@ def plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=False):
 
         # add some text for labels, title and axes ticks
         ax.set_ylabel('Throughput (Mbp/s)')
+        ax.set_xlabel(title)
         #ax.set_title(title)
         #ax.set_xticks(ind + width*len(labels))
         ax.set_xticks(ind + 2*width)
@@ -38,8 +39,8 @@ def plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=False):
                 c+=1
         if show_legend:
             #ax.legend((rects_set),legend,loc=2,ncol=2)
-            ax.legend((rects_set),legend, loc=4,ncol=2)
-            #lgd = ax.legend((rects_set),legend,bbox_to_anchor=(0.,1.254,1.41,0.102),loc=2,ncol=5, mode="expand", borderaxespad=0.1,markerscale=12)
+            #ax.legend((rects_set),legend, loc=4,ncol=2)
+            lgd = ax.legend((rects_set),legend,bbox_to_anchor=(0.,1.1,1.01,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
         
         ax.plot()
         return lgd
