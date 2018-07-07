@@ -14,7 +14,7 @@ def plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=False):
         baseline = groups[1]
 
         # add some text for labels, title and axes ticks
-        ax.set_ylabel('Throughput (Mbp/s)')
+        ax.set_ylabel('Throughput (Mbps)')
         ax.set_xlabel(title)
         #ax.set_title(title)
         #ax.set_xticks(ind + width*len(labels))

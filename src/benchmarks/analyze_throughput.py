@@ -5,6 +5,24 @@ from settings import *
 from plotters import plot_bars
 import subprocess
 
+def delete_ISCX_chunks(D):
+
+    #aggregate ISCX12 Full
+    for v in versions:
+        for p in patterns:
+            l = [ 'testbed-12jun_1.pcap', 'testbed-12jun_2.pcap', 'testbed-12jun_3.pcap', 'testbed-12jun_4.pcap']
+            s = 0
+            for x in l:
+                #sum times not throughput
+                s += dataset_sizes[x]/Data[(v,p,x)]
+            D[(v,pat,'testbed-12-full.pcap')] = dataset_sizes['testbed-12-full.pcap'] / s
+            #delete the chunks
+            del D[(v,pat,'testbed-12jun_2.pcap')]
+            del D[(v,pat,'testbed-12jun_3.pcap')]
+            del D[(v,pat,'testbed-12jun_4.pcap')]
+    #del dataset_names[3:6] #Warning!
+    delete_chunks()
+
 log_file = sys.argv[1]
 Data = {}
 
@@ -26,21 +44,7 @@ with open(log_file,'rb') as log:
 for x in Data:
     Data[x] = float(sum(Data[x]))/len(Data[x])
 
-#aggregate ISCX12 Full
-for v in versions:
-    for p in patterns:
-        l = [ 'testbed-12jun_1.pcap', 'testbed-12jun_2.pcap', 'testbed-12jun_3.pcap', 'testbed-12jun_4.pcap']
-        s = 0
-        for x in l:
-            #sum times not throughput
-            s += dataset_sizes[x]/Data[(v,p,x)]
-        Data[(v,pat,'testbed-12-full.pcap')] = dataset_sizes['testbed-12-full.pcap'] / s
-        #delete the chunks
-        del Data[(v,pat,'testbed-12jun_2.pcap')]
-        del Data[(v,pat,'testbed-12jun_3.pcap')]
-        del Data[(v,pat,'testbed-12jun_4.pcap')]
-#del dataset_names[3:6] #Warning!
-delete_chunks()
+delete_ISCX_chunks(Data)
 
 #turn to Mbps
 for x in Data:
@@ -55,17 +59,17 @@ print "---------"
 (x2,y2) =  get_datasets(Data,versions[1],patterns[0])
 (x3,y3) =  get_datasets(Data,versions[2],patterns[0])
 (x4,y4) =  get_datasets(Data,versions[3],patterns[0])
-#plt.plot(range(len(x1)),y1,label="CPU")
-#plt.plot(range(len(x2)),y2,label="GPU single")
-#plt.plot(range(len(x3)),y3,label="GPU double")
-#plt.plot(range(len(x4)),y4,label="CPU original")
-#plt.legend()
-#plt.show()
+
+#(x1,y1) =  get_patterns(Data,versions[0],datasets[2])
+#(x2,y2) =  get_patterns(Data,versions[1],datasets[2])
+#(x3,y3) =  get_patterns(Data,versions[2],datasets[2])
+#(x4,y4) =  get_patterns(Data,versions[3],datasets[2])
 
 groups = [y1,y2,y3,y4]
 title = 'Data sets'
-labels = [0,1,2,3,4,5,6]
 labels = dataset_names
+#title = 'Number of pattenrs'
+#labels = ['Default (829)', 'Intermediate (2000)', 'Full (3370)']
 legend = names
 to_compare = []
 stdz = [[0]*len(y1)]*4
@@ -77,6 +81,7 @@ fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 lgd = plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=True)
 
 name="/home/odroid/snort_GPU_system_logs/plots/overall_throughput.pdf"
+#name="/home/odroid/snort_GPU_system_logs/plots/patterns_ISCX_131.pdf"
 plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
 subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
 subprocess.Popen("pdfcrop")

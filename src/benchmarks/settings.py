@@ -4,7 +4,8 @@ names = ['Snort original',\
          'CLort single buffer (GPU)',\
          'CLort double buffer (GPU)',\
         ]
-datasets = ['smallFlows.pcap',\
+datasets = [\
+            'smallFlows.pcap',\
             'bigFlows.pcap',\
             'testbed-13jun_1.pcap',\
             'testbed-12jun_1.pcap',\
@@ -13,7 +14,8 @@ datasets = ['smallFlows.pcap',\
             'testbed-12jun_4.pcap',\
             'testbed-12-full.pcap',\
             ]
-dataset_names = ['smallFlows',\
+dataset_names = [\
+                'smallFlows',\
                 'bigFlows',\
                 'ISCX12 121',\
                 'ISCX12 131',\
@@ -22,15 +24,22 @@ dataset_names = ['smallFlows',\
                 'ISCX12 131-4',\
                 'ISCX12 131-full',\
                 ]
-dataset_sizes = {'smallFlows.pcap': 9444731,\
+dataset_sizes = {\
+                 'smallFlows.pcap': 9444731,\
                  'bigFlows.pcap': 368083648,\
                  'testbed-13jun_1.pcap': 665009856,\
                  'testbed-12jun_1.pcap': 1087244065,\
                  'testbed-12jun_2.pcap': 1180336181,\
                  'testbed-12jun_3.pcap': 1178561403,\
                  'testbed-12jun_4.pcap': 1085944370,\
-                 'testbed-12-full.pcap': 4532086019}
-patterns = ['snort3-community.rules']
+                 'testbed-12-full.pcap': 4532086019,\
+                 }
+patterns = [\
+            'snort3-community.rules',\
+            #'snort3-community_default_all_content.rules',\
+            #'snort3-community_medium_all_content.rules',\
+            #'snort3-community_full_all_content.rules',\
+            ]
 
 colors = ['lightsalmon','skyblue','steelblue','mediumseagreen','lightgreen','0.30','0.70','m']
 hatches = ['/','\\\\','x','\\','//']
