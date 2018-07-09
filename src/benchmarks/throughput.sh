@@ -14,19 +14,19 @@ versions=(0 1 2 3)
 #0-CPU, 1-GPU single, 2-GPU double
 
 patterns=(\
-	#/home/odroid/Downloads/snort3-community-rules/snort3-community.rules \
-	/home/odroid/Downloads/snort3-community-rules/snort3-community_default_all_content.rules \
-	/home/odroid/Downloads/snort3-community-rules/snort3-community_medium_all_content.rules \
-	/home/odroid/Downloads/snort3-community-rules/snort3-community_full_all_content.rules \
+	/home/odroid/Downloads/snort3-community-rules/snort3-community.rules \
+	#/home/odroid/Downloads/snort3-community-rules/snort3-community_default_all_content.rules \
+	#/home/odroid/Downloads/snort3-community-rules/snort3-community_medium_all_content.rules \
+	#/home/odroid/Downloads/snort3-community-rules/snort3-community_full_all_content.rules \
 	)
 
 datasets=(\
-	#/home/odroid/Downloads/smallFlows.pcap \
+	/home/odroid/Downloads/smallFlows.pcap \
 	/home/odroid/Downloads/bigFlows.pcap \
 	/home/odroid/Downloads/testbed-12jun_1.pcap \
-	#/home/odroid/Downloads/testbed-12jun_2.pcap \
-	#/home/odroid/Downloads/testbed-12jun_3.pcap \
-	#/home/odroid/Downloads/testbed-12jun_4.pcap \
+	/home/odroid/Downloads/testbed-12jun_2.pcap \
+	/home/odroid/Downloads/testbed-12jun_3.pcap \
+	/home/odroid/Downloads/testbed-12jun_4.pcap \
 	/home/odroid/Downloads/testbed-13jun_1.pcap \
 	)
 

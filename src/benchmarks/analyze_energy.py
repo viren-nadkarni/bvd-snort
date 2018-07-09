@@ -5,7 +5,8 @@ from settings import *
 from plotters import plot_bars
 import subprocess
 
-
+colors = ['lightsalmon','skyblue','steelblue','mediumseagreen','lightgreen','0.30','0.70','m']
+hatches = ['/','\\\\','x','\\','//']
 
 versions  = ['3_energy','0_energy','1_energy','2_energy']
 
@@ -37,27 +38,65 @@ for name in versions:
             Data[name]["mem"]= mem
 
 legend = ['Snort original', 'Snort modified (CPU)','CLort single buffer (GPU)','CLort double buffer (GPU)']
-for name in versions:
-    plt.plot(Data[name]["a15"])
-plt.legend(legend)
-plt.title('a15')
+FIG_SIZE=(10,5)
+
+#CPU -big (15)
+fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
+for i,name in enumerate(versions):
+    ax.plot(Data[name]["a15"],color=colors[i])
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+ax.set_xlabel("Time (ms)")
+ax.set_ylabel("Power Consumption (Watt)")
+ax.set_ylim([0.5,3.5])
+
+name="/home/odroid/snort_GPU_system_logs/plots/energy_CPU.pdf"
+plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
+subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
+subprocess.Popen("pdfcrop")
 plt.show()
 
-for name in versions:
-    plt.plot(Data[name]["a7"])
-plt.legend(legend)
-plt.title('a7')
+#CPU-LITTLE (a7)
+fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
+for i,name in enumerate(versions):
+    ax.plot(Data[name]["a7"],color=colors[i])
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+ax.set_xlabel("Time (ms)")
+ax.set_ylabel("Power Consumption (Watt)")
+
+name="/home/odroid/snort_GPU_system_logs/plots/energy_CPU_little.pdf"
+plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
+subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
+subprocess.Popen("pdfcrop")
 plt.show()
 
-for name in versions:
-    plt.plot(Data[name]["gpu"])
-plt.legend(legend)
-plt.title('gpu')
+
+
+#GPU
+fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
+for i,name in enumerate(versions):
+    ax.plot(Data[name]["gpu"],color=colors[i])
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+ax.set_xlabel("Time (ms)")
+ax.set_ylabel("Power Consumption (Watt)")
+ax.set_ylim([0.1,0.6])
+
+name="/home/odroid/snort_GPU_system_logs/plots/energy_GPU.pdf"
+plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
+subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
+subprocess.Popen("pdfcrop")
 plt.show()
 
-for name in versions:
-    plt.plot(Data[name]["mem"])
-plt.legend(legend)
-plt.title('memory')
-plt.show()
+#Memmory
+fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
+for i,name in enumerate(versions):
+    ax.plot(Data[name]["mem"],color=colors[i])
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+ax.set_xlabel("Time (ms)")
+ax.set_ylabel("Power Consumption (Watt)")
+ax.set_ylim([0.02,0.08])
 
+name="/home/odroid/snort_GPU_system_logs/plots/energy_Memmory.pdf"
+plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
+subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
+subprocess.Popen("pdfcrop")
+plt.show()
