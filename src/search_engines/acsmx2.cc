@@ -1786,8 +1786,8 @@ int acsm_search_dfa_full_gpu(
       c+=acsm->countsMap[i];
     }
     acsm->totalFound = c;
-		memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
-		acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
+		//memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
+		//acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
 	  acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
 		acsm->searchLaunched = 0;
 	}
@@ -1823,7 +1823,7 @@ int acsm_search_dfa_full_gpu(
 	if(err != CL_SUCCESS){
 		printf("Error in kernel execution! %d \n", err);
 	}
-	acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ, 0, acsm->acsmNumStates*sizeof(int));
+	//acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ, 0, acsm->acsmNumStates*sizeof(int));
   acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(acsm->countsBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
 	
 	if(acsm->currentBuffer==1){
@@ -1849,8 +1849,8 @@ int acsm_search_dfa_full_gpu(
     }
 		acsm->totalFound += c;
 		//Handle results
-		memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
-		acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
+		//memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
+		//acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
 		acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
 		acsm->searchLaunched = 0;
 		acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
@@ -1922,7 +1922,7 @@ int acsm_search_dfa_full_gpu_singleBuff(
 	if(err != CL_SUCCESS){
 		printf("Error in kernel execution!! %d \n", err);
 	}
-  acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, acsm->acsmNumStates*sizeof(int));
+  //acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, acsm->acsmNumStates*sizeof(int));
   acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(acsm->countsBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
 	acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer1,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
 	acsm->queue.finish();
@@ -1935,15 +1935,15 @@ int acsm_search_dfa_full_gpu_singleBuff(
   }
 	//acsm->totalFound += acsm->resultMap[0];
 	acsm->totalFound = c;
-  memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
+  //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
 	//memset(&(acsm->countsMap[0]),0,KERNEL_SIZE*sizeof(int));
-	acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
+	//acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
 	acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
   acsm->nTotal = 0;
 	
 	if(!n)	//When n is 0 (flush) unmap objects since they will not be used more
 	{
-		acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
+		//acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
 		acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
 		acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
 	}
@@ -1987,7 +1987,7 @@ int acsm_search_dfa_full_cpu(
 
     uint8_t* T = acsm->textBuffer;
     Tend = T + acsm->nTotal;
-    int * resultArray = new int[acsm->acsmNumStates]{0};
+    //int * resultArray = new int[acsm->acsmNumStates]{0};
 
     /*-------end added----------*/
 
@@ -2007,18 +2007,19 @@ int acsm_search_dfa_full_cpu(
 		if (ps[1]) 
 	    { 
 	    	counter++;
-	    	resultArray[state] +=1; 
+	    	//resultArray[state] +=1; 
 	    } 
     state = ps[2u + sindex]; 
 	}
 	
-  resultArray[0] += counter;
+  //resultArray[0] += counter;
 
 
     //printf("CPU  Found: %d  matches on cpu \n",resultArray[0]);
 	//printf("executing pattern matching on cpu");
     acsm->nTotal = 0;
-    acsm->totalFound = resultArray[0];
+    //acsm->totalFound = resultArray[0];
+    acsm->totalFound = counter;
 
 	//printf("the search on CPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
     //*current_state = state;
