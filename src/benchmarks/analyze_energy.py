@@ -5,7 +5,8 @@ from settings import *
 from plotters import plot_bars
 import subprocess
 
-colors = ['lightsalmon','skyblue','steelblue','mediumseagreen','lightgreen','0.30','0.70','m']
+#colors = ['lightsalmon','skyblue','steelblue','mediumseagreen','lightgreen','0.30','0.70','m']
+colors = ['coral','skyblue','steelblue','mediumseagreen','forestgreen','0.30','0.70','m']
 hatches = ['/','\\\\','x','\\','//']
 
 versions  = ['3_energy','0_energy','1_energy','2_energy']
@@ -32,10 +33,10 @@ for name in versions:
             gpu.append(float(row.split(',')[2]))
             mem.append(float(row.split(',')[3]))
             
-            Data[name]["a15"] = a15
-            Data[name]["a7"]  = a7 
-            Data[name]["gpu"]  = gpu
-            Data[name]["mem"]= mem
+            Data[name]["a15"] = a15[100:]
+            Data[name]["a7"]  = a7[100:]
+            Data[name]["gpu"]  = gpu[100:]
+            Data[name]["mem"]= mem[100:]
 
 legend = ['Snort original', 'Snort modified (CPU)','CLort single buffer (GPU)','CLort double buffer (GPU)']
 FIG_SIZE=(10,5)
@@ -100,3 +101,34 @@ plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
 subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
 subprocess.Popen("pdfcrop")
 plt.show()
+
+for name in versions:
+    Data[name]["total"] = []
+    for i in range(len(Data[name]["gpu"])):
+        Data[name]["total"].append( Data[name]["gpu"][i]+Data[name]['a15'][i]+Data[name]['a7'][i]+Data[name]['mem'][i] )
+
+
+
+#Total
+fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
+for i,name in enumerate(versions):
+    ax.plot(Data[name]["total"],color=colors[i])
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+ax.set_xlabel("Time (ms)")
+ax.set_ylabel("Power Consumption (Watt)")
+ax.set_ylim([0.5,3.5])
+
+name="/home/odroid/snort_GPU_system_logs/plots/energy_Total.pdf"
+plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
+subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
+subprocess.Popen("pdfcrop")
+plt.show()
+
+print "AVGS"
+for name in versions:
+    print sum(Data[name]['total'])/float(len(Data[name]['total']))
+
+
+print "SUMS"
+for name in versions:
+    print sum(Data[name]['total'])
