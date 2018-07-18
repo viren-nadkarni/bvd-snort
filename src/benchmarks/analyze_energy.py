@@ -4,6 +4,7 @@ from getters import get_versions,get_datasets,get_patterns
 from settings import *
 from plotters import plot_bars
 import subprocess
+import numpy as np
 
 #colors = ['lightsalmon','skyblue','steelblue','mediumseagreen','lightgreen','0.30','0.70','m']
 colors = ['coral','skyblue','steelblue','mediumseagreen','forestgreen','0.30','0.70','m']
@@ -41,12 +42,15 @@ for name in versions:
 legend = ['Snort original', 'Snort modified (CPU)','CLort single buffer (GPU)','CLort double buffer (GPU)']
 FIG_SIZE=(10,5)
 
+time = range(0,len(Data[name]["a15"]),10)
+
 #CPU -big (15)
 fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
-    ax.plot(Data[name]["a15"],color=colors[i])
+    time = np.linspace(0,len(Data[name]["a15"])/100.0,len(Data[name]["a15"]))
+    ax.plot(time,Data[name]["a15"],color=colors[i])
 lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
-ax.set_xlabel("Time (ms)")
+ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 ax.set_ylim([0.5,3.5])
 
@@ -59,9 +63,10 @@ plt.show()
 #CPU-LITTLE (a7)
 fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
-    ax.plot(Data[name]["a7"],color=colors[i])
+    time = np.linspace(0,len(Data[name]["a7"])/100.0,len(Data[name]["a7"]))
+    ax.plot(time,Data[name]["a7"],color=colors[i])
 lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
-ax.set_xlabel("Time (ms)")
+ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 
 name="/home/odroid/snort_GPU_system_logs/plots/energy_CPU_little.pdf"
@@ -75,9 +80,10 @@ plt.show()
 #GPU
 fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
-    ax.plot(Data[name]["gpu"],color=colors[i])
+    time = np.linspace(0,len(Data[name]["gpu"])/100.0,len(Data[name]["gpu"]))
+    ax.plot(time,Data[name]["gpu"],color=colors[i])
 lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
-ax.set_xlabel("Time (ms)")
+ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 ax.set_ylim([0.1,0.6])
 
@@ -90,9 +96,10 @@ plt.show()
 #Memmory
 fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
-    ax.plot(Data[name]["mem"],color=colors[i])
+    time = np.linspace(0,len(Data[name]["mem"])/100.0,len(Data[name]["mem"]))
+    ax.plot(time,Data[name]["mem"],color=colors[i])
 lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
-ax.set_xlabel("Time (ms)")
+ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 ax.set_ylim([0.02,0.08])
 
@@ -112,9 +119,10 @@ for name in versions:
 #Total
 fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
-    ax.plot(Data[name]["total"],color=colors[i])
+    time = np.linspace(0,len(Data[name]["total"])/100.0,len(Data[name]["total"]))
+    ax.plot(time,Data[name]["total"],color=colors[i])
 lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
-ax.set_xlabel("Time (ms)")
+ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 ax.set_ylim([0.5,3.5])
 
@@ -124,11 +132,33 @@ subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
 subprocess.Popen("pdfcrop")
 plt.show()
 
-print "AVGS"
+print "AVGS power (Watt)"
 for name in versions:
-    print sum(Data[name]['total'])/float(len(Data[name]['total']))
+    s = 0
+    min_t = 100000
+    max_t = 0
+    for i in range(len(Data[name]['total'])):
+        if Data[name]['total'][i]>2.0:
+            s += Data[name]['total'][i]
+            if (i>max_t):
+                max_t = i
+            if (i<min_t):
+                min_t = i
+        #print sum(Data[name]['total'])/float(len(Data[name]['total']))
+    print float(s)/(max_t - min_t)
 
-
-print "SUMS"
+print "Energy (Joule)"
 for name in versions:
-    print sum(Data[name]['total'])
+    s = 0
+    min_t = 100000
+    max_t = 0
+    for i in range(len(Data[name]['total'])):
+        if Data[name]['total'][i]>2.0:
+            s += Data[name]['total'][i]
+            if (i>max_t):
+                max_t = i
+            if (i<min_t):
+                min_t = i
+        #print sum(Data[name]['total'])/float(len(Data[name]['total']))
+    print float(s)/100.0 #because max_t, min_t is sec/100
+
