@@ -60,7 +60,7 @@ for x in Data:
 for x in Data:
     Data[x] = float(sum(Data[x]))/len(Data[x])
 
-delete_ISCX_chunks(Data,Dev)
+#delete_ISCX_chunks(Data,Dev)
 
 
 for x in Data:
@@ -69,57 +69,39 @@ print "---------"
 
 
 
-(x1,y1) =  get_datasets(Data,versions[0],patterns[0])
-(x2,y2) =  get_datasets(Data,versions[1],patterns[0])
-(x3,y3) =  get_datasets(Data,versions[2],patterns[0])
-(x4,y4) =  get_datasets(Data,versions[3],patterns[0])
 
+(x1,y1) =  get_patterns(Data,versions[0],datasets[3])
+(x2,y2) =  get_patterns(Data,versions[1],datasets[3])
+(x3,y3) =  get_patterns(Data,versions[2],datasets[3])
+(x4,y4) =  get_patterns(Data,versions[3],datasets[3])
 
-(s1,z1) =  get_datasets(Dev,versions[0],patterns[0])
-(s2,z2) =  get_datasets(Dev,versions[1],patterns[0])
-(s3,z3) =  get_datasets(Dev,versions[2],patterns[0])
-(s4,z4) =  get_datasets(Dev,versions[3],patterns[0])
-
-#(x1,y1) =  get_patterns(Data,versions[0],datasets[2])
-#(x2,y2) =  get_patterns(Data,versions[1],datasets[2])
-#(x3,y3) =  get_patterns(Data,versions[2],datasets[2])
-#(x4,y4) =  get_patterns(Data,versions[3],datasets[2])
+(s1,z1) =  get_patterns(Dev,versions[0],datasets[3])
+(s2,z2) =  get_patterns(Dev,versions[1],datasets[2])
+(s3,z3) =  get_patterns(Dev,versions[2],datasets[3])
+(s4,z4) =  get_patterns(Dev,versions[3],datasets[3])
 
 groups = [y1,y2,y3,y4]
-title = 'Data sets'
-labels = dataset_names
-labels = [\
-		'smallFlows',\
-                'bigFlows',\
-                'ISCX12 131',\
-                'ISCX12 121',\
-                'ISCX12 121-full',\
-	]
-#title = 'Number of pattenrs'
-#labels = ['Default (829)', 'Intermediate (2000)', 'Full (3370)']
+title = 'Number of pattenrs'
+labels = ['Default (829)', 'Intermediate (2000)', 'Full (3370)']
 legend = names
 to_compare = []
-#stdz = [[0]*len(y1)]*4
-stdz = [z1,z2,z3,z4] 
+stdz = [[0]*len(y1)]*4
+#stdz = [z1,z2,z3,z4] 
 print stdz
 print groups
 
-FIG_SIZE=(10,3)
+FIG_SIZE=(8,3)
 fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 lgd = plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=True)
 
-name="/home/odroid/snort_GPU_system_logs/plots/overall_throughput.pdf"
-#name="/home/odroid/snort_GPU_system_logs/plots/patterns_ISCX_131.pdf"
+#name="/home/odroid/snort_GPU_system_logs/plots/overall_throughput.pdf"
+name="/home/odroid/snort_GPU_system_logs/plots/patterns_ISCX_131.pdf"
 plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
 subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
 subprocess.Popen("pdfcrop")
 
 plt.show()
 
-print "Double buff vs CPU modified"
+print "Patterns: Double buff vs CPU modified"
 for i in range(len(y2)):
-    print float(y4[i])/y2[i]
-
-print "Double buff vs single buff"
-for i in range(len(y3)):
-    print float(y4[i])/y3[i]
+        print float(y4[i])/y2[i]
