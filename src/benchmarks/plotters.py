@@ -40,7 +40,8 @@ def plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=False):
         if show_legend:
             #ax.legend((rects_set),legend,loc=2,ncol=2)
             #ax.legend((rects_set),legend, loc=4,ncol=2)
-            lgd = ax.legend((rects_set),legend,bbox_to_anchor=(0.,1.1,1.01,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+            #lgd = ax.legend((rects_set),legend,bbox_to_anchor=(0.,1.1,1.01,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+            lgd = ax.legend((rects_set),legend,bbox_to_anchor=(0.,1.2,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
         
         ax.plot()
         return lgd
