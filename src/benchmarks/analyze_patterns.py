@@ -76,24 +76,24 @@ print "---------"
 (x4,y4) =  get_patterns(Data,versions[3],datasets[3])
 
 (s1,z1) =  get_patterns(Dev,versions[0],datasets[3])
-(s2,z2) =  get_patterns(Dev,versions[1],datasets[2])
+(s2,z2) =  get_patterns(Dev,versions[1],datasets[3])
 (s3,z3) =  get_patterns(Dev,versions[2],datasets[3])
 (s4,z4) =  get_patterns(Dev,versions[3],datasets[3])
 
 groups = [y1,y2,y3,y4]
-title = 'Number of pattenrs'
+title = 'Number of patterns'
 labels = ['Default (829)', 'Intermediate (2000)', 'Full (3370)']
 legend = names
 to_compare = []
-stdz = [[0]*len(y1)]*4
-#stdz = [z1,z2,z3,z4] 
+#stdz = [[0]*len(y1)]*4
+stdz = [z1,z2,z3,z4] 
 print stdz
 print groups
 
 FIG_SIZE=(8,3)
 fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 lgd = plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=True)
-
+ax.grid()
 #name="/home/odroid/snort_GPU_system_logs/plots/overall_throughput.pdf"
 name="/home/odroid/snort_GPU_system_logs/plots/patterns_ISCX_131.pdf"
 plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
