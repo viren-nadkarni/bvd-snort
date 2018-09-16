@@ -81,7 +81,7 @@ print "---------"
 (s4,z4) =  get_patterns(Dev,versions[3],datasets[3])
 
 groups = [y1,y2,y3,y4]
-title = 'Number of patterns'
+title = 'Number of rules'
 labels = ['Default (829)', 'Intermediate (2000)', 'Full (3370)']
 legend = names
 to_compare = []
@@ -90,13 +90,14 @@ stdz = [z1,z2,z3,z4]
 print stdz
 print groups
 
-FIG_SIZE=(8,3)
+FIG_SIZE=(10,3)
 fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
-lgd = plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=True)
+lgd = plot_bars(ax,groups,labels,title,legend,to_compare,stdz,show_legend=False)
 ax.grid()
 #name="/home/odroid/snort_GPU_system_logs/plots/overall_throughput.pdf"
 name="/home/odroid/snort_GPU_system_logs/plots/patterns_ISCX_131.pdf"
-plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
+#plt.savefig(name,bbox_extra_artists=(lgd,), bbox_inches = "tight")
+plt.savefig(name, bbox_inches = "tight")
 subprocess.Popen("pdfcrop "+name+" "+name,shell=True)
 subprocess.Popen("pdfcrop")
 

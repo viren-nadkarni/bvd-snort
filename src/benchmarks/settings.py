@@ -35,10 +35,10 @@ dataset_sizes = {\
                  'testbed-12-full.pcap': 4532086019,\
                  }
 patterns = [\
-            'snort3-community.rules',\
-            #'snort3-community_default_all_content.rules',\
-            #'snort3-community_medium_all_content.rules',\
-            #'snort3-community_full_all_content.rules',\
+            #'snort3-community.rules',\
+            'snort3-community_default_all_content.rules',\
+            'snort3-community_medium_all_content.rules',\
+            'snort3-community_full_all_content.rules',\
             ]
 
 colors = ['lightsalmon','skyblue','steelblue','mediumseagreen','lightgreen','0.30','0.70','m']
