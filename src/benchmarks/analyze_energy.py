@@ -40,7 +40,7 @@ for name in versions:
             Data[name]["mem"]= mem[100:]
 
 legend = ['Snort original', 'Snort modified (CPU)','CLort single buffer (GPU)','CLort double buffer (GPU)']
-FIG_SIZE=(10,5)
+FIG_SIZE=(8,4)
 
 time = range(0,len(Data[name]["a15"]),10)
 
@@ -49,7 +49,7 @@ fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
     time = np.linspace(0,len(Data[name]["a15"])/100.0,len(Data[name]["a15"]))
     ax.plot(time,Data[name]["a15"],color=colors[i])
-lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.15,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 ax.set_ylim([0.5,3.5])
@@ -65,7 +65,7 @@ fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
     time = np.linspace(0,len(Data[name]["a7"])/100.0,len(Data[name]["a7"]))
     ax.plot(time,Data[name]["a7"],color=colors[i])
-lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.15,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 
@@ -82,7 +82,7 @@ fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
     time = np.linspace(0,len(Data[name]["gpu"])/100.0,len(Data[name]["gpu"]))
     ax.plot(time,Data[name]["gpu"],color=colors[i])
-lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.15,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 ax.set_ylim([0.1,0.6])
@@ -98,7 +98,7 @@ fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
     time = np.linspace(0,len(Data[name]["mem"])/100.0,len(Data[name]["mem"]))
     ax.plot(time,Data[name]["mem"],color=colors[i])
-lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.15,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 ax.set_ylim([0.02,0.08])
@@ -121,7 +121,7 @@ fig , ax = plt.subplots(1,1,figsize=FIG_SIZE)
 for i,name in enumerate(versions):
     time = np.linspace(0,len(Data[name]["total"])/100.0,len(Data[name]["total"]))
     ax.plot(time,Data[name]["total"],color=colors[i])
-lgd = ax.legend(legend,bbox_to_anchor=(0.,1.1,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
+lgd = ax.legend(legend,bbox_to_anchor=(0.,1.15,1.0,0.102),loc=2,ncol=2, mode="expand", borderaxespad=0.1,markerscale=12)
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Power Consumption (Watt)")
 ax.set_ylim([0.5,3.5])
