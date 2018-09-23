@@ -99,3 +99,6 @@ coverage.txt
 src/uncovered.txt
 build/
 *.pyc
+
+*CMakeFiles
+*cmake_install.cmake
