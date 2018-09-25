@@ -1,9 +1,10 @@
 #!/bin/bash
 
+set -euxo pipefail
 
-src_dir="/home/odroid/snort_GPU_system/Master/src/search_engines"
-make_dir="/home/odroid/snort_GPU_system/Master/build"
-exec_dir="/home/odroid/snort_GPU_system_build"
+src_dir="./src/search_engines"
+make_dir="./build"
+exec_dir="."
 monitor_dir="/home/odroid/snort_simon_benchmarks/EnergyMonitor/build"
 
 log_dir="/home/odroid/snort_GPU_system_logs"
