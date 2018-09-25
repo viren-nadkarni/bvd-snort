@@ -31,12 +31,9 @@ datasets=(\
 
 for ver in "${versions[@]}"
 do
-	cd $src_dir
-	sed -i -e "s/USE_GPU [0-9]/USE_GPU $ver/g" acsmx2.h
+	sed -i -e "s/USE_GPU [0-9]/USE_GPU $ver/g" $src_dir/acsmx2.h
 	cd $make_dir
 	make -j 8 install || exit 1
-
-	
 
 	for data in "${datasets[@]}"
 	do
