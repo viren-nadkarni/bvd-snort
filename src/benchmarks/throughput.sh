@@ -7,7 +7,7 @@ exec_dir="/home/odroid/snort_GPU_system_build"
 
 log_dir="/home/odroid/snort_GPU_system_logs"
 log_name="throughput."$(date +%Y-%m-%d_%H:%M)".log"
-config="/home/odroid/Downloads/clort.lua"
+config="clort.lua"
 
 echo $log_dir"/"$log_name
 versions=(0 1 2 3)

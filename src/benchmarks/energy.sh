@@ -8,7 +8,7 @@ monitor_dir="/home/odroid/snort_simon_benchmarks/EnergyMonitor/build"
 
 log_dir="/home/odroid/snort_GPU_system_logs"
 log_name="energy."$(date +%Y-%m-%d_%H:%M)".log"
-config="/home/odroid/Downloads/clort.lua"
+config="clort.lua"
 
 versions=(0 1 2 3)
 #0-CPU, 1-GPU single, 2-GPU double
