@@ -60,6 +60,8 @@ add_subdirectory (daqs)
 include (cmake/packaging_data.cmake)
 include (cmake/create_pkg_config.cmake)
 
+configure_file(findMatches.cl /usr/local/src COPYONLY)
+
 # uninstall target
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"

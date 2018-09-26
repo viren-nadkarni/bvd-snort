@@ -2,6 +2,6 @@
 
 set -euxo pipefail
 
-./configure_cmake.sh --prefix=$build_path
+sudo ./configure_cmake.sh --prefix=$build_path
 cd build
 make -j $(nproc) install

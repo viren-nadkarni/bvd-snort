@@ -28,14 +28,34 @@ bash build.sh
 
 ## Running
 
-First set up the environment:
+Confirm that OpenCL is detected by the system with `clinfo`. If output is something like:
+
+```
+$ clinfo
+Number of platforms                               0
+```
+
+then setup Mali framebuffer driver and use the vendor ICD file:
+
+```
+sudo apt install mali-fbdev
+sudo mkdir -p /etc/OpenCL/vendors
+sudo bash -c 'echo "/usr/lib/arm-linux-gnueabihf/mali-egl/libOpenCL.so" > /etc/OpenCL/vendors/armocl.icd'
+```
+
+To run snort:
 
 ```shell
 export LUA_PATH=$build_path/include/snort/lua/\?.lua\;\;
 export SNORT_LUA_PATH=$build_path/etc/snort
-```
 
-* help examples:
+$build_path/bin/snort -c ~/bvd-snort/clort.lua -r ~/testbed-12jun_1.pcap
+```
+Use appropriate path for the pcap file
+
+### Other usage examples
+
+* help:
 
     ```shell
     $build_path/bin/snort --help

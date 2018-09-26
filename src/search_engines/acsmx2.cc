@@ -1131,23 +1131,21 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
         p->acsmSparseMaxZcnt = 10;
         p->dfa = false;
 
-		// ADDED -----------------------------------------------------------------
-
-		//get default plattform
+		// get default platform
     	cl::Platform::get(&(p->all_platforms));
+
 		if(p->all_platforms.size()==0){
-        	printf("No platforms \n");
+        	printf("No platforms detected\n");
     	}
 
 		p->default_platform=p->all_platforms[0];
 
 		//get default device of the default platform, also print how many found
 		
-		
 		p->default_platform.getDevices(CL_DEVICE_TYPE_GPU, &(p->all_devices));
 
 		if(p->all_devices.size()==0){
-		   printf("No devices \n");
+		   printf("No devices detected\n");
 		}
 
 		p->default_device=p->all_devices[0];
@@ -1160,10 +1158,11 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 		p->queue = cl::CommandQueue(p->context,p->default_device);
 
 		// Read source file
-		std::ifstream sourceFile("/home/odroid/snort_GPU_system/Master/src/search_engines/findMatches.cl");
+		std::ifstream sourceFile("/usr/local/src/findMatches.cl");
 		std::string sourceCode(
 			std::istreambuf_iterator<char>(sourceFile),
-		    (std::istreambuf_iterator<char>()));
+		    (std::istreambuf_iterator<char>())
+        );
 		
 		p->sources.push_back({sourceCode.c_str(),sourceCode.length()}); //curly brackets needed around arguments?
 
@@ -1171,8 +1170,9 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 
 		p->program = cl::Program(p->context,p->sources);
 		if(p->program.build({p->default_device})!=CL_SUCCESS){
-		    printf(" Error building");
+		    printf("Error building cl");
 			//<<p->program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(p->default_device)<<"\n";		    
+            std::exit(1);
 		}
 
 		p->kernel = cl::Kernel(p->program, "findMatches");
@@ -1469,6 +1469,7 @@ int acsmCompile2(
 	acsm->matchLenBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, acsm->acsmMaxStates*sizeof(int), acsm->acsmLenList);
 	if(err != CL_SUCCESS)
 		printf("Error CL compile");
+        std::exit(1);
 	}
 	return 0;
 
