@@ -287,16 +287,15 @@ ACSM_STRUCT* acsmNew(const MpseAgent* agent)
     {
         p->agent = agent;
 
-        // ADDED -----------------------------------------------------------------
-        
         std::ofstream out("/home/odroid/Documents/Clort/se_init_out.txt");
         std::streambuf *coutbuf = std::cout.rdbuf();
         std::cout.rdbuf(out.rdbuf());
 
-        //get default plattform
+        // get default platform
         cl::Platform::get(&(p->all_platforms));
         if(p->all_platforms.size()==0){
-            std::cout<<"No platforms \n";
+            std::cout<<"No cl platforms\n";
+            std::exit(1);
         }
 
         p->default_platform=p->all_platforms[0];
