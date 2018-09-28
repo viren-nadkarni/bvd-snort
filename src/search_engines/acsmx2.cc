@@ -1170,7 +1170,7 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 
 		p->program = cl::Program(p->context,p->sources);
 		if(p->program.build({p->default_device})!=CL_SUCCESS){
-		    printf("Error building cl");
+		    printf("Error CL building");
 			//<<p->program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(p->default_device)<<"\n";		    
             std::exit(1);
 		}
@@ -1429,47 +1429,50 @@ static inline int _acsmCompile2(ACSM_STRUCT2* acsm)
     return 0;
 }
 
-int acsmCompile2(
-    SnortConfig* sc, ACSM_STRUCT2* acsm)
-{
+int acsmCompile2(SnortConfig* sc, ACSM_STRUCT2* acsm) {
 	acsmCompressStates(acsm, 0);
-    if ( int rval = _acsmCompile2(acsm) )
+    
+    if(int rval = _acsmCompile2(acsm))
         return rval;
 
-    if ( acsm->agent )
+    if(acsm->agent)
         acsmBuildMatchStateTrees2(sc, acsm);
 
 	acsm->nTotal = 0;
 	acsm->totalFound = 0;
-	acsm->buffSize  = 0;
+	acsm->buffSize = 0;
 	acsm->resultArray = new int [acsm->acsmNumStates]{};
 	
 	if(USE_GPU) {
-	//printf("Build list array with states: %d \n", acsm->acsmNumStates);
-    acstate_t* p;
-    acstate_t** NextState = acsm->acsmNextState;
-	acsm->stateArray = new int [acsm->acsmNumStates*258];
-	for (int i=0; i<acsm->acsmNumStates; i++)
-    {
-		p = NextState[i];
-        if ( !p )
-            continue;
-		for (int j=0; j<258; j++ )
+        //printf("Build list array with states: %d \n", acsm->acsmNumStates);
+        acstate_t* p;
+        acstate_t** NextState = acsm->acsmNextState;
+        acsm->stateArray = new int [acsm->acsmNumStates*258];
+        for (int i=0; i<acsm->acsmNumStates; i++)
         {
-			acsm->stateArray[(i * 258) + j] = p[j];
+            p = NextState[i];
+            if ( !p )
+                continue;
+            for (int j=0; j<258; j++ )
+            {
+                acsm->stateArray[(i * 258) + j] = p[j];
+            }
         }
-	}
 
-	cl_int err;
-	acsm->stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
-	acsm->xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, 256 * sizeof(uint8_t), xlatcase);
-	acsm->matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, acsm->acsmNumStates*sizeof(int));
+        cl_int err;
 
-	acsm->countsBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, KERNEL_SIZE*sizeof(int));
-	acsm->matchLenBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, acsm->acsmMaxStates*sizeof(int), acsm->acsmLenList);
-	if(err != CL_SUCCESS)
-		printf("Error CL compile");
-        std::exit(1);
+        acsm->stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
+        acsm->xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, 256 * sizeof(uint8_t), xlatcase);
+        acsm->matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, acsm->acsmNumStates*sizeof(int));
+
+        acsm->countsBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, KERNEL_SIZE*sizeof(int));
+        acsm->matchLenBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, acsm->acsmMaxStates*sizeof(int), acsm->acsmLenList);
+
+        /*
+        if(err != CL_SUCCESS)
+            printf("Error CL compile");
+            std::exit(1);
+        */
 	}
 	return 0;
 

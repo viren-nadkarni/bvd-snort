@@ -1,6 +1,6 @@
 # bvd-snort
 
-Snort fork with OpenCL/GPGPU-based packet processing
+Snort fork with OpenCL/GPGPU-based packet processing engine
 
 ## Info
 
@@ -20,8 +20,8 @@ Snort fork with OpenCL/GPGPU-based packet processing
 ## Building
 
 ```
-mkdir ~/snort_build
 export build_path=~/snort_build
+mkdir -p $build_path
 
 bash build.sh
 ```
@@ -85,5 +85,7 @@ Use appropriate path for the pcap file
     ```
 
 ---
+
+Based on masters thesis work done by Linus Johansson and Oskar Olsson
 
 License: GPLv2

@@ -42,6 +42,12 @@
 #define MAX_ALPHABET_SIZE 256
 
 #define USE_GPU 2
+/* 0: CPU
+ * 1: GPU single buffer
+ * 2: GPU multi buffer (?)
+ * 3: (?)
+ */
+
 #define KERNEL_SIZE 768
 /*
    FAIL STATE for 1,2,or 4 bytes for state transitions
