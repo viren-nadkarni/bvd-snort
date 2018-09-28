@@ -21,105 +21,102 @@
 #include "config.h"
 #endif
 
-#include "framework/mpse.h"
-
-#include "acsmx2.h"
-
 #include <time.h>
+
+#include "framework/mpse.h"
+#include "acsmx2.h"
 
 #include "../my_util.h"
 
-//-------------------------------------------------------------------------
-// "ac_full"
-//-------------------------------------------------------------------------
-
 class AcfMpse : public Mpse
 {
-private:
-    ACSM_STRUCT2* obj;
+    private:
+        ACSM_STRUCT2* obj;
 
-public:
-    AcfMpse(SnortConfig*, const MpseAgent* agent)
-        : Mpse("ac_full")
-    {
-        obj = acsmNew2(agent, ACF_FULL);
-    }
+    public:
+        AcfMpse(SnortConfig*, const MpseAgent* agent)
+            : Mpse("ac_full")
+        {
+            obj = acsmNew2(agent, ACF_FULL);
+        }
 
-    ~AcfMpse() override
-    { acsmFree2(obj); }
+        ~AcfMpse() override
+            { acsmFree2(obj); }
 
-    void set_opt(int flag) override
-    {
-        //acsmCompressStates(obj, flag);
-        obj->enable_dfa();
-    }
+        void set_opt(int flag) override
+        {
+            //acsmCompressStates(obj, flag);
+            obj->enable_dfa();
+        }
 
-    int add_pattern(
-        SnortConfig*, const uint8_t* P, unsigned m,
-        const PatternDescriptor& desc, void* user) override
-    {
-        return acsmAddPattern2(obj, P, m, desc.no_case, desc.negated, user);
-    }
+        int add_pattern(
+            SnortConfig*, const uint8_t* P, unsigned m,
+            const PatternDescriptor& desc, void* user) override
+        {
+            return acsmAddPattern2(obj, P, m, desc.no_case, desc.negated, user);
+        }
 
-    int prep_patterns(SnortConfig* sc) override
-    { return acsmCompile2(sc, obj); }
+        int prep_patterns(SnortConfig* sc) override
+            { return acsmCompile2(sc, obj); }
 
-    int _search(
-        const uint8_t* T, int n, MpseMatch match,
-        void* context, int* current_state) override
-    {
-		if(1){		//ADDED - Change to 0 to run default matching
-			
-      int temp_matches=0;
-			if(USE_GPU == 1)
-			{
-				temp_matches =  acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
-        my_total_matches += temp_matches;
-        return temp_matches;
-			}
-			else if(USE_GPU == 2) {
-				temp_matches = acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
-        my_total_matches += temp_matches;
-        return temp_matches;
-			}
-			else if(USE_GPU == 3) {
-				temp_matches = acsm_search_dfa_full(obj, T, n, match, context, current_state);
-        my_total_matches += temp_matches;
-        return temp_matches;
-			}
-			else
-			{
-				temp_matches = acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);
-        my_total_matches += temp_matches;
-        return temp_matches;
-			}
+        int _search(
+            const uint8_t* T, int n, MpseMatch match,
+            void* context, int* current_state) override
+        {
+            if(1)                //ADDED - Change to 0 to run default matching
+            {
 
-		
-		}
-		else
-		{
-        	if ( obj->dfa_enabled() )
-         	   return acsm_search_dfa_full(obj, T, n, match, context, current_state);
+                int temp_matches=0;
+                if(USE_GPU == 1)
+                {
+                    temp_matches =  acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
+                    my_total_matches += temp_matches;
+                    return temp_matches;
+                }
+                else if(USE_GPU == 2)
+                {
+                    temp_matches = acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
+                    my_total_matches += temp_matches;
+                    return temp_matches;
+                }
+                else if(USE_GPU == 3)
+                {
+                    temp_matches = acsm_search_dfa_full(obj, T, n, match, context, current_state);
+                    my_total_matches += temp_matches;
+                    return temp_matches;
+                }
+                else
+                {
+                    temp_matches = acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);
+                    my_total_matches += temp_matches;
+                    return temp_matches;
+                }
 
-        	return acsm_search_nfa(obj, T, n, match, context, current_state);
-		}
-    }
+            }
+            else
+            {
+                if ( obj->dfa_enabled() )
+                    return acsm_search_dfa_full(obj, T, n, match, context, current_state);
 
-    int search_all(
-        const uint8_t* T, int n, MpseMatch match,
-        void* context, int* current_state) override
-    {
-        if ( !obj->dfa_enabled() )
-            return acsm_search_nfa(obj, T, n, match, context, current_state);
-        else
-            return acsm_search_dfa_full_all(obj, T, n, match, context, current_state);
-    }
+                return acsm_search_nfa(obj, T, n, match, context, current_state);
+            }
+        }
 
-    int print_info() override
-    { return acsmPrintDetailInfo2(obj); }
+        int search_all(
+            const uint8_t* T, int n, MpseMatch match,
+            void* context, int* current_state) override
+        {
+            if ( !obj->dfa_enabled() )
+                return acsm_search_nfa(obj, T, n, match, context, current_state);
+            else
+                return acsm_search_dfa_full_all(obj, T, n, match, context, current_state);
+        }
 
-    int get_pattern_count() override
-    { return acsmPatternCount2(obj); }
+        int print_info() override
+            { return acsmPrintDetailInfo2(obj); }
+
+        int get_pattern_count() override
+            { return acsmPatternCount2(obj); }
 };
 
 //-------------------------------------------------------------------------
@@ -127,18 +124,20 @@ public:
 //-------------------------------------------------------------------------
 
 static Mpse* acf_ctor(
-    SnortConfig* sc, class Module*, const MpseAgent* agent)
+SnortConfig* sc, class Module*, const MpseAgent* agent)
 {
     return new AcfMpse(sc, agent);
 }
 
+
 static void acf_dtor(Mpse* p)
 {
-	int state = 0;
-	p->search(nullptr, 0, nullptr, nullptr, &state);
-	//printf("total found : %d \n", p->search(nullptr, 0, nullptr, nullptr, &state));
+    int state = 0;
+    p->search(nullptr, 0, nullptr, nullptr, &state);
+    //printf("total found : %d \n", p->search(nullptr, 0, nullptr, nullptr, &state));
     delete p;
 }
+
 
 static void acf_init()
 {
@@ -146,10 +145,12 @@ static void acf_init()
     acsm_init_summary();
 }
 
+
 static void acf_print()
 {
     acsmPrintSummaryInfo2();
 }
+
 
 static const MpseApi acf_api =
 {
@@ -177,4 +178,3 @@ static const MpseApi acf_api =
 };
 
 const BaseApi* se_ac_full = &acf_api.base;
-

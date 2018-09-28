@@ -31,7 +31,7 @@
 
 //Added
 #ifndef CL
-#include "CL/cl.hpp"    //Added
+#include "CL/cl.hpp"             //Added
 #define CL
 #endif
 #include <vector>
@@ -75,8 +75,8 @@ struct ACSM_STATETABLE
 };
 
 /*
-* State machine Struct
-*/
+ * State machine Struct
+ */
 struct ACSM_STRUCT
 {
     int acsmMaxStates;
@@ -105,19 +105,19 @@ struct ACSM_STRUCT
 };
 
 /*
-*   Prototypes
-*/
+ *   Prototypes
+ */
 void acsmx_init_xlatcase();
 
 ACSM_STRUCT* acsmNew(const MpseAgent*);
 
 int acsmAddPattern(ACSM_STRUCT* p, const uint8_t* pat, unsigned n,
-    bool nocase, bool negative, void* id);
+bool nocase, bool negative, void* id);
 
 int acsmCompile(struct SnortConfig*, ACSM_STRUCT*);
 
 int acsmSearch(ACSM_STRUCT * acsm, const uint8_t* T,
-    int n, MpseMatch, void* context, int* current_state);
+int n, MpseMatch, void* context, int* current_state);
 
 void acsmFree(ACSM_STRUCT* acsm);
 int acsmPatternCount(ACSM_STRUCT* acsm);
@@ -125,6 +125,4 @@ int acsmPatternCount(ACSM_STRUCT* acsm);
 int acsmPrintDetailInfo(ACSM_STRUCT*);
 
 int acsmPrintSummaryInfo();
-
 #endif
-

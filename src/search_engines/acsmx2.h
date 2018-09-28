@@ -26,7 +26,6 @@
 
 #include "CL/cl.hpp"
 #define CL
-
 #endif
 
 #include <vector>
@@ -64,7 +63,6 @@ typedef unsigned int acstate_t;
 
 typedef unsigned short acstate_t;
 #define ACSM_FAIL_STATE2 0xffff
-
 #endif
 
 struct ACSM_PATTERN2
@@ -95,7 +93,7 @@ struct trans_node_t
      */
     acstate_t key;
     acstate_t next_state;
-    trans_node_t* next; /* next transition for this state */
+    trans_node_t* next;          /* next transition for this state */
 };
 
 /*
@@ -117,7 +115,7 @@ struct ACSM_STRUCT2
     ACSM_PATTERN2* acsmPatterns;
     acstate_t* acsmFailState;
     ACSM_PATTERN2** acsmMatchList;
-;
+    ;
 
     /* list of transitions in each state, this is used to build the nfa & dfa
        after construction we convert to sparse or full format matrix and free
@@ -145,10 +143,10 @@ struct ACSM_STRUCT2
     bool dfa;
 
     void enable_dfa()
-    { dfa = true; }
+        { dfa = true; }
 
     bool dfa_enabled()
-    { return dfa; }
+        { return dfa; }
 
     //ACSM_BUFFER_OBJ* acsmBuffer;     Buffering for packets, not used atm
     //int packetsInBuff;
@@ -193,40 +191,40 @@ struct ACSM_STRUCT2
 };
 
 /*
-*   Prototypes
-*/
+ *   Prototypes
+ */
 void acsmx2_init_xlatcase();
 
 ACSM_STRUCT2* acsmNew2(const MpseAgent*, int format);
 
 int acsmAddPattern2(
-    ACSM_STRUCT2* p, const uint8_t* pat, unsigned n, bool nocase, bool negative, void* id);
+ACSM_STRUCT2* p, const uint8_t* pat, unsigned n, bool nocase, bool negative, void* id);
 
 int acsmCompile2(struct SnortConfig*, ACSM_STRUCT2*);
 
 int acsm_search_nfa(
-    ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
+ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_sparse(
-    ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
+ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_banded(
-    ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
+ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_full_gpu(
-    ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
+ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
 
 int acsm_search_dfa_full_gpu_singleBuff(
-    ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
+ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
 
 int acsm_search_dfa_full_cpu(
-    ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
+ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
 
 int acsm_search_dfa_full(
-    ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
+ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_full_all(
-    ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch, void* context, int* current_state);
+ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch, void* context, int* current_state);
 
 void acsmFree2(ACSM_STRUCT2*);
 int acsmPatternCount2(ACSM_STRUCT2*);
@@ -236,6 +234,4 @@ int acsmPrintDetailInfo2(ACSM_STRUCT2*);
 int acsmPrintSummaryInfo2();
 void acsmx2_print_qinfo();
 void acsm_init_summary();
-
 #endif
-
