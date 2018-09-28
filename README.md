@@ -17,17 +17,6 @@ Snort fork with OpenCL/GPGPU-based packet processing engine
 * `apt install -y build-essential pkg-config libhwloc-dev hwloc luajit libluajit-5.1-dev libssl-dev libpcap-dev libpcre-dev flex bison zlib1g-dev zlibc ocl-icd-dev ocl-icd-opencl-dev`
 * EnergyMonitor from https://github.com/SimonKinds/EnergyMonitor for power consumption benchmarking
 
-## Building
-
-```
-export build_path=~/snort_build
-mkdir -p $build_path
-
-bash build.sh
-```
-
-## Running
-
 Confirm that OpenCL is detected by the system with `clinfo`. If output is something like:
 
 ```
@@ -43,15 +32,26 @@ sudo mkdir -p /etc/OpenCL/vendors
 sudo bash -c 'echo "/usr/lib/arm-linux-gnueabihf/mali-egl/libOpenCL.so" > /etc/OpenCL/vendors/armocl.icd'
 ```
 
-To run snort:
+## Building
+
+```
+export build_path=~/snort_build
+mkdir -p $build_path
+
+sudo ./configure_cmake.sh --prefix=$build_path
+cd build && make -j $(nproc) install
+```
+
+## Running
 
 ```shell
 export LUA_PATH=$build_path/include/snort/lua/\?.lua\;\;
 export SNORT_LUA_PATH=$build_path/etc/snort
 
-$build_path/bin/snort -c ~/bvd-snort/clort.lua -r ~/testbed-12jun_1.pcap
+$build_path/bin/snort -c ~/bvd-snort/clort.lua -r ~/testbed-12jun_1.pcap -R ~/snort3-community-rules/snort3-community.rules
 ```
-Use appropriate path for the pcap file
+
+Use appropriate paths. Community rule set is available [here](https://www.snort.org/downloads/#rule-downloads)
 
 ### Other usage examples
 

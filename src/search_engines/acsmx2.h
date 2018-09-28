@@ -22,26 +22,24 @@
 #ifndef ACSMX2_H
 #define ACSMX2_H
 
-// Version 2.0
-
 #ifndef CL
-#include "CL/cl.hpp"	//Added
+
+#include "CL/cl.hpp"
 #define CL
+
 #endif
+
 #include <vector>
-
 #include <cstdint>
-
 #include "search_common.h"
-
 #include <time.h>
-//TEST
+
 //#include "./detection/fp_detect.h"
 //#include "./protocols/packet.h"
 
 #define MAX_ALPHABET_SIZE 256
 
-#define USE_GPU 2
+#define USE_GPU 3
 /* 0: CPU
  * 1: GPU single buffer
  * 2: GPU multi buffer (?)
@@ -87,8 +85,8 @@ struct ACSM_PATTERN2
 };
 
 /*
-*    transition nodes  - either 8 or 12 bytes
-*/
+ *    transition nodes  - either 8 or 12 bytes
+ */
 struct trans_node_t
 {
     /* The character that got us here - sized to keep structure aligned on 4 bytes
@@ -101,8 +99,8 @@ struct trans_node_t
 };
 
 /*
-*  User specified final storage type for the state transitions
-*/
+ *  User specified final storage type for the state transitions
+ */
 enum
 {
     ACF_FULL,
@@ -112,8 +110,8 @@ enum
 };
 
 /*
-*   Aho-Corasick State Machine Struct - one per group of patterns
-*/
+ *   Aho-Corasick State Machine Struct - one per group of patterns
+ */
 struct ACSM_STRUCT2
 {
     ACSM_PATTERN2* acsmPatterns;
@@ -152,46 +150,46 @@ struct ACSM_STRUCT2
     bool dfa_enabled()
     { return dfa; }
 
-	//ACSM_BUFFER_OBJ* acsmBuffer;     Buffering for packets, not used atm
-	//int packetsInBuff;
-	//int packetsBuffMax;
+    //ACSM_BUFFER_OBJ* acsmBuffer;     Buffering for packets, not used atm
+    //int packetsInBuff;
+    //int packetsBuffMax;
 
-	uint8_t* textBuffer;
-	int totalFound;
-	int totalFoundCPU;
-	int buffSize;
+    uint8_t* textBuffer;
+    int totalFound;
+    int totalFoundCPU;
+    int buffSize;
     uint8_t* TxArray;
-	int * resultArray;
-	int nTotal;
-	int * stateArray;
+    int * resultArray;
+    int nTotal;
+    int * stateArray;
 
-	int currentBuffer;
-	int searchLaunched;
-	int * resultMap;
-	int * countsMap;
-	uint8_t* mapPtr;
-	uint8_t* mapPtr2;
+    int currentBuffer;
+    int searchLaunched;
+    int * resultMap;
+    int * countsMap;
+    uint8_t* mapPtr;
+    uint8_t* mapPtr2;
 
-	//OpenCL var
-	cl::Buffer textBuffer1;
-	cl::Buffer textBuffer2;
-	cl::Buffer stateBuffer;
-	cl::Buffer xlatBuffer;	
-	cl::Buffer matchBuffer;
-	cl::Buffer countsBuffer;
-	cl::Buffer matchLenBuffer;
+    //OpenCL var
+    cl::Buffer textBuffer1;
+    cl::Buffer textBuffer2;
+    cl::Buffer stateBuffer;
+    cl::Buffer xlatBuffer;
+    cl::Buffer matchBuffer;
+    cl::Buffer countsBuffer;
+    cl::Buffer matchLenBuffer;
 
-	cl::Event* bufferEvent;
+    cl::Event* bufferEvent;
 
-	std::vector<cl::Platform> all_platforms;
-	cl::Platform default_platform;
-	std::vector<cl::Device> all_devices;
-	cl::Device default_device;
-	cl::Context context;
-	cl::CommandQueue queue;
-	cl::Program program;
-	cl::Kernel kernel;
-	cl::Program::Sources sources;
+    std::vector<cl::Platform> all_platforms;
+    cl::Platform default_platform;
+    std::vector<cl::Device> all_devices;
+    cl::Device default_device;
+    cl::Context context;
+    cl::CommandQueue queue;
+    cl::Program program;
+    cl::Kernel kernel;
+    cl::Program::Sources sources;
 };
 
 /*
@@ -202,8 +200,7 @@ void acsmx2_init_xlatcase();
 ACSM_STRUCT2* acsmNew2(const MpseAgent*, int format);
 
 int acsmAddPattern2(
-    ACSM_STRUCT2* p, const uint8_t* pat, unsigned n,
-    bool nocase, bool negative, void* id);
+    ACSM_STRUCT2* p, const uint8_t* pat, unsigned n, bool nocase, bool negative, void* id);
 
 int acsmCompile2(struct SnortConfig*, ACSM_STRUCT2*);
 
@@ -223,7 +220,7 @@ int acsm_search_dfa_full_gpu_singleBuff(
     ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
 
 int acsm_search_dfa_full_cpu(
- 	ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
+    ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
 
 int acsm_search_dfa_full(
     ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
@@ -234,9 +231,7 @@ int acsm_search_dfa_full_all(
 void acsmFree2(ACSM_STRUCT2*);
 int acsmPatternCount2(ACSM_STRUCT2*);
 void acsmCompressStates(ACSM_STRUCT2*, int);
-
 void acsmPrintInfo2(ACSM_STRUCT2* p);
-
 int acsmPrintDetailInfo2(ACSM_STRUCT2*);
 int acsmPrintSummaryInfo2();
 void acsmx2_print_qinfo();
