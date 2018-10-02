@@ -11,10 +11,10 @@ Snort fork with OpenCL/GPGPU-based packet processing engine
 
 ## Requirements
 
-* odroid-xu4 with Ubuntu 16.04.5 LTS
+* odroid-xu4 with Ubuntu 18.04 LTS
 * daq-2.2.2 from https://www.snort.org/downloads/snortplus/daq-2.2.2.tar.gz for packet IO
 * dnet from https://github.com/dugsong/libdnet.git
-* `apt install -y build-essential pkg-config libhwloc-dev hwloc luajit libluajit-5.1-dev libssl-dev libpcap-dev libpcre-dev flex bison zlib1g-dev zlibc ocl-icd-dev ocl-icd-opencl-dev`
+* `apt install -y build-essential pkg-config libhwloc-dev hwloc luajit libluajit-5.1-dev libssl-dev libpcap-dev libpcre3-dev flex bison zlib1g-dev zlibc ocl-icd-dev ocl-icd-opencl-dev clinfo cmake`
 * EnergyMonitor from https://github.com/SimonKinds/EnergyMonitor for power consumption benchmarking
 
 Confirm that OpenCL is detected by the system with `clinfo`. If output is something like:
@@ -39,14 +39,13 @@ export build_path=~/snort_build
 mkdir -p $build_path
 
 sudo ./configure_cmake.sh --prefix=$build_path
-cd build && make -j $(nproc) install
+cd build && sudo make -j $(nproc) install
 ```
 
 If it fails with `fatal error: dnet/sctp.h: No such file or directory`:
 
 ```
-cd /usr/local/include/
-sudo cp ~/libdnet/include/dnet/* ./dnet/
+sudo cp ~/libdnet/include/dnet/* /usr/local/include/dnet/
 ```
 
 ## Running
@@ -58,7 +57,7 @@ export SNORT_LUA_PATH=$build_path/etc/snort
 $build_path/bin/snort -c ~/bvd-snort/clort.lua -r ~/testbed-12jun_1.pcap -R ~/snort3-community-rules/snort3-community.rules
 ```
 
-Use appropriate paths. Community rule set is available [here](https://www.snort.org/downloads/#rule-downloads)
+Use appropriate paths. Community rule set is available [here](https://www.snort.org/downloads/community/snort3-community-rules.tar.gz)
 
 ### Other usage examples
 
