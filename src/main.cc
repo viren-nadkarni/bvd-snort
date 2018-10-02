@@ -794,7 +794,9 @@ static void main_loop()
 {
     unsigned swine = 0, pending_privileges = 0;
     my_total_matches = 0;
-    printf("\n Main loop started\n ");
+
+    std::cout << "=> Main loop begins\n";
+
     if (SnortConfig::change_privileges())
         pending_privileges = max_pigs;
 
@@ -837,8 +839,9 @@ static void main_loop()
         }
         service_check();
     }
-    printf("\n Main loop finished\n ");
-    printf("### Total Matches reported:  %lu\n",my_total_matches);
+
+    std::cout << "=> Main loop ends\n";
+    std::cout << "=> Total matches: " << my_total_matches << "\n";
 }
 
 static void snort_main()
@@ -879,95 +882,14 @@ int main(int argc, char* argv[])
 
     if ( s )
         prompt = s;
-	
-	// ADDED -----------------------------------------------------------------
-	/*
-	//get default plattform
-	std::vector<cl::Platform> all_platforms;
-    cl::Platform::get(&all_platforms);
-	if(all_platforms.size()==0){
-        std::cout<<" No platforms found. Check OpenCL installation!\n";
-        return main_exit_code;
-    }
 
-	cl::Platform default_platform=all_platforms[0];
-    std::cout << "Using platform: "<<default_platform.getInfo<CL_PLATFORM_NAME>()<<"\n";
-
-	//get default device of the default platform, also print how many found
-    std::vector<cl::Device> all_devices;
-    default_platform.getDevices(CL_DEVICE_TYPE_GPU, &all_devices);
-    if(all_devices.size()==0){
-        std::cout<<" No devices found. Check OpenCL installation!\n";
-        return main_exit_code;
-    }
-    cl::Device default_device=all_devices[0];
-	std::cout<< "GPUs on Odriod: " << all_devices.size()<<"\n";
-    std::cout<< "Using device: "<<default_device.getInfo<CL_DEVICE_NAME>()<<"\n";
-
-	cl::Context context(default_device);	//cl::Context context({default_device}); Are curly brackets needed??
-
-	cl::CommandQueue queue(context,default_device);
-
-	// Read source file
-    std::ifstream sourceFile("/home/odroid/Documents/Clort/part1.cl");
-    std::string sourceCode(
-	    std::istreambuf_iterator<char>(sourceFile),
-        (std::istreambuf_iterator<char>()));
-
-    cl::Program::Sources sources;
-	sources.push_back({sourceCode.c_str(),sourceCode.length()}); //curly brackets needed around arguments?
-
-	//std::cout << sources;
-
-	cl::Program program(context,sources);
-    if(program.build({default_device})!=CL_SUCCESS){
-        std::cout<<" Error building: "<<program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(default_device)<<"\n";
-        return main_exit_code;
-    }
-
-	cl::Kernel kernel(program, "part1");
-
-	int A[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    int B[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-    // Create memory buffers
-    cl::Buffer bufferA = cl::Buffer(context, CL_MEM_READ_ONLY, 10 * sizeof(int));
-    cl::Buffer bufferB = cl::Buffer(context, CL_MEM_READ_ONLY, 10 * sizeof(int));
-    cl::Buffer bufferC = cl::Buffer(context, CL_MEM_WRITE_ONLY, 10 * sizeof(int));
-
-    // Copy lists A and B to the memory buffers
-    queue.enqueueWriteBuffer(bufferA, CL_TRUE, 0, 10 * sizeof(int), A);
-    queue.enqueueWriteBuffer(bufferB, CL_TRUE, 0, 10 * sizeof(int), B);
-
-    // Set arguments to kernel
-    kernel.setArg(0, bufferA);
-    kernel.setArg(1, bufferB);
-    kernel.setArg(2, bufferC);
-
-    // Run the kernel on specific ND range
-	cl::NDRange global(10);
-    cl::NDRange local(1);
-    queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local);
-
-    int C[10];
-
-	queue.finish();
-    queue.enqueueReadBuffer(bufferC, CL_TRUE, 0, 10 * sizeof(int), C);
- 
-    for(int i = 0; i < 10; i ++)
-	{
-    	std::cout << A[i] << " + " << B[i] << " = " << C[i] << std::endl; 
-    }*/
-
-	// ADDED END -------------------------------------------------------------	
-	
     Snort::setup(argc, argv);
 
     if ( set_mode() )
         snort_main();
 
     Snort::cleanup();
-    printf("###final total matches reported: %lu\n",my_total_matches);
+
     return main_exit_code;
 }
 

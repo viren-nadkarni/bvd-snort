@@ -69,7 +69,7 @@ class AcfMpse : public Mpse
                 int temp_matches=0;
                 if(USE_GPU == 1)
                 {
-                    temp_matches =  acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
+                    temp_matches = acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
                     my_total_matches += temp_matches;
                     return temp_matches;
                 }
