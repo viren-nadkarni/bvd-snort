@@ -39,10 +39,10 @@
 #define MAX_ALPHABET_SIZE 256
 
 #define USE_GPU 3
-/* 0: CPU
+/* 0: CPU (custom)
  * 1: GPU single buffer
- * 2: GPU multi buffer (?)
- * 3: (?)
+ * 2: GPU multi buffer
+ * 3: CPU (upstream)
  */
 
 #define KERNEL_SIZE 768

@@ -1774,86 +1774,94 @@ void acsmx2_print_qinfo()
 }
 
 
-/* TODO document function purpose
+/* gpusearch
  */
 int acsm_search_dfa_full_gpu(
 ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context,
 int* current_state)
+/* Tx: packet
+ * n: packet size
+ */
 {
-
-    //ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
-    //if (current_state == nullptr)
-    //    return 0;
-
-    // First time the state machine is used, Initiate buffers
-    if(!acsm->buffSize && n > 0)
-    {
+    /* intialise buffers the first time the state machine is used */
+    if(!acsm->buffSize && n > 0) {
         acsm->searchLaunched = 0;
         acsm->currentBuffer = 1;
-        acsm->buffSize  = 2000000;
+        acsm->buffSize = 2000000;
+
         acsm->textBuffer1 = cl::Buffer(
-            acsm->context,CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,sizeof(uint8_t)*acsm->buffSize);
+            acsm->context,
+            CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
+            sizeof(uint8_t) * acsm->buffSize);
+
         acsm->textBuffer2 = cl::Buffer(
-            acsm->context,CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,sizeof(uint8_t)*acsm->buffSize);
-        acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer1,CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
-        acsm->mapPtr2 = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer2,CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+            acsm->context,
+            CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
+            sizeof(uint8_t) * acsm->buffSize);
+
+        acsm->mapPtr = (uint8_t*) acsm->queue.enqueueMapBuffer(
+            acsm->textBuffer1,
+            CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
+            0, sizeof(uint8_t) * acsm->buffSize);
+
+        acsm->mapPtr2 = (uint8_t* )acsm->queue.enqueueMapBuffer(
+            acsm->textBuffer2,
+            CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
+            0, sizeof(uint8_t)*acsm->buffSize);
     }
 
-    // If the buffer is not full, store the payload data in the buffer and return 0
-    if(acsm->nTotal < (acsm->buffSize-3000) && n > 0)
-    {
-        if(acsm->currentBuffer==1)
-        {
-            memcpy(&(acsm->mapPtr[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
+    /* if the buffer is not full, store the payload data in the buffer and return 0 */
+    if(acsm->nTotal < (acsm->buffSize - 3000) && n > 0) {
+        if(acsm->currentBuffer == 1) {
+            memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
             acsm->nTotal += n;
-            return  0;
+            return 0;
         }
-        else
-        {
-            memcpy(&(acsm->mapPtr2[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
+        else {
+            memcpy(&(acsm->mapPtr2[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
             acsm->nTotal += n;
-            return  0;
+            return 0;
         }
     }
 
-    // Adding current packet to the buffer
-    if(acsm->currentBuffer==1)
-    {
-        memcpy(&(acsm->mapPtr[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
+    /* add current packet to the buffer */
+    if(acsm->currentBuffer == 1) {
+        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
         acsm->nTotal += n;
+
         acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
         acsm->kernel.setArg(2, acsm->textBuffer1);
     }
-    else
-    {
-        memcpy(&(acsm->mapPtr2[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
+    else {
+        memcpy(&(acsm->mapPtr2[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
         acsm->nTotal += n;
+
         acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
         acsm->kernel.setArg(2, acsm->textBuffer2);
     }
-    if(acsm->searchLaunched)
-    {
+
+    if(acsm->searchLaunched) {
         acsm->queue.finish();
         //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
         //acsm->totalFound += acsm->resultMap[0];
         //Handle results
         int c=0;
+
         for (int i=0;i<KERNEL_SIZE;i++)
         {
             c+=acsm->countsMap[i];
         }
         acsm->totalFound = c;
+
         //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
         //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
+
         acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
         acsm->searchLaunched = 0;
     }
 
     // Used for flushing, return if there is no objects to flush
-    if(!(acsm->nTotal))
-    {
+    if(!(acsm->nTotal)) {
         return 0;
     }
 
@@ -1863,7 +1871,9 @@ int* current_state)
 
     // Create memory buffers
     cl::Buffer lengthBuffer = cl::Buffer(
-        acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(int*), len, &err);
+        acsm->context,
+        CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+        sizeof(int*), len, &err);
 
     if(err != CL_SUCCESS)
         printf("Buffer error %d \n", err);
@@ -1880,7 +1890,7 @@ int* current_state)
     if(err != CL_SUCCESS)
         printf("Error in setarg result %d \n", err);
 
-    // Run the kernel on specific ND range
+    /* specify vector size */
     cl::NDRange global(KERNEL_SIZE);
     cl::NDRange local(1);
     err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
@@ -1889,42 +1899,48 @@ int* current_state)
         printf("Error in kernel execution! %d \n", err);
 
     //acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ, 0, acsm->acsmNumStates*sizeof(int));
+
+    /* enqueueMapBuffer is used as an alternative to clEnqueueRead/Write.
+     * this maps a memory object on the device to a mem region on host
+     */
     acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(
         acsm->countsBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
 
-    if(acsm->currentBuffer==1)
-    {
+    /* do some kind of buffer alternation? */
+    if(acsm->currentBuffer==1) {
         acsm->currentBuffer=2;
         acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer1,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+            acsm->textBuffer1, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
     }
-    else
-    {
+    else {
         acsm->currentBuffer=1;
         acsm->mapPtr2 = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer2,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+            acsm->textBuffer2, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
     }
 
     acsm->queue.flush();
     acsm->searchLaunched = 1;
     acsm->nTotal = 0;
 
-    if(!n)
-    {
+    /* if packet size is not zero */
+    if(!n) {
         acsm->queue.finish();
+
         //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
         //acsm->totalFound += acsm->resultMap[0];
 
         int c = 0;
 
         for (int i=0;i<KERNEL_SIZE;i++)
-            c+=acsm->countsMap[i];
+            c += acsm->countsMap[i];
 
+        /* update global match count */
         acsm->totalFound += c;
 
         //Handle results
         //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
         //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
+
         acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
         acsm->searchLaunched = 0;
         acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
@@ -1938,34 +1954,33 @@ int* current_state)
 int acsm_search_dfa_full_gpu_singleBuff(
 ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, int* current_state)
 {
-    //ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
-    //if (current_state == nullptr)
-    //    return 0;
-
-    //First time the state machine is used, Initiate buffers
-    if(!acsm->buffSize && n > 0)
-    {
+    /* create buffer first invocation */
+    if(!acsm->buffSize && n > 0) {
         acsm->buffSize  = 2000000;
-        acsm->textBuffer1 = cl::Buffer(acsm->context,CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,sizeof(uint8_t)*acsm->buffSize);
-        acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer1,CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+        acsm->textBuffer1 = cl::Buffer(
+                acsm->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
+                sizeof(uint8_t)*acsm->buffSize);
+        acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
+                acsm->textBuffer1, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
+                0, sizeof(uint8_t)*acsm->buffSize);
     }
 
-    //If the buffer is not full, store the payload data in the buffer and return 0
+    /* if the buffer is not full, store the payload data in the buffer and return */
     if(acsm->nTotal < (acsm->buffSize-3000) && n > 0)
     {
-        memcpy(&(acsm->mapPtr[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
+        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t)*n);
         acsm->nTotal += n;
-        return  0;
+        return 0;
     }
-    //Adding current packet to the buffer
-    if(n > 0)
-    {
-        memcpy(&(acsm->mapPtr[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
+
+    /* add current packet to the buffer */
+    if(n > 0) {
+        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t)*n);
         acsm->nTotal += n;
     }
     acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
 
-    //Used for flushing, return if there is no data to flush
+    /* for flushing, return if there is no data to flush */
     if(!(acsm->nTotal))
         return 0;
 
@@ -1973,13 +1988,16 @@ ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, in
     int * len = &acsm->nTotal;
     cl_int err;
 
-    // Create length buffer
-    cl::Buffer lengthBuffer  = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(int*), len, &err);
-    if(err != CL_SUCCESS)
-    {
-        printf("Error in buffer %d \n", err);
+    /* Create length buffer */
+    cl::Buffer lengthBuffer = cl::Buffer(
+            acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+            sizeof(int*), len, &err);
+
+    if(err != CL_SUCCESS) {
+        printf("Error in buffer: %d\n", err);
     }
-    // Set arguments to kernel
+
+    /* Set arguments to kernel */
     err = acsm->kernel.setArg(0, acsm->stateBuffer);
     err = acsm->kernel.setArg(1, acsm->xlatBuffer);
     err = acsm->kernel.setArg(2, acsm->textBuffer1);
@@ -1987,49 +2005,71 @@ ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, in
     err = acsm->kernel.setArg(4, acsm->matchBuffer);
     err = acsm->kernel.setArg(5, acsm->countsBuffer);
     err = acsm->kernel.setArg(6, acsm->matchLenBuffer);
-    if(err != CL_SUCCESS)
-    {
+
+    /* vn: not sure if this err actually changes */
+    if(err != CL_SUCCESS) {
         printf("Error in setarg %d \n", err);
     }
-    // Run the kernel on specific ND range
+
+    /* Run the kernel on specific ND range */
     cl::NDRange global(KERNEL_SIZE);
     cl::NDRange local(1);
     err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
-    if(err != CL_SUCCESS)
-    {
+
+    if(err != CL_SUCCESS) {
         printf("Error in kernel execution!! %d \n", err);
     }
-    //acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, acsm->acsmNumStates*sizeof(int));
-    acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(acsm->countsBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
-    acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(acsm->textBuffer1,CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+
+    /*
+    acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(
+            acsm->matchBuffer, CL_FALSE, CL_MAP_READ|CL_MAP_WRITE,
+            0, acsm->acsmNumStates*sizeof(int));
+    */
+
+    acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(
+            acsm->countsBuffer, CL_FALSE, CL_MAP_READ|CL_MAP_WRITE,
+            0, KERNEL_SIZE*sizeof(int));
+
+    acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
+            acsm->textBuffer1, CL_FALSE, CL_MAP_WRITE,
+            0, sizeof(uint8_t)*acsm->buffSize);
+
     acsm->queue.finish();
 
     //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
-    //Handle results
+
+    /* Handle results */
     int c=0;
-    for (int i=0;i<KERNEL_SIZE;i++)
-    {
+
+    for (int i=0;i<KERNEL_SIZE;i++) {
         c+=acsm->countsMap[i];
     }
+
     //acsm->totalFound += acsm->resultMap[0];
     acsm->totalFound = c;
+
     //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
     //memset(&(acsm->countsMap[0]),0,KERNEL_SIZE*sizeof(int));
+
     //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
     acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
+
     acsm->nTotal = 0;
 
-    if(!n)                       //When n is 0 (flush) unmap objects since they will not be used more
-    {
+    /* When n is 0 (flush) unmap objects since they will not be used more
+     */
+    if(!n) {
         //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
         acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
         acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
     }
+
     //printf("Exiting GPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
     return acsm->totalFound;
 }
 
 
+/* cpusearch */
 int acsm_search_dfa_full_cpu(
 ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
 void* context, int* current_state
@@ -2136,71 +2176,71 @@ void* context, int* current_state
         state = ps[2u + sindex]; \
     }
 
-            int acsm_search_dfa_full(
-            ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
-            void* context, int* current_state
-            )
-            {
-                ACSM_PATTERN2* mlist;
-                const uint8_t* Tend;
-                const uint8_t* T;
-                const uint8_t* text;
-                int index;
-                int sindex;
-                int nfound = 0;
-                int * len = &n;
-                acstate_t state;
-                ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
+int acsm_search_dfa_full(
+ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
+void* context, int* current_state
+)
+{
+    ACSM_PATTERN2* mlist;
+    const uint8_t* Tend;
+    const uint8_t* T;
+    const uint8_t* text;
+    int index;
+    int sindex;
+    int nfound = 0;
+    int * len = &n;
+    acstate_t state;
+    ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
 
-                T = Tx;
-                text = Tx;
-                Tend = Tx + n;
-                if (current_state == nullptr)
-                    return 0;
+    T = Tx;
+    text = Tx;
+    Tend = Tx + n;
+    if (current_state == nullptr)
+        return 0;
 
-                state = *current_state;
+    state = *current_state;
 
-                switch (acsm->sizeofstate)
-                {
-                    case 1:
-                    {
-                        uint8_t* ps;
-                        uint8_t** NextState = (uint8_t**)acsm->acsmNextState;
-                        AC_SEARCH;
-                    }
-                    break;
-                    case 2:
-                    {
-                        uint16_t* ps;
-                        uint16_t** NextState = (uint16_t**)acsm->acsmNextState;
-                        AC_SEARCH;
-                    }
-                    break;
-                    default:
-                    {
-                        acstate_t* ps;
-                        acstate_t** NextState = acsm->acsmNextState;
-                        AC_SEARCH;
-                    }
-                    break;
-                }
+    switch (acsm->sizeofstate)
+    {
+        case 1:
+        {
+            uint8_t* ps;
+            uint8_t** NextState = (uint8_t**)acsm->acsmNextState;
+            AC_SEARCH;
+        }
+        break;
+        case 2:
+        {
+            uint16_t* ps;
+            uint16_t** NextState = (uint16_t**)acsm->acsmNextState;
+            AC_SEARCH;
+        }
+        break;
+        default:
+        {
+            acstate_t* ps;
+            acstate_t** NextState = acsm->acsmNextState;
+            AC_SEARCH;
+        }
+        break;
+    }
 
-    /* Check the last state for a pattern match */
-                mlist = MatchList[state];
-                if (mlist)
-                {
-                    index = T - Tx;
-                    nfound++;
-                    if (match(mlist->udata, mlist->rule_option_tree, index, context, mlist->neg_list) > 0)
-                    {
-                        *current_state = state;
-                        return nfound;
-                    }
-                }
+/* Check the last state for a pattern match */
+    mlist = MatchList[state];
+    if (mlist)
+    {
+        index = T - Tx;
+        nfound++;
+        if (match(mlist->udata, mlist->rule_option_tree, index, context, mlist->neg_list) > 0)
+        {
+            *current_state = state;
+            return nfound;
+        }
+    }
 
-                *current_state = state;
-                return nfound;
-            }
+    *current_state = state;
+    return nfound;
+}
 
 /*
  *   Full format DFA search
