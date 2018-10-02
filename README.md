@@ -12,7 +12,7 @@ Snort fork with OpenCL/GPGPU-based packet processing engine
 ## Requirements
 
 * odroid-xu4 with Ubuntu 16.04.5 LTS
-* daq from http://www.snort.org for packet IO
+* daq-2.2.2 from https://www.snort.org/downloads/snortplus/daq-2.2.2.tar.gz for packet IO
 * dnet from https://github.com/dugsong/libdnet.git
 * `apt install -y build-essential pkg-config libhwloc-dev hwloc luajit libluajit-5.1-dev libssl-dev libpcap-dev libpcre-dev flex bison zlib1g-dev zlibc ocl-icd-dev ocl-icd-opencl-dev`
 * EnergyMonitor from https://github.com/SimonKinds/EnergyMonitor for power consumption benchmarking
@@ -40,6 +40,13 @@ mkdir -p $build_path
 
 sudo ./configure_cmake.sh --prefix=$build_path
 cd build && make -j $(nproc) install
+```
+
+If it fails with `fatal error: dnet/sctp.h: No such file or directory`:
+
+```
+cd /usr/local/include/
+sudo cp ~/libdnet/include/dnet/* ./dnet/
 ```
 
 ## Running
