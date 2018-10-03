@@ -1918,13 +1918,16 @@ int* current_state)
             acsm->textBuffer2, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
     }
 
+    /* flush is a non-blocking call */
     acsm->queue.flush();
     acsm->searchLaunched = 1;
     acsm->nTotal = 0;
 
     /* if packet size is not zero */
     if(!n) {
+        /* finish is a blocking call */
         acsm->queue.finish();
+        /* flush and finish basically perform the same operation. why do they use both? */
 
         //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
         //acsm->totalFound += acsm->resultMap[0];
