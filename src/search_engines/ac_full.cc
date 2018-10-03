@@ -63,42 +63,42 @@ class AcfMpse : public Mpse
             const uint8_t* T, int n, MpseMatch match,
             void* context, int* current_state) override
         {
-            if(1)                //ADDED - Change to 0 to run default matching
-            {
-
+            // Change to 0 to run default matching
+            if(1) {
                 int temp_matches=0;
-                if(USE_GPU == 1)
-                {
+                if(USE_GPU == 1) {
                     temp_matches = acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
                     my_total_matches += temp_matches;
                     return temp_matches;
                 }
-                else if(USE_GPU == 2)
-                {
+                else if(USE_GPU == 2) {
                     temp_matches = acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
                     my_total_matches += temp_matches;
                     return temp_matches;
                 }
-                else if(USE_GPU == 3)
-                {
+                else if(USE_GPU == 3) {
                     temp_matches = acsm_search_dfa_full(obj, T, n, match, context, current_state);
                     my_total_matches += temp_matches;
                     return temp_matches;
                 }
-                else
-                {
+                else {
                     temp_matches = acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);
                     my_total_matches += temp_matches;
                     return temp_matches;
                 }
 
             }
-            else
-            {
-                if ( obj->dfa_enabled() )
-                    return acsm_search_dfa_full(obj, T, n, match, context, current_state);
+            else {
+                int ncount;
+                if ( obj->dfa_enabled() ) {
+                    ncount = acsm_search_dfa_full(obj, T, n, match, context, current_state);
+                    foocount += ncount;
+                    return ncount;
+                }
 
-                return acsm_search_nfa(obj, T, n, match, context, current_state);
+                ncount = acsm_search_nfa(obj, T, n, match, context, current_state);
+                foocount += ncount;
+                return ncount;
             }
         }
 

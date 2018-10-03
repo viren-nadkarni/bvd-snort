@@ -124,6 +124,9 @@
 #include "utils/stats.h"
 #include "utils/util.h"
 
+#include "../my_util.h"
+
+
 //Added
 #include <iostream>              // std::cout
 #include <fstream>               // std::ifstream
@@ -1785,10 +1788,16 @@ int* current_state)
 {
     /* intialise buffers the first time the state machine is used */
     if(!acsm->buffSize && n > 0) {
+        /* this is a flag that indicates whether GPU processing has started or not */
         acsm->searchLaunched = 0;
+        /* there are two buffers that are used alternatively,
+         * this var specifies which one
+         */
         acsm->currentBuffer = 1;
+        /* buffer size i suppose */
         acsm->buffSize = 2000000;
 
+        /* initialise buffers */
         acsm->textBuffer1 = cl::Buffer(
             acsm->context,
             CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
@@ -1799,10 +1808,14 @@ int* current_state)
             CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
             sizeof(uint8_t) * acsm->buffSize);
 
+        /* this maps the buffer object to host memory, and returns address of
+         * latter. in this case */
         acsm->mapPtr = (uint8_t*) acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer1,
-            CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
-            0, sizeof(uint8_t) * acsm->buffSize);
+            acsm->textBuffer1,          /* is the buffer */
+            CL_TRUE,                    /* blocking */
+            CL_MAP_READ | CL_MAP_WRITE, /* flags */
+            0,                          /* offset */
+            sizeof(uint8_t) * acsm->buffSize); /* buffer size */
 
         acsm->mapPtr2 = (uint8_t* )acsm->queue.enqueueMapBuffer(
             acsm->textBuffer2,
@@ -1826,10 +1839,14 @@ int* current_state)
 
     /* add current packet to the buffer */
     if(acsm->currentBuffer == 1) {
+        /* here, Tx which is the incoming packet is copied to mapPtr. n is the
+         * size of Tx */
         memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
         acsm->nTotal += n;
 
+        /* unmap a previously mapped region of a memory object (but why?) */
         acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
+
         acsm->kernel.setArg(2, acsm->textBuffer1);
     }
     else {
@@ -1841,14 +1858,16 @@ int* current_state)
     }
 
     if(acsm->searchLaunched) {
+        //clock_t timer = clock();
+
         acsm->queue.finish();
-        //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
-        //acsm->totalFound += acsm->resultMap[0];
-        //Handle results
+
+        //stopwatch += difftime(clock(), timer)/CLOCKS_PER_SEC;
+
+        /* count number of matches */
         int c=0;
 
-        for (int i=0;i<KERNEL_SIZE;i++)
-        {
+        for (int i=0;i<KERNEL_SIZE;i++) {
             c+=acsm->countsMap[i];
         }
         acsm->totalFound = c;
@@ -1865,7 +1884,6 @@ int* current_state)
         return 0;
     }
 
-    clock_t timer = clock();
     int * len = &acsm->nTotal;
     cl_int err;
 
@@ -1878,17 +1896,15 @@ int* current_state)
     if(err != CL_SUCCESS)
         printf("Buffer error %d \n", err);
 
-    // Set arguments to kernel
-    err = acsm->kernel.setArg(0, acsm->stateBuffer);
-    err = acsm->kernel.setArg(1, acsm->xlatBuffer);
-    //err = acsm->kernel.setArg(2, acsm->testBuffer);
-    err = acsm->kernel.setArg(3, lengthBuffer);
-    err = acsm->kernel.setArg(4, acsm->matchBuffer);
-    err = acsm->kernel.setArg(5, acsm->countsBuffer);
-    err = acsm->kernel.setArg(6, acsm->matchLenBuffer);
-
-    if(err != CL_SUCCESS)
-        printf("Error in setarg result %d \n", err);
+    /* Set parameters to kernel. These parameters correspond to function parameters
+     * for findMatches function in findMatches.cl */
+    acsm->kernel.setArg(0, acsm->stateBuffer);      /* int* stateTable */
+    acsm->kernel.setArg(1, acsm->xlatBuffer);       /* uchar* translate */
+    //acsm->kernel.setArg(2, acsm->testBuffer);     /* uchar* input */
+    acsm->kernel.setArg(3, lengthBuffer);           /* int* length */
+    acsm->kernel.setArg(4, acsm->matchBuffer);      /* int* resultList */
+    acsm->kernel.setArg(5, acsm->countsBuffer);     /* int* match_count */
+    acsm->kernel.setArg(6, acsm->matchLenBuffer);   /* int* matchLen */
 
     /* specify vector size */
     cl::NDRange global(KERNEL_SIZE);
@@ -1902,9 +1918,12 @@ int* current_state)
 
     /* enqueueMapBuffer is used as an alternative to clEnqueueRead/Write.
      * this maps a memory object on the device to a mem region on host
+     *
+     * countsMap
      */
     acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(
-        acsm->countsBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
+        acsm->countsBuffer,
+        CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
 
     /* do some kind of buffer alternation? */
     if(acsm->currentBuffer==1) {
@@ -1918,38 +1937,45 @@ int* current_state)
             acsm->textBuffer2, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
     }
 
-    /* flush is a non-blocking call */
+    /* flush is a non-blocking call. issues all queued commands to the device */
     acsm->queue.flush();
     acsm->searchLaunched = 1;
     acsm->nTotal = 0;
 
-    /* if packet size is not zero */
+    /* if packet size is zero, end search. but why? */
     if(!n) {
+        std::cout << "packet size is zero" << std::endl;
+
+        //clock_t timer = clock();
+
         /* finish is a blocking call */
         acsm->queue.finish();
-        /* flush and finish basically perform the same operation. why do they use both? */
+        /* flush and finish basically perform the same operation.
+         * why do they use both?
+         */
+
+        //stopwatch += difftime(clock(), timer)/CLOCKS_PER_SEC;
 
         //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
         //acsm->totalFound += acsm->resultMap[0];
 
+        /* count number of matches */
         int c = 0;
-
         for (int i=0;i<KERNEL_SIZE;i++)
             c += acsm->countsMap[i];
 
         /* update global match count */
         acsm->totalFound += c;
 
-        //Handle results
         //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
         //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
 
         acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
-        acsm->searchLaunched = 0;
         acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
         acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
+
+        acsm->searchLaunched = 0;
     }
-    //printf("Exiting GPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
     return acsm->totalFound;
 }
 
@@ -2041,7 +2067,7 @@ ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, in
 
     //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
 
-    /* Handle results */
+    /* count number of matches */
     int c=0;
 
     for (int i=0;i<KERNEL_SIZE;i++) {
