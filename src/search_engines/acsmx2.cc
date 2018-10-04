@@ -1474,7 +1474,8 @@ int acsmCompile2(SnortConfig* sc, ACSM_STRUCT2* acsm)
     acsm->buffSize = 0;
     acsm->resultArray = new int [acsm->acsmNumStates]{};
 
-    if(USE_GPU)
+    /* TODO: here */
+    if(true)
     {
         //printf("Build list array with states: %d \n", acsm->acsmNumStates);
         acstate_t* p;
