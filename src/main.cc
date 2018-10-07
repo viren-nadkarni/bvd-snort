@@ -879,6 +879,10 @@ static void snort_main()
 #endif
 }
 
+void foo_thread(){
+    printf("Working!!\n\n");
+}
+
 int main(int argc, char* argv[])
 {
     set_mem_constraint_handler_s(log_safec_error);

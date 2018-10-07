@@ -132,6 +132,7 @@
 #include <fstream>               // std::ifstream
 #include <cstring>
 #include <time.h>
+#include <thread>
 
 #define printf LogMessage
 
@@ -1776,6 +1777,47 @@ void* context, int* current_state)
 void acsmx2_print_qinfo()
 {
 }
+
+bool first_time = true;
+std::vector<std::tuple<ACSM_STRUCT2*, const uint8_t*, int, MpseMatch, void*, int*>> work_vector;
+
+
+std::thread thread1;
+
+void fun(){
+
+    while(1){
+        if(!work_vector.empty())
+        {
+            std::cout << "There is work to be done size: " << work_vector.size() << std::endl;
+            //work_vector.pop_back();
+        }
+    }
+    
+
+    /*
+     * Remove work from queue and prepare 
+     *
+     * */
+
+}
+
+int custom_acsm_search_dfa_full_gpu(
+ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context,
+int* current_state)
+{
+    // Initialize threads
+    if(first_time){
+        thread1 = std::thread(fun);
+        first_time = false;
+    }
+
+    std::tuple<ACSM_STRUCT2*, const uint8_t*, int, MpseMatch, void*, int*> work;
+    work = std::make_tuple(acsm, Tx, n, match, context, current_state);
+
+    work_vector.push_back(work);
+}
+
 
 
 /* gpusearch

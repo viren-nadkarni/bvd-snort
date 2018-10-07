@@ -73,13 +73,17 @@ class AcfMpse : public Mpse
                 /*
                 ncount = acsm_search_dfa_full_gpu_singleBuff(
                         obj, T, n, match, context, current_state);
-                ncount = acsm_search_dfa_full_gpu(
-                        obj, T, n, match, context, current_state);
                 */
+                /*count = acsm_search_dfa_full_gpu(
+                        obj, T, n, match, context, current_state);*/
+                /*
                 ncount = acsm_search_dfa_full_cpu(
                         obj, T, n, match, context, current_state);
-                /*
                 */
+
+                ncount = custom_acsm_search_dfa_full_gpu(
+                        obj, T, n, match, context, current_state);
+
                 my_total_matches += ncount;
                 foocount += ncount;
 
