@@ -1809,9 +1809,14 @@ int* current_state)
             CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
             sizeof(uint8_t) * acsm->buffSize);
 
+        acsm->textBuffer3 = cl::Buffer(
+            acsm->context,
+            CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
+            sizeof(uint8_t) * acsm->buffSize);
+
         /* this maps the buffer object to host memory, and returns address of
          * latter. in this case */
-        acsm->mapPtr = (uint8_t*) acsm->queue.enqueueMapBuffer(
+        acsm->mapPtr1 = (uint8_t*) acsm->queue.enqueueMapBuffer(
             acsm->textBuffer1,          /* is the buffer */
             CL_TRUE,                    /* blocking */
             CL_MAP_READ | CL_MAP_WRITE, /* flags */
@@ -1822,40 +1827,52 @@ int* current_state)
             acsm->textBuffer2,
             CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
             0, sizeof(uint8_t)*acsm->buffSize);
+
+        acsm->mapPtr3 = (uint8_t* )acsm->queue.enqueueMapBuffer(
+            acsm->textBuffer3,
+            CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
+            0, sizeof(uint8_t)*acsm->buffSize);
     }
 
     /* if the buffer is not full, store the payload data in the buffer and return 0 */
     if(acsm->nTotal < (acsm->buffSize - 3000) && n > 0) {
-        if(acsm->currentBuffer == 1) {
-            memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
-            acsm->nTotal += n;
-            return 0;
+        switch(acsm->currentBuffer) {
+            case 1:
+                memcpy(&(acsm->mapPtr1[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
+                break;
+            case 2:
+                memcpy(&(acsm->mapPtr2[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
+                break;
+            case 3:
+                memcpy(&(acsm->mapPtr3[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
+                break;
         }
-        else {
-            memcpy(&(acsm->mapPtr2[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
-            acsm->nTotal += n;
-            return 0;
-        }
+        acsm->nTotal += n;
+        return 0;
     }
 
     /* add current packet to the buffer */
-    if(acsm->currentBuffer == 1) {
+    switch(acsm->currentBuffer) {
         /* here, Tx which is the incoming packet is copied to mapPtr. n is the
          * size of Tx */
-        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
-        acsm->nTotal += n;
-
-        /* unmap a previously mapped region of a memory object (but why?) */
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
-
-        acsm->kernel.setArg(2, acsm->textBuffer1);
-    }
-    else {
-        memcpy(&(acsm->mapPtr2[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
-        acsm->nTotal += n;
-
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
-        acsm->kernel.setArg(2, acsm->textBuffer2);
+        case 1:
+            memcpy(&(acsm->mapPtr1[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
+            acsm->nTotal += n;
+            acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr1);
+            acsm->kernel.setArg(2, acsm->textBuffer1);
+            break;
+        case 2:
+            memcpy(&(acsm->mapPtr2[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
+            acsm->nTotal += n;
+            acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
+            acsm->kernel.setArg(2, acsm->textBuffer2);
+            break;
+        case 3:
+            memcpy(&(acsm->mapPtr3[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
+            acsm->nTotal += n;
+            acsm->queue.enqueueUnmapMemObject(acsm->textBuffer3, acsm->mapPtr3);
+            acsm->kernel.setArg(2, acsm->textBuffer3);
+            break;
     }
 
     if(acsm->searchLaunched) {
@@ -1926,17 +1943,23 @@ int* current_state)
         acsm->countsBuffer,
         CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
 
-    /* do some kind of buffer alternation? */
-    if(acsm->currentBuffer==1) {
-        acsm->currentBuffer=2;
-        acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer1, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+    switch(acsm->currentBuffer) {
+        case 1:
+            acsm->mapPtr1 = (uint8_t*)acsm->queue.enqueueMapBuffer(
+                acsm->textBuffer1, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+            break;
+        case 2:
+            acsm->mapPtr2 = (uint8_t*)acsm->queue.enqueueMapBuffer(
+                acsm->textBuffer2, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+            break;
+        case 3:
+            acsm->mapPtr3 = (uint8_t*)acsm->queue.enqueueMapBuffer(
+                acsm->textBuffer3, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
+            break;
     }
-    else {
-        acsm->currentBuffer=1;
-        acsm->mapPtr2 = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer2, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
-    }
+
+    /* change buffer */
+    acsm->currentBuffer = 1 + ((acsm->currentBuffer + 1) % 3);
 
     /* flush is a non-blocking call. issues all queued commands to the device */
     acsm->queue.flush();
@@ -1971,9 +1994,14 @@ int* current_state)
         //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
         //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
 
-        acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
+        acsm->queue.enqueueUnmapMemObject(
+                acsm->countsBuffer, acsm->countsMap);
+        acsm->queue.enqueueUnmapMemObject(
+                acsm->textBuffer1, acsm->mapPtr1);
+        acsm->queue.enqueueUnmapMemObject(
+                acsm->textBuffer2, acsm->mapPtr2);
+        acsm->queue.enqueueUnmapMemObject(
+                acsm->textBuffer3, acsm->mapPtr3);
 
         acsm->searchLaunched = 0;
     }
@@ -1990,7 +2018,7 @@ ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, in
         acsm->textBuffer1 = cl::Buffer(
                 acsm->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
                 sizeof(uint8_t)*acsm->buffSize);
-        acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
+        acsm->mapPtr1 = (uint8_t*)acsm->queue.enqueueMapBuffer(
                 acsm->textBuffer1, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
                 0, sizeof(uint8_t)*acsm->buffSize);
     }
@@ -1998,17 +2026,17 @@ ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, in
     /* if the buffer is not full, store the payload data in the buffer and return */
     if(acsm->nTotal < (acsm->buffSize-3000) && n > 0)
     {
-        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t)*n);
+        memcpy(&(acsm->mapPtr1[acsm->nTotal]), Tx, sizeof(uint8_t)*n);
         acsm->nTotal += n;
         return 0;
     }
 
     /* add current packet to the buffer */
     if(n > 0) {
-        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t)*n);
+        memcpy(&(acsm->mapPtr1[acsm->nTotal]), Tx, sizeof(uint8_t)*n);
         acsm->nTotal += n;
     }
-    acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
+    acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr1);
 
     /* for flushing, return if there is no data to flush */
     if(!(acsm->nTotal))
@@ -2060,7 +2088,7 @@ ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, in
             acsm->countsBuffer, CL_FALSE, CL_MAP_READ|CL_MAP_WRITE,
             0, KERNEL_SIZE*sizeof(int));
 
-    acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
+    acsm->mapPtr1 = (uint8_t*)acsm->queue.enqueueMapBuffer(
             acsm->textBuffer1, CL_FALSE, CL_MAP_WRITE,
             0, sizeof(uint8_t)*acsm->buffSize);
 
@@ -2091,7 +2119,7 @@ ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, in
     if(!n) {
         //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
         acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
+        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr1);
     }
 
     //printf("Exiting GPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);

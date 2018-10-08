@@ -158,12 +158,16 @@ struct ACSM_STRUCT2
     int searchLaunched;
     int * resultMap;
     int * countsMap;
-    uint8_t* mapPtr;
+
+    uint8_t* mapPtr1;
     uint8_t* mapPtr2;
+    uint8_t* mapPtr3;
 
     //OpenCL var
     cl::Buffer textBuffer1;
     cl::Buffer textBuffer2;
+    cl::Buffer textBuffer3;
+
     cl::Buffer stateBuffer;
     cl::Buffer xlatBuffer;
     cl::Buffer matchBuffer;
