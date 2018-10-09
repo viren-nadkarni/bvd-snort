@@ -134,6 +134,9 @@
 #include <time.h>
 #include <thread>
 
+#include <mutex>
+#include <condition_variable>
+
 #define printf LogMessage
 
 #define MEMASSERT(p,s) if (!(p)) { FatalError("ACSM-No Memory: %s\n",s); }
@@ -1782,26 +1785,52 @@ bool first_time = true;
 std::vector<std::tuple<ACSM_STRUCT2*, const uint8_t*, int, MpseMatch, void*, int*>> work_vector;
 
 
+// Temporarily set global variables used for synchronization.
 std::thread thread1;
+std::mutex _work_lock;
+std::condition_variable cond;
 
+long long popped = 0;
+long long pushed = 0;
+int i = 1;
+
+/**
+ * Handles preparing queued work to the buffer.
+ */
 void fun(){
 
-    while(1){
-        if(!work_vector.empty())
-        {
-            std::cout << "There is work to be done size: " << work_vector.size() << std::endl;
-            //work_vector.pop_back();
+    while(true){
+        // Aquire mutex so that we can safely access the work_vector.
+        std::unique_lock<std::mutex> locker(_work_lock);
+
+        // Wait for the work_queue to get some work.
+        cond.wait(locker, []{ return !work_vector.empty(); });
+
+        // Handle work.
+        work_vector.pop_back();
+        popped += 1;
+
+        /**
+         * Temporary check to verify that pop() and push_back() are called the 
+         * same number of times.
+         */
+        if (popped > 10000*i) {
+            //std::cout << "Popped: " << popped << ", pushed: " << pushed << std::endl;
+            i += 1;
         }
+
+        // Release the lock.
+        locker.unlock();
     }
-    
-
-    /*
-     * Remove work from queue and prepare 
-     *
-     * */
-
 }
 
+/**
+ * Spawns threads which deal with preparing the buffer and sending to the gpu.
+ * Adds work to be done to a work_queue for processing.
+ *
+ * Exhibits consumer-producer processing pattern so that the work_queue can be 
+ * handled safely and efficiently.
+ */
 int custom_acsm_search_dfa_full_gpu(
 ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context,
 int* current_state)
@@ -1812,10 +1841,24 @@ int* current_state)
         first_time = false;
     }
 
+    // Prepare work for queue.
     std::tuple<ACSM_STRUCT2*, const uint8_t*, int, MpseMatch, void*, int*> work;
     work = std::make_tuple(acsm, Tx, n, match, context, current_state);
+    
+    // Aquire mutex so that we can safely access the work_vector.
+    std::unique_lock<std::mutex> locker(_work_lock);
 
+    // Add work to queue.
     work_vector.push_back(work);
+    pushed += 1;
+
+    // Release the lock.
+    locker.unlock();
+    
+    // Notify all buffer threads that the work_vector has received new work.
+    cond.notify_all();
+
+    return 0;
 }
 
 
