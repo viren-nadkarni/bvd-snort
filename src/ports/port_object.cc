@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,7 +26,6 @@
 #include "port_object.h"
 
 #include "log/messages.h"
-#include "main/snort_debug.h"
 #include "parser/parser.h"
 #include "utils/util.h"
 #include "utils/util_cstring.h"
@@ -34,6 +33,8 @@
 #include "port_group.h"
 #include "port_item.h"
 #include "port_utils.h"
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // PortObject - public
@@ -51,9 +52,6 @@ void PortObjectFree(void* pv)
 {
     assert(pv);
     PortObject* po = (PortObject*)pv;
-
-    DEBUG_WRAP(static int pof_cnt = 0; pof_cnt++; );
-    DebugFormat(DEBUG_PORTLISTS, "PortObjectFree-Cnt: %d ptr=%p\n", pof_cnt, (void*)po);
 
     if ( po->name )
         snort_free(po->name);
@@ -119,7 +117,7 @@ int PortObjectAddItem(PortObject* po, PortObjectItem* poi, int* errflag)
         p=(PortObjectItem*)sflist_next(&pos) )
     {
         if ((p->lport == poi->lport) && (p->hport == poi->hport))
-            ParseWarning(WARN_RULES, "duplicate ports in list");
+            snort::ParseWarning(WARN_RULES, "duplicate ports in list");
     }
 
     sflist_add_tail(po->item_list, poi);
@@ -555,7 +553,7 @@ void PortObjectPrintPortsRaw(PortObject* po)
 
     SnortSnprintfAppend(buf, bufsize, " ]");
 
-    LogMessage("%s", buf);
+    snort::LogMessage("%s", buf);
 
     snort_free(buf);
 }
@@ -574,7 +572,7 @@ void PortObjectPrintEx(PortObject* po, po_print_f print_index_map)
     unsigned i;
 
     /* static for printing so we don't put so many bytes on the stack */
-    static char po_print_buf[MAX_PORTS];  // FIXIT-L delete this; replace with local stringstream
+    static char po_print_buf[snort::MAX_PORTS];  // FIXIT-L delete this; replace with local stringstream
 
     int bufsize = sizeof(po_print_buf);
     po_print_buf[0] = '\0';
@@ -642,7 +640,7 @@ void PortObjectPrintEx(PortObject* po, po_print_f print_index_map)
     }
     SnortSnprintfAppend(po_print_buf, bufsize, "  ]\n }\n");
 
-    LogMessage("%s", po_print_buf);
+    snort::LogMessage("%s", po_print_buf);
     snort_free(rlist);
 }
 

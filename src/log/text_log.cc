@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2007-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -38,6 +38,8 @@
 #include "utils/util.h"
 
 #include "log.h"
+
+using namespace snort;
 
 /* a reasonable minimum */
 #define MIN_BUF  (4* K_BYTES)
@@ -94,11 +96,8 @@ static size_t TextLog_Size(FILE* file)
     return err ? 0 : sbuf.st_size;
 }
 
-int TextLog_Tell(TextLog* const txt)
+namespace snort
 {
-    return txt->pos;
-}
-
 int TextLog_Avail(TextLog* const txt)
 {
     return txt->maxBuf - txt->pos - 1;
@@ -306,4 +305,4 @@ bool TextLog_Quote(TextLog* const txt, const char* qs)
 
     return true;
 }
-
+} // namespace snort

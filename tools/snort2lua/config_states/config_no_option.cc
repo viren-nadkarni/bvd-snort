@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -83,6 +83,8 @@ static ConversionState* config_false_no_opt_ctor(Converter& c)
     return new DeadCode(c);
 }
 
+#if 0
+// currently unused - for future reference
 template<const std::string* snort_option,
 const std::string* lua_table>
 static ConversionState* config_false_no_opt_ctor(Converter& c)
@@ -92,6 +94,7 @@ static ConversionState* config_false_no_opt_ctor(Converter& c)
     c.get_table_api().close_table();
     return new DeadCode(c);
 }
+#endif
 } // namespace
 
 /*************************************************

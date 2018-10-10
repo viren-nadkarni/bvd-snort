@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,11 +27,24 @@
 
 #include <algorithm>
 
-#include "appid_config.h"
-#include "appid_session.h"
-#include "app_info_table.h"
-#include "lua_detector_api.h"
+#include "profiler/profiler.h"
+#include "protocols/packet.h"
+#include "protocols/tcp.h"
 
+#include "app_info_table.h"
+#include "appid_config.h"
+#include "appid_debug.h"
+#include "appid_dns_session.h"
+#include "appid_session.h"
+#include "detector_plugins/detector_dns.h"
+#include "detector_plugins/detector_http.h"
+#include "detector_plugins/detector_imap.h"
+#include "detector_plugins/detector_kerberos.h"
+#include "detector_plugins/detector_pattern.h"
+#include "detector_plugins/detector_pop3.h"
+#include "detector_plugins/detector_sip.h"
+#include "detector_plugins/detector_smtp.h"
+#include "lua_detector_api.h"
 #include "service_battle_field.h"
 #include "service_bgp.h"
 #include "service_bit.h"
@@ -58,31 +71,24 @@
 #include "service_snmp.h"
 #include "service_ssh.h"
 #include "service_ssl.h"
+#include "service_telnet.h"
 #include "service_tftp.h"
 #include "service_timbuktu.h"
 #include "service_tns.h"
-#include "service_telnet.h"
-#include "thirdparty_appid_utils.h"
-#include "detector_plugins/detector_dns.h"
-#include "detector_plugins/detector_http.h"
-#include "detector_plugins/detector_imap.h"
-#include "detector_plugins/detector_kerberos.h"
-#include "detector_plugins/detector_pattern.h"
-#include "detector_plugins/detector_pop3.h"
-#include "detector_plugins/detector_sip.h"
-#include "detector_plugins/detector_smtp.h"
-
-#include "profiler/profiler.h"
-#include "protocols/packet.h"
-#include "protocols/tcp.h"
 
 #ifdef REG_TEST
 #include "service_regtest.h"
 #endif
 
-static THREAD_LOCAL ServiceDetector* ftp_service = nullptr;
+#ifdef ENABLE_APPID_THIRD_PARTY
+#include "tp_appid_session_api.h"
+#endif
+
+using namespace snort;
 
 ProfileStats serviceMatchPerfStats;
+static ServiceDetector* ftp_service;
+ServiceDiscovery* ServiceDiscovery::discovery_manager = nullptr;
 
 ServiceDiscovery::ServiceDiscovery(AppIdInspector& ins)
     : AppIdDiscovery(ins)
@@ -90,10 +96,8 @@ ServiceDiscovery::ServiceDiscovery(AppIdInspector& ins)
     initialize();
 }
 
-
 ServiceDiscovery& ServiceDiscovery::get_instance(AppIdInspector* ins)
 {
-    static THREAD_LOCAL ServiceDiscovery* discovery_manager = nullptr;
     if (!discovery_manager)
     {
         assert(ins);
@@ -101,6 +105,13 @@ ServiceDiscovery& ServiceDiscovery::get_instance(AppIdInspector* ins)
     }
 
     return *discovery_manager;
+}
+
+void ServiceDiscovery::release_instance()
+{
+    assert(discovery_manager);
+    delete discovery_manager;
+    discovery_manager = nullptr;
 }
 
 void ServiceDiscovery::initialize()
@@ -154,10 +165,15 @@ void ServiceDiscovery::initialize()
 #endif
 
     for ( auto kv : tcp_detectors )
+    {
         kv.second->initialize();
-
+        service_detector_list.push_back(kv.second);
+    }
     for ( auto kv : udp_detectors )
+    {
         kv.second->initialize();
+        service_detector_list.push_back(kv.second);	
+    }
 }
 
 void ServiceDiscovery::finalize_service_patterns()
@@ -245,8 +261,7 @@ static int pattern_match(void* id, void*, int match_end_pos, void* data, void*)
  * don't do any pattern match. This is a way degrades RNA detector selection if FRE is running on
  * this sensor.
 */
-void ServiceDiscovery::match_services_by_pattern(AppIdSession* asd, const Packet* pkt, IpProtocol
-    proto)
+void ServiceDiscovery::match_by_pattern(AppIdSession& asd, const Packet* pkt, IpProtocol proto)
 {
     SearchTool* patterns = nullptr;
 
@@ -270,10 +285,10 @@ void ServiceDiscovery::match_services_by_pattern(AppIdSession* asd, const Packet
             std::sort(smOrderedList.begin(), smOrderedList.end(), AppIdPatternPrecedence);
             for ( auto& sm : smOrderedList )
             {
-                if ( std::find(asd->service_candidates.begin(), asd->service_candidates.end(),
-                    sm->service) == asd->service_candidates.end() )
+                if ( std::find(asd.service_candidates.begin(), asd.service_candidates.end(),
+                    sm->service) == asd.service_candidates.end() )
                 {
-                    asd->service_candidates.push_back(sm->service);
+                    asd.service_candidates.push_back(sm->service);
                 }
                 snort_free(sm);
             }
@@ -306,28 +321,28 @@ static inline uint16_t sslPortRemap(uint16_t port)
 }
 
 void ServiceDiscovery::get_port_based_services(IpProtocol protocol, uint16_t port,
-    AppIdSession* asd)
+    AppIdSession& asd)
 {
     ServiceDiscovery& sd = ServiceDiscovery::get_instance();
 
-    if ( asd->is_decrypted() )
+    if ( asd.is_decrypted() )
     {
         unsigned mapped_port = sslPortRemap(port);
         if (mapped_port)
         {
             if ( sd.tcp_services.find(mapped_port) != sd.tcp_services.end() )
-                asd->service_candidates = sd.tcp_services[mapped_port];
+                asd.service_candidates = sd.tcp_services[mapped_port];
         }
     }
     else if ( protocol == IpProtocol::TCP )
     {
         if ( sd.tcp_services.find(port) != sd.tcp_services.end() )
-            asd->service_candidates = sd.tcp_services[port];
+            asd.service_candidates = sd.tcp_services[port];
     }
     else
     {
         if ( sd.udp_services.find(port) != sd.udp_services.end() )
-            asd->service_candidates = sd.udp_services[port];
+            asd.service_candidates = sd.udp_services[port];
     }
 }
 
@@ -344,68 +359,70 @@ void ServiceDiscovery::get_port_based_services(IpProtocol protocol, uint16_t por
  * been specified (service_detector).  Basically, this function handles going
  * through the main port/pattern search (and returning which detector to add
  * next to the list of detectors to try (even if only 1)). */
-void ServiceDiscovery::get_next_service(const Packet* p, const int dir,
-    AppIdSession* asd, ServiceDiscoveryState* sds)
+void ServiceDiscovery::get_next_service(const Packet* p, const AppidSessionDirection dir, AppIdSession& asd)
 {
-    auto proto = asd->protocol;
+    auto proto = asd.protocol;
 
     /* See if there are any port detectors to try.  If not, move onto patterns. */
-    if ( asd->service_search_state == SESSION_SERVICE_SEARCH_STATE::PORT )
+    if ( asd.service_search_state == SESSION_SERVICE_SEARCH_STATE::PORT )
     {
         get_port_based_services(proto,
             (dir ==  APP_ID_FROM_RESPONDER) ? p->ptrs.sp : p->ptrs.dp, asd);
-        asd->service_search_state = SESSION_SERVICE_SEARCH_STATE::PATTERN;
+        asd.service_search_state = SESSION_SERVICE_SEARCH_STATE::PATTERN;
     }
 
-    if ( asd->service_search_state == SESSION_SERVICE_SEARCH_STATE::PATTERN)
+    if ( asd.service_search_state == SESSION_SERVICE_SEARCH_STATE::PATTERN)
     {
         /* If we haven't found anything yet, try to see if we get any hits
          * first with UDP reversed services before moving onto pattern matches. */
         if (dir == APP_ID_FROM_INITIATOR)
         {
-            if ( !asd->get_session_flags(APPID_SESSION_ADDITIONAL_PACKET)
-                && (proto == IpProtocol::UDP) && !asd->tried_reverse_service )
+            if ( (proto == IpProtocol::UDP) and !asd.tried_reverse_service and
+                 !asd.get_session_flags(APPID_SESSION_ADDITIONAL_PACKET) )
             {
-                asd->tried_reverse_service = true;
+                asd.tried_reverse_service = true;
                 ServiceDiscoveryState* rsds = AppIdServiceState::get(p->ptrs.ip_api.get_src(),
-                    proto, p->ptrs.sp, asd->is_decrypted());
+                    proto, p->ptrs.sp, asd.is_decrypted());
+                std::unordered_map<uint16_t, std::vector<ServiceDetector*>>::iterator urs_iterator;
                 if ( rsds && rsds->get_service() )
-                    asd->service_candidates.push_back(rsds->get_service());
-                else if ( !udp_reversed_services[p->ptrs.sp].empty() )
+                    asd.service_candidates.push_back(rsds->get_service());
+                else if ( ( urs_iterator = udp_reversed_services.find(p->ptrs.sp) )
+                          != udp_reversed_services.end() and !urs_iterator->second.empty() )
                 {
-                    asd->service_candidates.insert(asd->service_candidates.end(),
-                        udp_reversed_services[p->ptrs.sp].begin(),
-                        udp_reversed_services[p->ptrs.sp].end());
+                    asd.service_candidates.insert(asd.service_candidates.end(),
+                        urs_iterator->second.begin(),
+                        urs_iterator->second.end());
                 }
                 else if ( p->dsize )
                 {
-                    match_services_by_pattern(asd, p, proto);
+                    match_by_pattern(asd, p, proto);
                 }
                 return;
             }
         }
         else
         {
-            match_services_by_pattern(asd, p, proto);
-            sds->set_state(SERVICE_ID_STATE::SEARCHING_BRUTE_FORCE);
+            match_by_pattern(asd, p, proto);
+            asd.service_search_state = SESSION_SERVICE_SEARCH_STATE::PENDING;
             return;
         }
     }
 }
 
-int ServiceDiscovery::identify_service(AppIdSession* asd, Packet* p, int dir)
+int ServiceDiscovery::identify_service(AppIdSession& asd, Packet* p,
+    AppidSessionDirection dir, AppidChangeBits& change_bits)
 {
-    const SfIp* ip = nullptr;
-    int ret = APPID_NOMATCH;
-    uint16_t port = 0;
-    bool got_incompatible_services = false;
+    ServiceDiscoveryState* sds = nullptr;
+    bool got_brute_force = false;
+    const SfIp* ip;
+    uint16_t port;
 
     /* Get packet info. */
-    auto proto = asd->protocol;
-    if ( asd->service_ip.is_set() )
+    auto proto = asd.protocol;
+    if ( asd.service_ip.is_set() )
     {
-        ip   = &asd->service_ip;
-        port = asd->service_port;
+        ip   = &asd.service_ip;
+        port = asd.service_port;
     }
     else
     {
@@ -419,109 +436,125 @@ int ServiceDiscovery::identify_service(AppIdSession* asd, Packet* p, int dir)
             ip   = p->ptrs.ip_api.get_dst();
             port = p->ptrs.dp;
         }
+        asd.service_ip = *ip;
+        asd.service_port = port;
     }
 
-    ServiceDiscoveryState* sds = AppIdServiceState::get(ip, proto, port, asd->is_decrypted());
-    if ( !sds )
-        sds = AppIdServiceState::add(ip, proto, port, asd->is_decrypted());
-
-    if ( asd->service_search_state == SESSION_SERVICE_SEARCH_STATE::START )
+    if ( asd.service_search_state == SESSION_SERVICE_SEARCH_STATE::START )
     {
-        asd->service_search_state = SESSION_SERVICE_SEARCH_STATE::PORT;
+        asd.service_search_state = SESSION_SERVICE_SEARCH_STATE::PORT;
+        sds = AppIdServiceState::add(ip, proto, port, asd.is_decrypted());
+        sds->set_reset_time(0);
+        SERVICE_ID_STATE sds_state = sds->get_state();
 
-        if ( sds->get_state() == SERVICE_ID_STATE::FAILED )
+        if ( sds_state == SERVICE_ID_STATE::FAILED )
         {
-            fail_service(asd, p, dir, nullptr);
+            if (appidDebug->is_active())
+                LogMessage("AppIdDbg %s No service match, failed state\n", appidDebug->get_debug_session());
+            fail_service(asd, p, dir, nullptr, sds);
             return APPID_NOMATCH;
         }
 
-        if ( !asd->service_detector )
+        if ( !asd.service_detector )
         {
             /* If a valid service already exists in host tracker, give it a try. */
-            if ( sds->get_state() == SERVICE_ID_STATE::VALID )
-                asd->service_detector = sds->get_service();
-            else if ( asd->service_candidates.empty() )
+            if ( sds_state == SERVICE_ID_STATE::VALID )
+                asd.service_detector = sds->get_service();
+            /* If we've gotten to brute force, give next detector a try. */
+            else if ( sds_state == SERVICE_ID_STATE::SEARCHING_BRUTE_FORCE and
+                      asd.service_candidates.empty() )
             {
-                asd->service_detector = sds->select_detector_by_brute_force(proto);
+                asd.service_detector = sds->select_detector_by_brute_force(proto);
+                got_brute_force = true;
             }
         }
     }
 
-    AppIdDiscoveryArgs args(p->data, p->dsize, dir, asd, p);
-    if ( asd->service_detector )
+    int ret = APPID_NOMATCH;
+    bool got_incompatible_service = false;
+    bool got_fail_service = false;
+    AppIdDiscoveryArgs args(p->data, p->dsize, dir, asd, p, change_bits);
+    /* If we already have a service to try, then try it out. */
+    if ( asd.service_detector )
     {
-        ret = asd->service_detector->validate(args);
-        if (ret == APPID_NOT_COMPATIBLE)
-            got_incompatible_services = true;
-        if (asd->session_logging_enabled)
-            LogMessage("AppIdDbg %s %s returned %d\n", asd->session_logging_id,
-                asd->service_detector->get_name().c_str(), ret);
+        ret = asd.service_detector->validate(args);
+        if (ret == APPID_NOMATCH)
+            got_fail_service = true;
+        else if (ret == APPID_NOT_COMPATIBLE)
+            got_incompatible_service = true;
+        asd.service_search_state = SESSION_SERVICE_SEARCH_STATE::PENDING;
+        if (appidDebug->is_active())
+            LogMessage("AppIdDbg %s %s service detector returned %s (%d)\n",
+                appidDebug->get_debug_session(), asd.service_detector->get_log_name().c_str(),
+                asd.service_detector->get_code_string((APPID_STATUS_CODE)ret), ret);
     }
-    else
+    /* Try to find detectors based on ports and patterns. */
+    else if (!got_brute_force)
     {
         /* See if we've got more detector(s) to add to the candidate list. */
-        if ( ( asd->service_search_state == SESSION_SERVICE_SEARCH_STATE::PORT )
-            || ( ( asd->service_search_state == SESSION_SERVICE_SEARCH_STATE::PATTERN )
+        if ( ( asd.service_search_state == SESSION_SERVICE_SEARCH_STATE::PORT )
+            || ( ( asd.service_search_state == SESSION_SERVICE_SEARCH_STATE::PATTERN )
             && (dir == APP_ID_FROM_RESPONDER ) ) )
         {
-            get_next_service(p, dir, asd, sds);
+            get_next_service(p, dir, asd);
         }
 
         /* Run all of the detectors that we currently have. */
         ret = APPID_INPROCESS;
-        auto it = asd->service_candidates.begin();
-        while ( it != asd->service_candidates.end() )
+        auto it = asd.service_candidates.begin();
+        while ( it != asd.service_candidates.end() )
         {
             ServiceDetector* service = (ServiceDetector*)*it;
             int result;
 
             result = service->validate(args);
-            if ( result == APPID_NOT_COMPATIBLE )
-                got_incompatible_services = true;
-            if ( asd->session_logging_enabled )
-                LogMessage("AppIdDbg %s %s returned %d\n",
-                    asd->session_logging_id, service->get_name().c_str(), result);
+            if ( appidDebug->is_active() )
+                LogMessage("AppIdDbg %s %s service candidate returned %s (%d)\n",
+                    appidDebug->get_debug_session(), service->get_log_name().c_str(),
+                    service->get_code_string((APPID_STATUS_CODE)result), result);
 
             if ( result == APPID_SUCCESS )
             {
                 ret = APPID_SUCCESS;
-                asd->service_detector = service;
-                asd->service_candidates.empty();
+                asd.service_detector = service;
+                asd.service_candidates.clear();
                 break;    /* done */
             }
-            else if (result != APPID_INPROCESS)    /* fail */
-                asd->service_candidates.erase(it);
             else
-                ++it;
+            {
+                if ( result == APPID_NOT_COMPATIBLE )
+                    got_incompatible_service = true;
+                if (result != APPID_INPROCESS)    /* fail */
+                    it = asd.service_candidates.erase(it);
+                else
+                    ++it;
+            }
         }
 
         /* If we tried everything and found nothing, then fail. */
-        if ( ret != APPID_SUCCESS )
-        {
-            if ( ( asd->service_candidates.empty() )
-                && ( sds->get_state() == SERVICE_ID_STATE::SEARCHING_BRUTE_FORCE ) )
-            {
-                fail_service(asd, p, dir, nullptr);
-                ret = APPID_NOMATCH;
-            }
-        }
+        if ( asd.service_candidates.empty() and ret != APPID_SUCCESS and
+             ( asd.service_search_state == SESSION_SERVICE_SEARCH_STATE::PENDING ) )
+            got_fail_service = true;
     }
 
-    if ( asd->service_detector )
+    /* Failed all candidates, or no detector identified after seeing bidirectional exchange */
+    if ( got_fail_service or ( ( ret != APPID_INPROCESS ) and
+         !asd.service_detector and ( dir == APP_ID_FROM_RESPONDER ) ) )
     {
-        sds->set_reset_time(0);
-    }
-    else if ( dir == APP_ID_FROM_RESPONDER )    // bidirectional exchange unknown service
-    {
-        if (asd->session_logging_enabled)
-            LogMessage("AppIdDbg %s no service detector\n", asd->session_logging_id);
-
-        fail_service(asd, p, dir, nullptr);
+        if (!sds)
+            sds = AppIdServiceState::add(ip, proto, port, asd.is_decrypted());
+        // Don't log this if fail service is not due to empty list
+        if (appidDebug->is_active() and !(got_fail_service and asd.service_detector))
+            LogMessage("AppIdDbg %s No service %s\n", appidDebug->get_debug_session(),
+                got_fail_service? "candidate" : "detector");
+        got_fail_service = true;
+        fail_service(asd, p, dir, nullptr, sds);
         ret = APPID_NOMATCH;
     }
 
     /* Handle failure exception cases in states. */
-    if ( ( ret != APPID_INPROCESS ) && ( ret != APPID_SUCCESS ) )
+    if ( ( ( got_fail_service and !got_brute_force ) or got_incompatible_service ) and
+         ( ret != APPID_INPROCESS ) and ( ret != APPID_SUCCESS ) )
     {
         const SfIp* tmp_ip;
         if (dir == APP_ID_FROM_RESPONDER)
@@ -529,7 +562,10 @@ int ServiceDiscovery::identify_service(AppIdSession* asd, Packet* p, int dir)
         else
             tmp_ip = p->ptrs.ip_api.get_src();
 
-        if (got_incompatible_services)
+        if (!sds)
+            sds = AppIdServiceState::add(ip, proto, port, asd.is_decrypted());
+
+        if (got_incompatible_service)
             sds->update_service_incompatiable(tmp_ip);
 
         sds->set_service_id_failed(asd, tmp_ip);
@@ -545,12 +581,14 @@ int ServiceDiscovery::add_ftp_service_state(AppIdSession& asd)
     return asd.add_flow_data_id(21, ftp_service);
 }
 
-bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p, int direction)
+bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p,
+    AppidSessionDirection direction, AppidChangeBits& change_bits)
 {
     bool isTpAppidDiscoveryDone = false;
 
     Profile serviceMatchPerfStats_profile_context(serviceMatchPerfStats);
     uint32_t prevRnaServiceState = asd.service_disco_state;
+    AppId tp_app_id = asd.get_tp_app_id();
 
     if (asd.service_disco_state == APPID_DISCO_STATE_NONE && p->dsize)
     {
@@ -565,24 +603,27 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p, int di
                 if ( !ServiceDiscovery::add_ftp_service_state(asd) )
                 {
                     asd.set_session_flags(APPID_SESSION_CONTINUE);
-                    if (p->ptrs.dp != 21)
-                        asd.set_session_flags(APPID_SESSION_RESPONDER_SEEN);
                 }
                 asd.service_disco_state = APPID_DISCO_STATE_STATEFUL;
             }
             else
             {
-                asd.set_session_flags(APPID_SESSION_MID | APPID_SESSION_SERVICE_DETECTED);
+                asd.set_session_flags(APPID_SESSION_SERVICE_DETECTED);
                 asd.service_disco_state = APPID_DISCO_STATE_FINISHED;
+
+                if ( (asd.is_tp_appid_available() ||
+                      asd.get_session_flags(APPID_SESSION_NO_TPI))
+                     && asd.payload.get_id() == APP_ID_NONE )
+                    asd.payload.set_id(APP_ID_UNKNOWN);
             }
         }
-        else if (is_third_party_appid_available(asd.tpsession))
+        else if (asd.is_tp_appid_available())
         {
-            if (asd.tp_app_id > APP_ID_NONE)
+            if (tp_app_id > APP_ID_NONE)
             {
                 //tp has positively identified appId, Dig deeper only if sourcefire
                 // detector identifies additional information or flow is UDP reversed.
-                AppInfoTableEntry* entry = asd.app_info_mgr->get_app_info_entry(asd.tp_app_id);
+                AppInfoTableEntry* entry = asd.app_info_mgr->get_app_info_entry(tp_app_id);
                 if ( entry && entry->service_detector &&
                     ( ( entry->flags & APPINFO_FLAG_SERVICE_ADDITIONAL ) ||
                     ( ( entry->flags & APPINFO_FLAG_SERVICE_UDP_REVERSED ) &&
@@ -606,17 +647,17 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p, int di
 
     //stop rna inspection as soon as tp has classified a valid AppId later in the session
     if ( asd.service_disco_state == APPID_DISCO_STATE_STATEFUL &&
-        prevRnaServiceState == APPID_DISCO_STATE_STATEFUL &&
-        !asd.get_session_flags(APPID_SESSION_NO_TPI) &&
-        is_third_party_appid_available(asd.tpsession) &&
-        asd.tp_app_id > APP_ID_NONE && asd.tp_app_id < SF_APPID_MAX)
+         prevRnaServiceState == APPID_DISCO_STATE_STATEFUL &&
+         !asd.get_session_flags(APPID_SESSION_NO_TPI) &&
+         asd.is_tp_appid_available() &&
+         tp_app_id > APP_ID_NONE && tp_app_id < SF_APPID_MAX)
     {
-        AppInfoTableEntry* entry = asd.app_info_mgr->get_app_info_entry(asd.tp_app_id);
+        AppInfoTableEntry* entry = asd.app_info_mgr->get_app_info_entry(tp_app_id);
         if ( entry && entry->service_detector &&
             !(entry->flags & APPINFO_FLAG_SERVICE_ADDITIONAL) )
         {
-            if (asd.session_logging_enabled)
-                LogMessage("AppIdDbg %s Stop service detection\n", asd.session_logging_id);
+            if (appidDebug->is_active())
+                LogMessage("AppIdDbg %s Stop service detection\n", appidDebug->get_debug_session());
             asd.stop_rna_service_inspection(p, direction);
         }
     }
@@ -624,7 +665,7 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p, int di
     // Check to see if we want to stop any detectors for SIP/RTP.
     if (asd.service_disco_state != APPID_DISCO_STATE_FINISHED)
     {
-        if (asd.tp_app_id == APP_ID_SIP)
+        if (tp_app_id == APP_ID_SIP)
         {
             // TP needs to see its own future flows and does a better
             // job of it than we do, so stay out of its way, and don't
@@ -634,16 +675,19 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p, int di
             asd.stop_rna_service_inspection(p, direction);
             asd.service_disco_state = APPID_DISCO_STATE_FINISHED;
         }
-        else if ((asd.tp_app_id == APP_ID_RTP) || (asd.tp_app_id == APP_ID_RTP_AUDIO) ||
-            (asd.tp_app_id == APP_ID_RTP_VIDEO))
+        else if ((tp_app_id == APP_ID_RTP) || (tp_app_id == APP_ID_RTP_AUDIO) ||
+            (tp_app_id == APP_ID_RTP_VIDEO))
         {
             // No need for anybody to keep wasting time once we've
             // found RTP - Shut down our detectors.
-            asd.service.set_id(asd.tp_app_id);
+            asd.service.set_id(tp_app_id);
             asd.stop_rna_service_inspection(p, direction);
             asd.service_disco_state = APPID_DISCO_STATE_FINISHED;
             //  - Shut down TP.
-            thirdparty_appid_module->session_state_set(asd.tpsession, TP_STATE_TERMINATED);
+
+#ifdef ENABLE_APPID_THIRD_PARTY
+            asd.tpsession->set_state(TP_STATE_TERMINATED);
+#endif
             //  - Just ignore everything from now on.
             asd.set_session_flags(APPID_SESSION_IGNORE_FLOW);
         }
@@ -651,33 +695,41 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p, int di
 
     if (asd.service_disco_state == APPID_DISCO_STATE_STATEFUL)
     {
-        identify_service(&asd, p, direction);
+        identify_service(asd, p, direction, change_bits);
         isTpAppidDiscoveryDone = true;
         //to stop executing validator after service has been detected by RNA.
         if (asd.get_session_flags(APPID_SESSION_SERVICE_DETECTED |
             APPID_SESSION_CONTINUE) == APPID_SESSION_SERVICE_DETECTED)
+        {
             asd.service_disco_state = APPID_DISCO_STATE_FINISHED;
+            if ( (asd.is_tp_appid_available() ||
+                  asd.get_session_flags(APPID_SESSION_NO_TPI)) &&
+                 asd.payload.get_id() == APP_ID_NONE )
+            {
+                asd.payload.set_id(APP_ID_UNKNOWN);
+            }
+        }
 
+        AppIdDnsSession* dsession = asd.get_dns_session();
         if (asd.service.get_id() == APP_ID_DNS && asd.config->mod_config->dns_host_reporting
-            && asd.dsession && asd.dsession->host)
+            && dsession->get_host())
         {
             AppId client_id = APP_ID_NONE;
             AppId payload_id = APP_ID_NONE;
-            size_t size = asd.dsession->host_len;
-            dns_host_scan_hostname((const uint8_t*)(asd.dsession->host), size, &client_id,
-                &payload_id);
-            asd.set_client_appid_data(client_id, nullptr);
+            dns_host_scan_hostname((const uint8_t*)(dsession->get_host()), dsession->get_host_len(),
+                &client_id, &payload_id);
+            asd.set_client_appid_data(client_id, nullptr, change_bits);
         }
         else if (asd.service.get_id() == APP_ID_RTMP)
-            asd.examine_rtmp_metadata();
+            asd.examine_rtmp_metadata(change_bits);
         else if (asd.get_session_flags(APPID_SESSION_SSL_SESSION) && asd.tsession)
-            asd.examine_ssl_metadata(p);
+            asd.examine_ssl_metadata(p, change_bits);
 
-        if (asd.tp_app_id <= APP_ID_NONE && asd.get_session_flags(
+        if (tp_app_id <= APP_ID_NONE && asd.get_session_flags(
             APPID_SESSION_SERVICE_DETECTED | APPID_SESSION_NOT_A_SERVICE |
             APPID_SESSION_IGNORE_HOST) == APPID_SESSION_SERVICE_DETECTED)
         {
-            asd.sync_with_snort_id(asd.service.get_id(), p);
+            asd.sync_with_snort_protocol_id(asd.service.get_id(), p);
         }
     }
 
@@ -690,85 +742,83 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p, int di
  * client ultimately we will have to fail the service. If the same behavior is seen from different
  * clients going to same service then this most likely the service is something else.
  */
-int ServiceDiscovery::incompatible_data(AppIdSession* asd, const Packet* pkt, int dir,
+int ServiceDiscovery::incompatible_data(AppIdSession& asd, const Packet* pkt, AppidSessionDirection dir,
     ServiceDetector* service)
 {
-    const SfIp* ip = pkt->ptrs.ip_api.get_src();
-    uint16_t port = asd->service_port ? asd->service_port : pkt->ptrs.sp;
-    ServiceDiscoveryState* sds = AppIdServiceState::get(ip, asd->protocol, port,
-        asd->is_decrypted());
-
-    asd->free_flow_data_by_id(service->get_flow_data_index());
+    if (service)
+        asd.free_flow_data_by_id(service->get_flow_data_index());
 
     // ignore fails while searching with port/pattern selected detectors
-    if ( !asd->service_detector && !asd->service_candidates.empty() )
+    if ( !asd.service_detector && !asd.service_candidates.empty() )
         return APPID_SUCCESS;
 
-    asd->set_service_detected();
-    asd->clear_session_flags(APPID_SESSION_CONTINUE);
-    asd->service.set_id(APP_ID_NONE);
+    asd.set_service_detected();
+    asd.clear_session_flags(APPID_SESSION_CONTINUE);
+    asd.service.set_id(APP_ID_NONE);
 
-    if ( asd->get_session_flags(APPID_SESSION_IGNORE_HOST | APPID_SESSION_UDP_REVERSED) )
+    if ( asd.get_session_flags(APPID_SESSION_IGNORE_HOST | APPID_SESSION_UDP_REVERSED) )
         return APPID_SUCCESS;
 
     if ( dir == APP_ID_FROM_INITIATOR )
     {
-        asd->set_session_flags(APPID_SESSION_INCOMPATIBLE);
+        asd.set_session_flags(APPID_SESSION_INCOMPATIBLE);
         return APPID_SUCCESS;
     }
 
-    if ( !asd->service_ip.is_set() )
-    {
-        asd->service_ip = *ip;
-        if (!asd->service_port)
-            asd->service_port = port;
-    }
+    const SfIp* ip = pkt->ptrs.ip_api.get_src();
+    uint16_t port = asd.service_port ? asd.service_port : pkt->ptrs.sp;
+    ServiceDiscoveryState* sds = AppIdServiceState::add(ip, asd.protocol, port,
+        asd.is_decrypted());
+    sds->set_service(service);
     sds->set_reset_time(0);
+    if ( !asd.service_ip.is_set() )
+    {
+        asd.service_ip = *ip;
+        asd.service_port = port;
+    }
     return APPID_SUCCESS;
 }
 
-int ServiceDiscovery::fail_service(AppIdSession* asd, const Packet* pkt, int dir,
-    ServiceDetector* service)
+int ServiceDiscovery::fail_service(AppIdSession& asd, const Packet* pkt, AppidSessionDirection dir,
+    ServiceDetector* service, ServiceDiscoveryState* sds)
 {
-    const SfIp* ip = pkt->ptrs.ip_api.get_src();
-    uint16_t port = asd->service_port ? asd->service_port : pkt->ptrs.sp;
-
     if ( service )
-        asd->free_flow_data_by_id(service->get_flow_data_index());
+        asd.free_flow_data_by_id(service->get_flow_data_index());
 
-    if ( !asd->service_detector && !asd->service_candidates.empty() )
+    /* If we're still working on a port/pattern list of detectors, then ignore
+     * individual fails until we're done looking at everything. */
+    if ( !asd.service_detector && !asd.service_candidates.empty() )
         return APPID_SUCCESS;
 
-    asd->service.set_id(APP_ID_NONE);
-    asd->set_service_detected();
-    asd->clear_session_flags(APPID_SESSION_CONTINUE);
+    asd.service.set_id(APP_ID_NONE);
+    asd.set_service_detected();
+    asd.clear_session_flags(APPID_SESSION_CONTINUE);
 
-    /* detectors should be careful in marking session UDP_REVERSED otherwise the same detector
+    /* Detectors should be careful in marking session UDP_REVERSED otherwise the same detector
      * gets all future flows. UDP_REVERSE should be marked only when detector positively
      * matches opposite direction patterns. */
-    if ( asd->get_session_flags(APPID_SESSION_IGNORE_HOST | APPID_SESSION_UDP_REVERSED) )
+    if ( asd.get_session_flags(APPID_SESSION_IGNORE_HOST | APPID_SESSION_UDP_REVERSED) )
         return APPID_SUCCESS;
 
     /* For subsequent packets, avoid marking service failed on client packet,
      * otherwise the service will show up on client side. */
     if (dir == APP_ID_FROM_INITIATOR)
     {
-        asd->set_session_flags(APPID_SESSION_INCOMPATIBLE);
+        asd.set_session_flags(APPID_SESSION_INCOMPATIBLE);
         return APPID_SUCCESS;
     }
 
-    if (!asd->service_ip.is_set())
+    const SfIp* ip = pkt->ptrs.ip_api.get_src();
+    uint16_t port = asd.service_port ? asd.service_port : pkt->ptrs.sp;
+    if (!asd.service_ip.is_set())
     {
-        asd->service_ip = *ip;
-        if (!asd->service_port)
-            asd->service_port = port;
+        asd.service_ip = *ip;
+        asd.service_port = port;
     }
 
-    ServiceDiscoveryState* sds = AppIdServiceState::get(ip, asd->protocol, port,
-        asd->is_decrypted());
     if ( !sds )
     {
-        sds = AppIdServiceState::add(ip, asd->protocol, port, asd->is_decrypted());
+        sds = AppIdServiceState::add(ip, asd.protocol, port, asd.is_decrypted());
         sds->set_service(service);
     }
     sds->set_reset_time(0);
@@ -776,3 +826,8 @@ int ServiceDiscovery::fail_service(AppIdSession* asd, const Packet* pkt, int dir
     return APPID_SUCCESS;
 }
 
+void ServiceDiscovery::release_thread_resources()
+{
+    for (auto detectors : service_detector_list)
+	    detectors->release_thread_resources();
+}

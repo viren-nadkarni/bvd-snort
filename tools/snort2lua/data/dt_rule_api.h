@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -44,6 +44,7 @@ public:
     std::size_t num_errors() const;
     bool empty() const;
     void reset_state();
+    void clear();
 
     friend std::ostream& operator<<(std::ostream&, const RuleApi&);
     void print_rules(std::ostream&, bool in_rule_file);
@@ -63,6 +64,8 @@ public:
     void update_rule_action(const std::string& new_type);
     void add_option(const std::string& keyword);
     void add_option(const std::string& keyword, const std::string& val);
+    std::string get_option(const std::string& keyword);
+    void update_option(const std::string& keyword, std::string& val);
     void add_suboption(const std::string& keyword);
     void add_suboption(const std::string& keyword, const std::string& val);
     void set_curr_options_buffer(const std::string& buffer, bool add_option=false);
@@ -70,6 +73,8 @@ public:
     void add_comment(const std::string& comment);
     void make_rule_a_comment();
     void bad_rule(std::istringstream& stream, const std::string& bad_option);
+    void old_http_rule();
+    bool is_old_http_rule();
 
 private:
     static std::size_t error_count;

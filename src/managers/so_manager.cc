@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -55,7 +55,7 @@ void SoManager::release_plugins()
 
 void SoManager::dump_plugins()
 {
-    Dumper d("SO Rules");
+    snort::Dumper d("SO Rules");
 
     for ( auto* p : s_rules )
         d.dump(p->base.name, p->base.version);
@@ -88,7 +88,7 @@ static const uint8_t* compress(const string& text, unsigned& len)
     if ( ret != Z_OK )
         return nullptr;
 
-    stream.next_in = (Bytef*)s;
+    stream.next_in = const_cast<Bytef*>(reinterpret_cast<const uint8_t*>(s));
     stream.avail_in = text.size();
 
     stream.next_out = so_buf;
@@ -121,7 +121,7 @@ static const char* expand(const uint8_t* data, unsigned len)
     if ( inflateInit2(&stream, window_bits) != Z_OK )
         return nullptr;
 
-    stream.next_in = (Bytef*)data;
+    stream.next_in = const_cast<Bytef*>(data);
     stream.avail_in = (uInt)len;
 
     stream.next_out = (Bytef*)so_buf;
@@ -257,18 +257,31 @@ void SoManager::dump_rule_stubs(const char*)
         if ( !(s = strchr(s, ';')) )
             continue;
 
-        // FIXIT-L strip newlines (optional?)
-        if ( !p->length )
-            cout << rule << endl;
-        else
-        {
-            string stub(rule, ++s-rule);
-            cout << stub << ")" << endl;
-        }
+        if ( *rule == '\n' )
+            ++rule;
+
+        unsigned n = p->length ? s-rule+1 : strlen(rule);
+
+        if ( n and rule[n-1] == '\n' )
+            --n;
+
+        cout.write(rule, n);
+
+        if ( p->length )
+            cout << " )";
+
+        cout << endl;
+
         ++c;
     }
     if ( !c )
         cerr << "no rules to dump" << endl;
+}
+
+static void strip_newline(string& s)
+{
+    if ( s.find_last_of('\n') == s.length()-1 )
+        s.pop_back();
 }
 
 static void get_var(const string& s, string& v)
@@ -289,13 +302,13 @@ static void get_var(const string& s, string& v)
     v = s.substr(pos, end-pos);
 }
 
-const unsigned hex_per_row = 16;
-
 void SoManager::rule_to_hex(const char*)
 {
     stringstream buffer;
     buffer << cin.rdbuf();
+
     string text = buffer.str();
+    strip_newline(text);
 
     unsigned idx;
     string data;
@@ -303,6 +316,8 @@ void SoManager::rule_to_hex(const char*)
 
     string var;
     get_var(text, var);
+
+    const unsigned hex_per_row = 16;
 
     cout << "static const uint8_t rule_" << var;
     cout << "[] =" << endl;
@@ -326,37 +341,25 @@ void SoManager::rule_to_hex(const char*)
     cout << data.size() << ";" << endl;
 }
 
-void SoManager::rule_to_text(const char*)
+void SoManager::rule_to_text(const char* delim)
 {
     stringstream buffer;
     buffer << cin.rdbuf();
-    string text = buffer.str();
 
-    unsigned len = text.size(), idx;
-    const uint8_t* data = (const uint8_t*)text.c_str();
+    string text = buffer.str();
+    strip_newline(text);
 
     string var;
     get_var(text, var);
 
-    cout << "static const uint8_t rule_" << var;
-    cout << "[] =" << endl;
-    cout << "{" << endl << "   ";
-    cout << hex << uppercase;
+    if ( !delim or !*delim )
+        delim = "[Snort_SO_Rule]";
 
-    for ( idx = 0; idx <= len; idx++ )
-    {
-        if ( idx && !(idx % hex_per_row) )
-            cout << endl << "   ";
-
-        unsigned byte = (idx == len) ? 0 : data[idx];
-        cout << " 0x" << setfill('0') << setw(2) << byte << ",";
-    }
-    if ( idx % hex_per_row )
-        cout << endl;
-
-    cout << dec;
-    cout << "};" << endl;
-    cout << "static const unsigned rule_" << var;
-    cout << "_len = 0;" << endl;
+    cout << "static const char* rule_" << var << " = ";
+    cout << "R\"" << delim << "(" << endl;
+    cout << text << endl;
+    cout << ')' << delim << "\";" << endl;
+    cout << endl;
+    cout << "static const unsigned rule_" << var << "_len = 0;" << endl;
 }
 

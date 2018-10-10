@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -158,7 +158,7 @@ bool LruCacheShared<Key, Data, Hash>::set_max_size(size_t newsize)
     list_iter=list.end();
     while (current_size > newsize)
     {
-        list_iter--;
+        --list_iter;
         current_size--;
         map.erase(list_iter->first);
         list.erase(list_iter);
@@ -199,7 +199,7 @@ void LruCacheShared<Key, Data, Hash>::insert(const Key& key, const Data& data)
     {
         LruListIter list_iter;
         list_iter = list.end();
-        list_iter--;
+        --list_iter;
         map.erase(list_iter->first);
         list.erase(list_iter);
         stats.prunes++;

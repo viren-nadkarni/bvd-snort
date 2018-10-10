@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2007-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -36,11 +36,18 @@
 #include "detection/rule_option_types.h"
 #include "time/clock_defs.h"
 
-struct Packet;
-struct RuleLatencyState;
-struct XHash;
+#include "main/snort_debug.h"
+extern Trace TRACE_NAME(detection);
 
-typedef int (* eval_func_t)(void* option_data, class Cursor&, Packet*);
+namespace snort
+{
+struct Packet;
+struct SnortConfig;
+struct XHash;
+}
+struct RuleLatencyState;
+
+typedef int (* eval_func_t)(void* option_data, class Cursor&, snort::Packet*);
 
 // this is per packet thread
 struct dot_node_state_t
@@ -105,23 +112,23 @@ struct detection_option_eval_data_t
 {
     void* pomd;
     void* pmd;
-    Packet* p;
+    snort::Packet* p;
     char flowbit_failed;
     char flowbit_noalert;
 };
 
 // return existing data or add given and return nullptr
-void* add_detection_option(struct SnortConfig*, option_type_t, void*);
-void* add_detection_option_tree(struct SnortConfig*, detection_option_tree_node_t*);
+void* add_detection_option(struct snort::SnortConfig*, option_type_t, void*);
+void* add_detection_option_tree(struct snort::SnortConfig*, detection_option_tree_node_t*);
 
 int detection_option_node_evaluate(
     detection_option_tree_node_t*, detection_option_eval_data_t*, class Cursor&);
 
-void DetectionHashTableFree(XHash*);
-void DetectionTreeHashTableFree(XHash*);
+void DetectionHashTableFree(snort::XHash*);
+void DetectionTreeHashTableFree(snort::XHash*);
 
 void print_option_tree(detection_option_tree_node_t*, int level);
-void detection_option_tree_update_otn_stats(XHash*);
+void detection_option_tree_update_otn_stats(snort::XHash*);
 
 detection_option_tree_root_t* new_root(OptTreeNode*);
 void free_detection_option_root(void** existing_tree);

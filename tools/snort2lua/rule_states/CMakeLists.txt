@@ -1,5 +1,5 @@
 
-add_library( rule_states
+add_library( rule_states OBJECT
     rule_base64_decode.cc
     rule_content.cc
     rule_convert_comma_list.cc
@@ -7,6 +7,8 @@ add_library( rule_states
     rule_dnp3_obj.cc
     rule_dsize.cc
     rule_file_data.cc
+    rule_file_type.cc
+    rule_gid_sid.cc
     rule_http_encode.cc
     rule_isdataat.cc
     rule_metadata.cc
@@ -17,8 +19,8 @@ add_library( rule_states
     rule_stream_reassemble.cc
     rule_stream_size.cc
     rule_tag.cc
-    rule_ttl.cc
     rule_threshold.cc
+    rule_ttl.cc
     rule_unchanged.cc
     rule_unsupported.cc
     rule_urilen.cc
@@ -26,7 +28,3 @@ add_library( rule_states
     rule_api.h
 )
 
-target_link_libraries( rule_states
-    snort2lua_helpers
-    conversion_data
-)

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,6 +32,8 @@
 
 #include "dce_smb_module.h"
 #include "dce_smb_utils.h"
+
+using namespace snort;
 
 #define   UNKNOWN_FILE_SIZE                  ~0
 
@@ -67,20 +69,17 @@ static inline void DCE2_Smb2InsertTid(DCE2_SmbSsnData* ssd, const uint32_t tid,
         || ((ssd->max_file_depth == -1) && DCE2_ScSmbFileDepth(
         (dce2SmbProtoConf*)ssd->sd.config) == -1)))
     {
-        DebugFormat(DEBUG_DCE_SMB, "Not inserting TID (%u) "
-            "because it's not IPC and not inspecting normal file "
-            "data.", tid);
+        trace_logf(dce_smb, "Not inserting TID (%u) because it's "
+            "not IPC and not inspecting normal file data.\n", tid);
         return;
     }
 
     if (is_ipc)
     {
-        DebugFormat(DEBUG_DCE_SMB, "Not inserting TID (%u) "
-            "because it's IPC and only inspecting normal file data.", tid);
+        trace_logf(dce_smb, "Not inserting TID (%u) "
+            "because it's IPC and only inspecting normal file data.\n", tid);
         return;
     }
-
-    DebugFormat(DEBUG_DCE_SMB, "Inserting Tid: %u\n", tid);
 
     if (ssd->tids == nullptr)
     {
@@ -202,12 +201,13 @@ static inline void DCE2_Smb2ResetFileName(DCE2_SmbFileTracker* ftracker)
     ftracker->file_name_size = 0;
 }
 
-static inline FileContext* get_file_context(DCE2_SmbSsnData* ssd, uint64_t file_id)
+static inline FileContext* get_file_context(uint64_t file_id)
 {
-    assert(ssd->sd.wire_pkt);
-    FileFlows* file_flows = FileFlows::get_file_flows((ssd->sd.wire_pkt)->flow);
-    if(!file_flows)
+    FileFlows* file_flows = FileFlows::get_file_flows(DetectionEngine::get_current_packet()->flow);
+
+    if ( !file_flows )
         return nullptr;
+
     return file_flows->get_file_context(file_id, true);
 }
 
@@ -235,9 +235,8 @@ static inline void DCE2_Smb2ProcessFileData(DCE2_SmbSsnData* ssd, const uint8_t*
         DCE2_FileDetect();
     }
 
-    assert(ssd->sd.wire_pkt);
-    FileFlows* file_flows = FileFlows::get_file_flows((ssd->sd.wire_pkt)->flow);
-    if(!file_flows)
+    FileFlows* file_flows = FileFlows::get_file_flows(DetectionEngine::get_current_packet()->flow);
+    if ( !file_flows )
         return;
 
     file_flows->file_process(ssd->ftracker.fid_v2, file_data, data_size,
@@ -302,7 +301,7 @@ static void DCE2_Smb2CreateRequest(DCE2_SmbSsnData* ssd, const Smb2Hdr*,
     const Smb2CreateRequestHdr* smb_create_hdr,const uint8_t* end)
 {
     uint16_t name_offset = alignedNtohs(&(smb_create_hdr->name_offset));
-    DebugMessage(DEBUG_DCE_SMB, "Processing create request command!\n");
+ 
     DCE2_Smb2InitFileTracker(&ssd->ftracker, false, 0);
 
     if (name_offset > SMB2_HEADER_LENGTH)
@@ -336,20 +335,19 @@ static void DCE2_Smb2CreateResponse(DCE2_SmbSsnData* ssd, const Smb2Hdr*,
 {
     uint64_t fileId_persistent;
     uint64_t file_size = UNKNOWN_FILE_SIZE;
-    DebugMessage(DEBUG_DCE_SMB, "Processing create response command!\n");
+  
 
     fileId_persistent = alignedNtohq((const uint64_t*)(&(smb_create_hdr->fileId_persistent)));
     ssd->ftracker.fid_v2 = fileId_persistent;
     if (smb_create_hdr->end_of_file)
     {
-        file_size = alignedNtohq((const uint64_t*)(&(smb_create_hdr->end_of_file)));
-        DebugFormat(DEBUG_DCE_SMB, "Get file size %" PRIu64 "!\n", file_size);
+        file_size = alignedNtohq((const uint64_t*)(&(smb_create_hdr->end_of_file)));      
         ssd->ftracker.tracker.file.file_size = file_size;
     }
 
     if (ssd->ftracker.file_name && ssd->ftracker.file_name_size)
     {
-        FileContext* file = get_file_context(ssd, ssd->ftracker.fid_v2);
+        FileContext* file = get_file_context(ssd->ftracker.fid_v2);
         if (file)
         {
             file->set_file_size(file_size);
@@ -397,10 +395,6 @@ static void DCE2_Smb2Create(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr,
             DCE2_Smb2FreeFileName(&(ssd->ftracker));
         }
     }
-    else
-    {
-        DebugMessage(DEBUG_DCE_SMB, "Wrong format for smb create command!\n");
-    }
 }
 
 /********************************************************************
@@ -425,10 +419,12 @@ static void DCE2_Smb2CloseCmd(DCE2_SmbSsnData* ssd, const Smb2Hdr*,
         !ssd->ftracker.tracker.file.file_size
         && ssd->ftracker.tracker.file.file_offset)
     {
-        FileDirection dir = DCE2_SsnFromClient(ssd->sd.wire_pkt) ? FILE_UPLOAD : FILE_DOWNLOAD;
+        FileDirection dir = DetectionEngine::get_current_packet()->is_from_client() ?
+            FILE_UPLOAD : FILE_DOWNLOAD;
+
         ssd->ftracker.tracker.file.file_size = ssd->ftracker.tracker.file.file_offset;
         uint64_t fileId_persistent = alignedNtohq(&(smb_close_hdr->fileId_persistent));
-        FileContext* file = get_file_context(ssd, fileId_persistent);
+        FileContext* file = get_file_context(fileId_persistent);
         if (file)
         {
             file->set_file_size(ssd->ftracker.tracker.file.file_size);
@@ -462,10 +458,9 @@ static void DCE2_Smb2SetInfo(DCE2_SmbSsnData* ssd, const Smb2Hdr*,
         if (smb_set_info_hdr->file_info_class == SMB2_FILE_ENDOFFILE_INFO)
         {
             uint64_t file_size = alignedNtohq((const uint64_t*)file_data);
-            DebugFormat(DEBUG_DCE_SMB, "Get file size %" PRIu64 "!\n", file_size);
             ssd->ftracker.tracker.file.file_size = file_size;
             uint64_t fileId_persistent = alignedNtohq(&(smb_set_info_hdr->fileId_persistent));
-            FileContext* file = get_file_context(ssd, fileId_persistent);
+            FileContext* file = get_file_context(fileId_persistent);
             if (file)
             {
                 file->set_file_size(ssd->ftracker.tracker.file.file_size);
@@ -484,14 +479,13 @@ static void DCE2_Smb2ReadRequest(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr,
 {
     uint64_t message_id, offset;
     uint64_t fileId_persistent;
-    DebugMessage(DEBUG_DCE_SMB, "Processing read request command!\n");
+  
     message_id = alignedNtohq((const uint64_t*)(&(smb_hdr->message_id)));
     offset = alignedNtohq((const uint64_t*)(&(smb_read_hdr->offset)));
     fileId_persistent = alignedNtohq((const uint64_t*)(&(smb_read_hdr->fileId_persistent)));
     DCE2_Smb2StoreRequest(ssd, message_id, offset, fileId_persistent);
     if (fileId_persistent && (ssd->ftracker.fid_v2 != fileId_persistent))
     {
-        DebugMessage(DEBUG_DCE_SMB, "Persistent file ID changed read request command!\n");
         ssd->ftracker.fid_v2 = fileId_persistent;
     }
     if (ssd->ftracker.tracker.file.file_size && (offset > ssd->ftracker.tracker.file.file_size))
@@ -514,8 +508,6 @@ static void DCE2_Smb2ReadResponse(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr,
     uint64_t message_id;
     uint16_t data_offset;
     Smb2Request* request;
-
-    DebugMessage(DEBUG_DCE_SMB, "Processing read response command!\n");
 
     message_id = alignedNtohq((const uint64_t*)(&(smb_hdr->message_id)));
     request = DCE2_Smb2GetRequest(ssd, message_id);
@@ -571,7 +563,7 @@ static void DCE2_Smb2Read(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr,
     {
         uint64_t message_id;
         Smb2Request* request;
-        DebugMessage(DEBUG_DCE_SMB, "Wrong format for smb read command!\n");
+    
         message_id = alignedNtohq((const uint64_t*)(&(smb_hdr->message_id)));
         request = DCE2_Smb2GetRequest(ssd, message_id);
         if (!request)
@@ -596,12 +588,9 @@ static void DCE2_Smb2WriteRequest(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr,
     uint16_t data_offset;
     uint32_t total_data_length;
 
-    DebugMessage(DEBUG_DCE_SMB, "Processing write request command!\n");
-
     fileId_persistent = alignedNtohq((const uint64_t*)(&(smb_write_hdr->fileId_persistent)));
     if (fileId_persistent && (ssd->ftracker.fid_v2 != fileId_persistent))
     {
-        DebugMessage(DEBUG_DCE_SMB, "Persistent file ID changed read request command!\n");
         ssd->ftracker.fid_v2 = fileId_persistent;
     }
     data_offset = alignedNtohs((const uint16_t*)(&(smb_write_hdr->data_offset)));
@@ -625,16 +614,6 @@ static void DCE2_Smb2WriteRequest(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr,
         ssd->pdu_state = DCE2_SMB_PDU_STATE__RAW_DATA;
 }
 
-/********************************************************************
- *
- * Process write response
- *
- ********************************************************************/
-static void DCE2_Smb2WriteResponse(DCE2_SmbSsnData*, const Smb2Hdr*,
-    const Smb2WriteResponseHdr*, const uint8_t*)
-{
-    DebugMessage(DEBUG_DCE_SMB, "Processing write response command!\n");
-}
 
 /********************************************************************
  *
@@ -654,16 +633,6 @@ static void DCE2_Smb2Write(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr,
         if ((const uint8_t*)smb_write_hdr + SMB2_WRITE_REQUEST_STRUC_SIZE - 1 > end)
             return;
         DCE2_Smb2WriteRequest(ssd, smb_hdr, smb_write_hdr, end);
-    }
-    else if (structure_size == SMB2_WRITE_RESPONSE_STRUC_SIZE)
-    {
-        if ((const uint8_t*)smb_write_hdr + SMB2_WRITE_RESPONSE_STRUC_SIZE - 1 > end)
-            return;
-        DCE2_Smb2WriteResponse(ssd,  smb_hdr, (const Smb2WriteResponseHdr*)smb_write_hdr, end);
-    }
-    else
-    {
-        DebugMessage(DEBUG_DCE_SMB, "Wrong format for smb write command!\n");
     }
 }
 
@@ -686,52 +655,44 @@ static void DCE2_Smb2Inspect(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr, const
     switch (command)
     {
     case SMB2_COM_CREATE:
-        DebugMessage(DEBUG_DCE_SMB, "Create command.\n");
         dce2_smb_stats.smb2_create++;
         if (DCE2_Smb2FindTid(ssd, smb_hdr) != DCE2_RET__SUCCESS)
             return;
         DCE2_Smb2Create(ssd, smb_hdr, smb_data, end);
         break;
     case SMB2_COM_READ:
-        DebugMessage(DEBUG_DCE_SMB, "Read command.\n");
         dce2_smb_stats.smb2_read++;
         if (DCE2_Smb2FindTid(ssd, smb_hdr) != DCE2_RET__SUCCESS)
             return;
         DCE2_Smb2Read(ssd, smb_hdr, smb_data, end);
         break;
     case SMB2_COM_WRITE:
-        DebugMessage(DEBUG_DCE_SMB, "Write command.\n");
         dce2_smb_stats.smb2_write++;
         if (DCE2_Smb2FindTid(ssd, smb_hdr) != DCE2_RET__SUCCESS)
             return;
         DCE2_Smb2Write(ssd, smb_hdr, smb_data, end);
         break;
     case SMB2_COM_SET_INFO:
-        DebugMessage(DEBUG_DCE_SMB, "Set info command.\n");
         dce2_smb_stats.smb2_set_info++;
         if (DCE2_Smb2FindTid(ssd, smb_hdr) != DCE2_RET__SUCCESS)
             return;
         DCE2_Smb2SetInfo(ssd, smb_hdr, smb_data, end);
         break;
     case SMB2_COM_CLOSE:
-        DebugMessage(DEBUG_DCE_SMB, "Close command.\n");
         dce2_smb_stats.smb2_close++;
         if (DCE2_Smb2FindTid(ssd, smb_hdr) != DCE2_RET__SUCCESS)
             return;
         DCE2_Smb2CloseCmd(ssd, smb_hdr, smb_data, end);
         break;
     case SMB2_COM_TREE_CONNECT:
-        DebugMessage(DEBUG_DCE_SMB, "Tree connect command.\n");
         dce2_smb_stats.smb2_tree_connect++;
         DCE2_Smb2TreeConnect(ssd, smb_hdr, smb_data, end);
         break;
     case SMB2_COM_TREE_DISCONNECT:
-        DebugMessage(DEBUG_DCE_SMB, "Tree disconnect command.\n");
         dce2_smb_stats.smb2_tree_disconnect++;
         DCE2_Smb2TreeDisconnect(ssd, smb_hdr, smb_data, end);
         break;
     default:
-        DebugMessage(DEBUG_DCE_SMB, "command ignored!\n");
         break;
     }
 }
@@ -739,7 +700,7 @@ static void DCE2_Smb2Inspect(DCE2_SmbSsnData* ssd, const Smb2Hdr* smb_hdr, const
 // This is the main entry point for SMB2 processing.
 void DCE2_Smb2Process(DCE2_SmbSsnData* ssd)
 {
-    Packet* p = ssd->sd.wire_pkt;
+    Packet* p = DetectionEngine::get_current_packet();
     const uint8_t* data_ptr = p->data;
     uint16_t data_len = p->dsize;
 
@@ -768,7 +729,7 @@ void DCE2_Smb2Process(DCE2_SmbSsnData* ssd)
     else if (ssd->pdu_state == DCE2_SMB_PDU_STATE__RAW_DATA)
     {
         /*continue processing raw data*/
-        FileDirection dir = DCE2_SsnFromClient(ssd->sd.wire_pkt) ? FILE_UPLOAD : FILE_DOWNLOAD;
+        FileDirection dir = p->is_from_client() ? FILE_UPLOAD : FILE_DOWNLOAD;
         DCE2_Smb2ProcessFileData(ssd, data_ptr, data_len, dir);
         ssd->ftracker.tracker.file.file_offset += data_len;
     }

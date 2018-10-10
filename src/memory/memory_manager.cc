@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -193,6 +193,7 @@ THREAD_LOCAL bool Interface<Allocator, Cap>::in_allocation_call = false;
 
 // these don't have to be visible to operate as replacements
 
+#ifndef NO_MEM_MGR
 void* operator new(size_t n)
 {
     auto p = memory::Interface<>::allocate(n);
@@ -222,6 +223,17 @@ void operator delete[](void* p) noexcept
 
 void operator delete[](void* p, const std::nothrow_t&) noexcept
 { ::operator delete[](p); }
+
+// C++14 delete operators are a special case and must be explicitly exported
+// since we're compiling as C++11 but must capture these for external libraries
+void operator delete(void* p, size_t) noexcept;
+SO_PUBLIC void operator delete(void* p, size_t) noexcept
+{ ::operator delete(p); }
+
+void operator delete[](void* p, size_t) noexcept;
+SO_PUBLIC void operator delete[](void* p, size_t) noexcept
+{ ::operator delete[](p); }
+#endif
 
 // -----------------------------------------------------------------------------
 // unit tests
@@ -441,6 +453,8 @@ TEST_CASE( "memory manager interface", "[memory]" )
             CHECK( CapSpy::update_deallocations_arg == memory::Metadata::calculate_total_size(n) );
         }
     }
+    AllocatorSpy::pool = nullptr;
+    AllocatorSpy::deallocate_arg = nullptr;
 }
 
 #endif

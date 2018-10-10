@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,8 +32,6 @@
 #include "hash/ghash.h"
 
 #include "file_lib.h"
-
-#define FILE_ID_MAX          1024
 
 #define MAX_BRANCH (UINT8_MAX + 1)
 
@@ -91,6 +89,7 @@ public:
     void insert_file_rule(FileMagicRule& rule);
     uint32_t find_file_type_id(const uint8_t* buf, int len, uint64_t offset, void** context);
     FileMagicRule* get_rule_from_id(uint32_t);
+    void get_magic_rule_ids_from_type(const std::string&, const std::string&, snort::FileTypeBitSet&);
 
 private:
     void init_merge_hash();
@@ -104,7 +103,7 @@ private:
     /*properties*/
     IdentifierNode* identifier_root = nullptr; /*Root of magic tries*/
     uint32_t memory_used = 0; /*Track memory usage*/
-    GHash* identifier_merge_hash = nullptr;
+    snort::GHash* identifier_merge_hash = nullptr;
     FileMagicRule file_magic_rules[FILE_ID_MAX + 1];
     IDMemoryBlocks id_memory_blocks;
 };

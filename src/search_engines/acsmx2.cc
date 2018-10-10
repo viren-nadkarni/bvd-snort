@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2003-2004 Daniel Roelker
 // Copyright (C) 2002-2004 Marc Norton
@@ -19,97 +19,97 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 /*
- **   acsmx2.c
- **
- **   Multi-Pattern Search Engine
- **
- **   Aho-Corasick State Machine - version 2.0
- **
- **   Supports both Non-Deterministic and Deterministic Finite Automata
- **
- **
- **   Reference - Efficient String matching: An Aid to Bibliographic Search
- **               Alfred V Aho and Margaret J Corasick
- **               Bell Laboratories
- **               Copyright (C) 1975 Association for Computing Machinery,Inc
- **
- **   +++
- **   +++ Version 1.0 notes - Marc Norton:
- **   +++
- **
- **   Original implementation based on the 4 algorithms in the paper by
- **   Aho & Corasick, some implementation ideas from 'Practical Algorithms
- **   in C', and some of my own.
- **
- **   1) Finds all occurrences of all patterns within a text.
- **
- **   +++
- **   +++ Version 2.0 Notes - Marc Norton/Dan Roelker:
- **   +++
- **
- **   New implementation modifies the state table storage and access model to
- **   use compacted sparse vector storage. Dan Roelker and I hammered this
- **   strategy out amongst many others in order to reduce memory usage and
- **   improve caching performance.  The memory usage is greatly reduced, we
- **   only use 1/4 of what we use to. The caching performance is better in
- **   pure benchmarking tests, but does not show overall improvement in Snort.
- **   Unfortunately, once a pattern match test has been performed Snort moves
- **   on to doing many other things before we get back to a pattern match test,
- **   so the cache is voided.
- **
- **   This versions has better caching performance characteristics, reduced
- **   memory, more state table storage options, and requires no a priori case
- **   conversions.  It does maintain the same public interface. (Snort only
- **   used banded storage).
- **
- **     1) Supports NFA and DFA state machines, and basic keyword state machines
- **     2) Initial transition table uses Linked Lists
- **     3) Improved state table memory options. NFA and DFA state transition
- **        tables are converted to one of 4 formats during compilation.
- **        a) Full matrix
- **        b) Sparse matrix
- **        c) Banded matrix (Default-this is the only one used in snort)
- **        d) Sparse-Banded matrix
- **     4) Added support for acstate_t in .h file so we can compile states as
- **        16, or 32 bit state values for another reduction in memory
- **        consumption, smaller states allows more of the state table to be
- **        cached, and improves performance on x86-P4.  Your mileage may vary,
- **        especially on risc systems.
- **     5) Added a bool to each state transition list to indicate if there is
- **        a matching pattern in the state. This prevents us from accessing
- **        another data array and can improve caching/performance.
- **     6) The search functions are very sensitive, don't change them without
- **        extensive testing, or you'll just spoil the caching and prefetching
- **        opportunities.
- **
- **   Extras for fellow pattern matchers:
- **    The table below explains the storage format used at each step.
- **    You can use an NFA or DFA to match with, the NFA is slower but tiny -
- **    set the structure directly.
- **    You can use any of the 4 storage modes above -full, sparse, banded,
- **    sparse-bands, set the structure directly.
- **    For applications where you have lots of data and a pattern set to
- **    search, this version was up to 3x faster than the previous version, due
- **    to caching performance. This cannot be fully realized in Snort yet,
- **    but other applications may have better caching opportunities.
- **    Snort only needs to use the banded or full storage.
- **
- **  Transition table format at each processing stage.
- **  -------------------------------------------------
- **  Patterns -> Keyword State Table (List)
- **  Keyword State Table -> NFA (List)
- **  NFA -> DFA (List)
- **  DFA (List)-> Sparse Rows  O(m-avg # transitions per state)
- **        -> Banded Rows  O(1)
- **            -> Sparse-Banded Rows O(nb-# bands)
- **        -> Full Matrix  O(1)
- **
- ** Notes:
- **
- ** 8/28/06
- ** man - Sparse and SparseBands - fixed off by one in calculating matching index
- **       SparseBands changed ps increment to 2+n to increment between bands.
- */
+**   acsmx2.c
+**
+**   Multi-Pattern Search Engine
+**
+**   Aho-Corasick State Machine - version 2.0
+**
+**   Supports both Non-Deterministic and Deterministic Finite Automata
+**
+**
+**   Reference - Efficient String matching: An Aid to Bibliographic Search
+**               Alfred V Aho and Margaret J Corasick
+**               Bell Laboratories
+**               Copyright (C) 1975 Association for Computing Machinery,Inc
+**
+**   +++
+**   +++ Version 1.0 notes - Marc Norton:
+**   +++
+**
+**   Original implementation based on the 4 algorithms in the paper by
+**   Aho & Corasick, some implementation ideas from 'Practical Algorithms
+**   in C', and some of my own.
+**
+**   1) Finds all occurrences of all patterns within a text.
+**
+**   +++
+**   +++ Version 2.0 Notes - Marc Norton/Dan Roelker:
+**   +++
+**
+**   New implementation modifies the state table storage and access model to
+**   use compacted sparse vector storage. Dan Roelker and I hammered this
+**   strategy out amongst many others in order to reduce memory usage and
+**   improve caching performance.  The memory usage is greatly reduced, we
+**   only use 1/4 of what we use to. The caching performance is better in
+**   pure benchmarking tests, but does not show overall improvement in Snort.
+**   Unfortunately, once a pattern match test has been performed Snort moves
+**   on to doing many other things before we get back to a pattern match test,
+**   so the cache is voided.
+**
+**   This versions has better caching performance characteristics, reduced
+**   memory, more state table storage options, and requires no a priori case
+**   conversions.  It does maintain the same public interface. (Snort only
+**   used banded storage).
+**
+**     1) Supports NFA and DFA state machines, and basic keyword state machines
+**     2) Initial transition table uses Linked Lists
+**     3) Improved state table memory options. NFA and DFA state transition
+**        tables are converted to one of 4 formats during compilation.
+**        a) Full matrix
+**        b) Sparse matrix
+**        c) Banded matrix (Default-this is the only one used in snort)
+**        d) Sparse-Banded matrix
+**     4) Added support for acstate_t in .h file so we can compile states as
+**        16, or 32 bit state values for another reduction in memory
+**        consumption, smaller states allows more of the state table to be
+**        cached, and improves performance on x86-P4.  Your mileage may vary,
+**        especially on risc systems.
+**     5) Added a bool to each state transition list to indicate if there is
+**        a matching pattern in the state. This prevents us from accessing
+**        another data array and can improve caching/performance.
+**     6) The search functions are very sensitive, don't change them without
+**        extensive testing, or you'll just spoil the caching and prefetching
+**        opportunities.
+**
+**   Extras for fellow pattern matchers:
+**    The table below explains the storage format used at each step.
+**    You can use an NFA or DFA to match with, the NFA is slower but tiny -
+**    set the structure directly.
+**    You can use any of the 4 storage modes above -full, sparse, banded,
+**    sparse-bands, set the structure directly.
+**    For applications where you have lots of data and a pattern set to
+**    search, this version was up to 3x faster than the previous version, due
+**    to caching performance. This cannot be fully realized in Snort yet,
+**    but other applications may have better caching opportunities.
+**    Snort only needs to use the banded or full storage.
+**
+**  Transition table format at each processing stage.
+**  -------------------------------------------------
+**  Patterns -> Keyword State Table (List)
+**  Keyword State Table -> NFA (List)
+**  NFA -> DFA (List)
+**  DFA (List)-> Sparse Rows  O(m-avg # transitions per state)
+**        -> Banded Rows  O(1)
+**            -> Sparse-Banded Rows O(nb-# bands)
+**        -> Full Matrix  O(1)
+**
+** Notes:
+**
+** 8/28/06
+** man - Sparse and SparseBands - fixed off by one in calculating matching index
+**       SparseBands changed ps increment to 2+n to increment between bands.
+*/
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -124,15 +124,11 @@
 #include "utils/stats.h"
 #include "utils/util.h"
 
-//Added
-#include <iostream>              // std::cout
-#include <fstream>               // std::ifstream
-#include <cstring>
-#include <time.h>
+using namespace snort;
 
 #define printf LogMessage
 
-#define MEMASSERT(p,s) if (!(p)) { FatalError("ACSM-No Memory: %s\n",s); }
+#define MEMASSERT(p,s) if (!(p)) { snort::FatalError("ACSM-No Memory: %s\n",s); }
 
 static int acsm2_total_memory = 0;
 static int acsm2_pattern_memory = 0;
@@ -180,16 +176,13 @@ void acsm_init_summary()
     acsm2_failstate_memory = 0;
 }
 
-
-int countMatch = 0;              //Count times that match is run in search
-
 /*
- ** Case Translation Table
- */
+** Case Translation Table
+*/
 static uint8_t xlatcase[256];
 /*
- *
- */
+*
+*/
 void acsmx2_init_xlatcase()
 {
     int i;
@@ -199,14 +192,13 @@ void acsmx2_init_xlatcase()
     }
 }
 
-
 /*
- *    Case Conversion
- */
+*    Case Conversion
+*/
 static inline void ConvertCaseEx(uint8_t* d, const uint8_t* s, int m)
 {
     int i;
-    #ifdef XXXX
+#ifdef XXXX
     int n;
     n   = m & 3;
     m >>= 2;
@@ -225,18 +217,18 @@ static inline void ConvertCaseEx(uint8_t* d, const uint8_t* s, int m)
     {
         d[i] = xlatcase[ s[i] ];
     }
-    #else
+#else
     for (i=0; i < m; i++)
     {
         d[i] = xlatcase[ s[i] ];
     }
-    #endif
+
+#endif
 }
 
-
 /*
- *
- */
+*
+*/
 enum Acsm2MemoryType
 {
     ACSM2_MEMORY_TYPE__NONE = 0,
@@ -247,36 +239,35 @@ enum Acsm2MemoryType
 };
 
 /*
- *
- */
+*
+*/
 static void* AC_MALLOC(int n, Acsm2MemoryType type)
 {
     void* p = snort_calloc(n);
 
     switch (type)
     {
-        case ACSM2_MEMORY_TYPE__PATTERN:
-            acsm2_pattern_memory += n;
-            break;
-        case ACSM2_MEMORY_TYPE__MATCHLIST:
-            acsm2_matchlist_memory += n;
-            break;
-        case ACSM2_MEMORY_TYPE__TRANSTABLE:
-            acsm2_transtable_memory += n;
-            break;
-        case ACSM2_MEMORY_TYPE__FAILSTATE:
-            acsm2_failstate_memory += n;
-            break;
-        case ACSM2_MEMORY_TYPE__NONE:
-            break;
-        default:
-            assert(false);
+    case ACSM2_MEMORY_TYPE__PATTERN:
+        acsm2_pattern_memory += n;
+        break;
+    case ACSM2_MEMORY_TYPE__MATCHLIST:
+        acsm2_matchlist_memory += n;
+        break;
+    case ACSM2_MEMORY_TYPE__TRANSTABLE:
+        acsm2_transtable_memory += n;
+        break;
+    case ACSM2_MEMORY_TYPE__FAILSTATE:
+        acsm2_failstate_memory += n;
+        break;
+    case ACSM2_MEMORY_TYPE__NONE:
+        break;
+    default:
+        assert(false);
     }
     acsm2_total_memory += n;
 
     return p;
 }
-
 
 static void* AC_MALLOC_DFA(int n, int sizeofstate)
 {
@@ -284,16 +275,16 @@ static void* AC_MALLOC_DFA(int n, int sizeofstate)
 
     switch (sizeofstate)
     {
-        case 1:
-            acsm2_dfa1_memory += n;
-            break;
-        case 2:
-            acsm2_dfa2_memory += n;
-            break;
-        case 4:
-        default:
-            acsm2_dfa4_memory += n;
-            break;
+    case 1:
+        acsm2_dfa1_memory += n;
+        break;
+    case 2:
+        acsm2_dfa2_memory += n;
+        break;
+    case 4:
+    default:
+        acsm2_dfa4_memory += n;
+        break;
     }
 
     acsm2_dfa_memory += n;
@@ -302,28 +293,27 @@ static void* AC_MALLOC_DFA(int n, int sizeofstate)
     return p;
 }
 
-
 static void AC_FREE(void* p, int n, Acsm2MemoryType type)
 {
     if (p != nullptr)
     {
         switch (type)
         {
-            case ACSM2_MEMORY_TYPE__PATTERN:
-                acsm2_pattern_memory -= n;
-                break;
-            case ACSM2_MEMORY_TYPE__MATCHLIST:
-                acsm2_matchlist_memory -= n;
-                break;
-            case ACSM2_MEMORY_TYPE__TRANSTABLE:
-                acsm2_transtable_memory -= n;
-                break;
-            case ACSM2_MEMORY_TYPE__FAILSTATE:
-                acsm2_failstate_memory -= n;
-                break;
-            case ACSM2_MEMORY_TYPE__NONE:
-            default:
-                break;
+        case ACSM2_MEMORY_TYPE__PATTERN:
+            acsm2_pattern_memory -= n;
+            break;
+        case ACSM2_MEMORY_TYPE__MATCHLIST:
+            acsm2_matchlist_memory -= n;
+            break;
+        case ACSM2_MEMORY_TYPE__TRANSTABLE:
+            acsm2_transtable_memory -= n;
+            break;
+        case ACSM2_MEMORY_TYPE__FAILSTATE:
+            acsm2_failstate_memory -= n;
+            break;
+        case ACSM2_MEMORY_TYPE__NONE:
+        default:
+            break;
         }
 
         acsm2_total_memory -= n;
@@ -331,23 +321,22 @@ static void AC_FREE(void* p, int n, Acsm2MemoryType type)
     }
 }
 
-
 static void AC_FREE_DFA(void* p, int n, int sizeofstate)
 {
     if (p != nullptr)
     {
         switch (sizeofstate)
         {
-            case 1:
-                acsm2_dfa1_memory -= n;
-                break;
-            case 2:
-                acsm2_dfa2_memory -= n;
-                break;
-            case 4:
-            default:
-                acsm2_dfa4_memory -= n;
-                break;
+        case 1:
+            acsm2_dfa1_memory -= n;
+            break;
+        case 2:
+            acsm2_dfa2_memory -= n;
+            break;
+        case 4:
+        default:
+            acsm2_dfa4_memory -= n;
+            break;
         }
 
         acsm2_dfa_memory -= n;
@@ -361,7 +350,7 @@ static void AC_FREE_DFA(void* p, int n, int sizeofstate)
  *  Get Next State-NFA, using direct index to speed up search
  */
 static int List_GetNextStateOpt( ACSM_STRUCT2 * acsm,
-trans_node_t **acsmTransTableOpt, int state, int input )
+    trans_node_t **acsmTransTableOpt, int state, int input )
 {
     int index = state * acsm->acsmAlphabetSize + input;
     trans_node_t * t = acsmTransTableOpt[index];
@@ -372,13 +361,13 @@ trans_node_t **acsmTransTableOpt, int state, int input )
     if( state == 0 )
         return 0;
 
-    return ACSM_FAIL_STATE2;     /* Fail state ??? */
+    return ACSM_FAIL_STATE2; /* Fail state ??? */
 }
 
 
 /*
- *  Get Next State-NFA
- */
+*  Get Next State-NFA
+*/
 static int List_GetNextState(ACSM_STRUCT2* acsm, int state, int input)
 {
     trans_node_t* t = acsm->acsmTransTable[state];
@@ -395,13 +384,12 @@ static int List_GetNextState(ACSM_STRUCT2* acsm, int state, int input)
     if ( state == 0 )
         return 0;
 
-    return ACSM_FAIL_STATE2;     /* Fail state ??? */
+    return ACSM_FAIL_STATE2; /* Fail state ??? */
 }
 
-
 /*
- *  Get Next State-DFA
- */
+*  Get Next State-DFA
+*/
 static int List_GetNextState2(ACSM_STRUCT2* acsm, int state, int input)
 {
     trans_node_t* t = acsm->acsmTransTable[state];
@@ -415,15 +403,14 @@ static int List_GetNextState2(ACSM_STRUCT2* acsm, int state, int input)
         t = t->next;
     }
 
-    return 0;                    /* default state */
+    return 0; /* default state */
 }
-
 
 /*
  *  Put Next State - Head insertion, and transition updates
  */
 static int List_PutNextStateOpt( ACSM_STRUCT2 * acsm, trans_node_t **acsmTransTableOpt,
-int state, int input, int next_state )
+        int state, int input, int next_state )
 {
     int index = state * acsm->acsmAlphabetSize + input;
 
@@ -437,7 +424,7 @@ int state, int input, int next_state )
 
     /* Definitely not an existing transition - add it */
     trans_node_t * tnew = (trans_node_t*)AC_MALLOC(sizeof(trans_node_t),
-        ACSM2_MEMORY_TYPE__TRANSTABLE);
+            ACSM2_MEMORY_TYPE__TRANSTABLE);
 
     if( !tnew )
         return -1;
@@ -453,10 +440,9 @@ int state, int input, int next_state )
     return 0;
 }
 
-
 /*
- *  Put Next State - Head insertion, and transition updates
- */
+*  Put Next State - Head insertion, and transition updates
+*/
 static int List_PutNextState(ACSM_STRUCT2* acsm, int state, int input, int next_state)
 {
     trans_node_t* p;
@@ -491,10 +477,9 @@ static int List_PutNextState(ACSM_STRUCT2* acsm, int state, int input, int next_
     return 0;
 }
 
-
 /*
- *   Free the entire transition table
- */
+*   Free the entire transition table
+*/
 static int List_FreeTransTable(ACSM_STRUCT2* acsm)
 {
     int i;
@@ -525,8 +510,8 @@ static int List_FreeTransTable(ACSM_STRUCT2* acsm)
 
 
 /*
- *   Converts row of states from list to a full vector format
- */
+*   Converts row of states from list to a full vector format
+*/
 static inline int List_ConvToFull(ACSM_STRUCT2* acsm, acstate_t state, acstate_t* full)
 {
     int tcnt = 0;
@@ -539,15 +524,15 @@ static inline int List_ConvToFull(ACSM_STRUCT2* acsm, acstate_t state, acstate_t
     {
         switch (acsm->sizeofstate)
         {
-            case 1:
-                *((uint8_t*)full + t->key) = (uint8_t)t->next_state;
-                break;
-            case 2:
-                *((uint16_t*)full + t->key) = (uint16_t)t->next_state;
-                break;
-            default:
-                full[t->key] = t->next_state;
-                break;
+        case 1:
+            *((uint8_t*)full + t->key) = (uint8_t)t->next_state;
+            break;
+        case 2:
+            *((uint16_t*)full + t->key) = (uint16_t)t->next_state;
+            break;
+        default:
+            full[t->key] = t->next_state;
+            break;
         }
 
         tcnt++;
@@ -557,10 +542,9 @@ static inline int List_ConvToFull(ACSM_STRUCT2* acsm, acstate_t state, acstate_t
     return tcnt;
 }
 
-
 /*
- *   Copy a Match List Entry - don't dup the pattern data
- */
+*   Copy a Match List Entry - don't dup the pattern data
+*/
 static ACSM_PATTERN2* CopyMatchListEntry(ACSM_PATTERN2* px)
 {
     ACSM_PATTERN2* p;
@@ -573,12 +557,11 @@ static ACSM_PATTERN2* CopyMatchListEntry(ACSM_PATTERN2* px)
     return p;
 }
 
-
 /*
- *  Check if a pattern is in the list already,
- *  validate it using the 'id' field. This must be unique
- *  for every pattern.
- */
+*  Check if a pattern is in the list already,
+*  validate it using the 'id' field. This must be unique
+*  for every pattern.
+*/
 /*
 static int FindMatchListEntry (ACSM_STRUCT2 * acsm, int state, ACSM_PATTERN2 * px)
 {
@@ -596,9 +579,9 @@ static int FindMatchListEntry (ACSM_STRUCT2 * acsm, int state, ACSM_PATTERN2 * p
 */
 
 /*
- *  Add a pattern to the list of patterns terminated at this state.
- *  Insert at front of list.
- */
+*  Add a pattern to the list of patterns terminated at this state.
+*  Insert at front of list.
+*/
 static void AddMatchListEntry(ACSM_STRUCT2* acsm, int state, ACSM_PATTERN2* px)
 {
     ACSM_PATTERN2* p;
@@ -610,9 +593,7 @@ static void AddMatchListEntry(ACSM_STRUCT2* acsm, int state, ACSM_PATTERN2* px)
     p->next = acsm->acsmMatchList[state];
 
     acsm->acsmMatchList[state] = p;
-    acsm->acsmLenList[state] = p->n;
 }
-
 
 static void AddPatternStates(ACSM_STRUCT2* acsm, ACSM_PATTERN2* p)
 {
@@ -621,8 +602,8 @@ static void AddPatternStates(ACSM_STRUCT2* acsm, ACSM_PATTERN2* p)
     uint8_t* pattern = p->patrn;
 
     /*
-     *  Match up pattern with existing states
-     */
+    *  Match up pattern with existing states
+    */
     for (; n > 0; pattern++, n--)
     {
         int next = List_GetNextState(acsm,state,*pattern);
@@ -634,8 +615,8 @@ static void AddPatternStates(ACSM_STRUCT2* acsm, ACSM_PATTERN2* p)
     }
 
     /*
-     *   Add new states for the rest of the pattern bytes, 1 state per byte
-     */
+    *   Add new states for the rest of the pattern bytes, 1 state per byte
+    */
     for (; n > 0; pattern++, n--)
     {
         acsm->acsmNumStates++;
@@ -646,11 +627,10 @@ static void AddPatternStates(ACSM_STRUCT2* acsm, ACSM_PATTERN2* p)
     AddMatchListEntry (acsm, state, p);
 }
 
-
 /*
- *   Build A Non-Deterministic Finite Automata
- *   The keyword state table must already be built, via AddPatternStates().
- */
+*   Build A Non-Deterministic Finite Automata
+*   The keyword state table must already be built, via AddPatternStates().
+*/
 static void Build_NFA(ACSM_STRUCT2* acsm)
 {
     acstate_t* FailState = acsm->acsmFailState;
@@ -732,10 +712,9 @@ static void Build_NFA(ACSM_STRUCT2* acsm)
     snort_free(queue_array);
 }
 
-
 /*
- *   Build Deterministic Finite Automata from the NFA
- */
+*   Build Deterministic Finite Automata from the NFA
+*/
 static void Convert_NFA_To_DFA(ACSM_STRUCT2* acsm)
 {
     int cFailState;
@@ -804,12 +783,11 @@ static void Convert_NFA_To_DFA(ACSM_STRUCT2* acsm)
     snort_free(acsmTransTableOpt);
 }
 
-
 /*
- *
- *  Convert a row lists for the state table to a full vector format
- *
- */
+*
+*  Convert a row lists for the state table to a full vector format
+*
+*/
 static int Conv_List_To_Full(ACSM_STRUCT2* acsm)
 {
     acstate_t k;
@@ -825,58 +803,57 @@ static int Conv_List_To_Full(ACSM_STRUCT2* acsm)
 
         switch (acsm->sizeofstate)
         {
-            case 1:
-                List_ConvToFull(acsm, k, (acstate_t*)((uint8_t*)p + 2));
-                *((uint8_t*)p) = ACF_FULL;
-                *((uint8_t*)p + 1) = 0;
-                break;
-            case 2:
-                List_ConvToFull(acsm, k, (acstate_t*)((uint16_t*)p + 2));
-                *((uint16_t*)p) = ACF_FULL;
-                *((uint16_t*)p + 1) = 0;
-                break;
-            default:
-                List_ConvToFull(acsm, k, (p + 2));
-                p[0] = ACF_FULL;
-                p[1] = 0;        /* no matches yet */
-                break;
+        case 1:
+            List_ConvToFull(acsm, k, (acstate_t*)((uint8_t*)p + 2));
+            *((uint8_t*)p) = ACF_FULL;
+            *((uint8_t*)p + 1) = 0;
+            break;
+        case 2:
+            List_ConvToFull(acsm, k, (acstate_t*)((uint16_t*)p + 2));
+            *((uint16_t*)p) = ACF_FULL;
+            *((uint16_t*)p + 1) = 0;
+            break;
+        default:
+            List_ConvToFull(acsm, k, (p + 2));
+            p[0] = ACF_FULL;
+            p[1] = 0; /* no matches yet */
+            break;
         }
 
-        NextState[k] = p;        /* now we have a full format row vector  */
+        NextState[k] = p; /* now we have a full format row vector  */
     }
 
     return 0;
 }
 
-
 /*
- *   Convert DFA memory usage from list based storage to a sparse-row storage.
- *
- *   The Sparse format allows each row to be either full or sparse formatted.  If the sparse row has
- *   too many transitions, performance or space may dictate that we use the standard full formatting
- *   for the row.  More than 5 or 10 transitions per state ought to really whack performance. So the
- *   user can specify the max state transitions per state allowed in the sparse format.
- *
- *   Standard Full Matrix Format
- *   ---------------------------
- *   acstate_t ** NextState ( 1st index is row/state, 2nd index is column=event/input)
- *
- *   example:
- *
- *        events -> a b c d e f g h i j k l m n o p
- *   states
- *     N            1 7 0 0 0 3 0 0 0 0 0 0 0 0 0 0
- *
- *   Sparse Format, each row : Words     Value
- *                            1-1       fmt(0-full,1-sparse,2-banded,3-sparsebands)
- *                            2-2       bool match flag (indicates this state has pattern matches)
- *                            3-3       sparse state count ( # of input/next-state pairs )
- *                            4-3+2*cnt 'input,next-state' pairs... each sizeof(acstate_t)
- *
- *   above example case yields:
- *     Full Format:    0, 1 7 0 0 0 3 0 0 0 0 0 0 0 0 0 0 ...
- *     Sparse format:  1, 3, 'a',1,'b',7,'f',3  - uses 2+2*ntransitions (non-default transitions)
- */
+*   Convert DFA memory usage from list based storage to a sparse-row storage.
+*
+*   The Sparse format allows each row to be either full or sparse formatted.  If the sparse row has
+*   too many transitions, performance or space may dictate that we use the standard full formatting
+*   for the row.  More than 5 or 10 transitions per state ought to really whack performance. So the
+*   user can specify the max state transitions per state allowed in the sparse format.
+*
+*   Standard Full Matrix Format
+*   ---------------------------
+*   acstate_t ** NextState ( 1st index is row/state, 2nd index is column=event/input)
+*
+*   example:
+*
+*        events -> a b c d e f g h i j k l m n o p
+*   states
+*     N            1 7 0 0 0 3 0 0 0 0 0 0 0 0 0 0
+*
+*   Sparse Format, each row : Words     Value
+*                            1-1       fmt(0-full,1-sparse,2-banded,3-sparsebands)
+*                            2-2       bool match flag (indicates this state has pattern matches)
+*                            3-3       sparse state count ( # of input/next-state pairs )
+*                            4-3+2*cnt 'input,next-state' pairs... each sizeof(acstate_t)
+*
+*   above example case yields:
+*     Full Format:    0, 1 7 0 0 0 3 0 0 0 0 0 0 0 0 0 0 ...
+*     Sparse format:  1, 3, 'a',1,'b',7,'f',3  - uses 2+2*ntransitions (non-default transitions)
+*/
 static int Conv_Full_DFA_To_Sparse(ACSM_STRUCT2* acsm)
 {
     acstate_t* p;
@@ -917,7 +894,7 @@ static int Conv_Full_DFA_To_Sparse(ACSM_STRUCT2* acsm)
 
             int m = 0;
             p[m++] = ACF_SPARSE;
-            p[m++] = 0;          /* no matches */
+            p[m++] = 0;   /* no matches */
             p[m++] = cnt;
 
             for (int i = 0; i < acsm->acsmAlphabetSize; i++)
@@ -931,12 +908,11 @@ static int Conv_Full_DFA_To_Sparse(ACSM_STRUCT2* acsm)
             }
         }
 
-        NextState[k] = p;        /* now we are a sparse formatted state transition array  */
+        NextState[k] = p; /* now we are a sparse formatted state transition array  */
     }
 
     return 0;
 }
-
 
 /*
     Convert Full matrix to Banded row format.
@@ -983,7 +959,7 @@ static int Conv_Full_DFA_To_Banded(ACSM_STRUCT2* acsm)
 
         int m = 0;
         p[m++] = ACF_BANDED;
-        p[m++] = 0;              /* no matches */
+        p[m++] = 0;   /* no matches */
         p[m++] = cnt;
         p[m++] = first;
 
@@ -992,27 +968,26 @@ static int Conv_Full_DFA_To_Banded(ACSM_STRUCT2* acsm)
             p[m++] = full[i];
         }
 
-        NextState[k] = p;        /* now we are a banded formatted state transition array  */
+        NextState[k] = p; /* now we are a banded formatted state transition array  */
     }
 
     return 0;
 }
 
-
 /*
- *   Convert full matrix to Sparse Band row format.
- *
- *   next  - Full formatted row of next states
- *   asize - size of alphabet
- *   zcnt - max number of zeros in a run of zeros in any given band.
- *
- *  Word Values
- *  1    ACF_SPARSE_BANDS
- *  2    number of bands
- *  repeat 3 - 5+ ....once for each band in this row.
- *  3    number of items in this band*  4    start index of this band
- *  5-   next-state values in this band...
- */
+*   Convert full matrix to Sparse Band row format.
+*
+*   next  - Full formatted row of next states
+*   asize - size of alphabet
+*   zcnt - max number of zeros in a run of zeros in any given band.
+*
+*  Word Values
+*  1    ACF_SPARSE_BANDS
+*  2    number of bands
+*  repeat 3 - 5+ ....once for each band in this row.
+*  3    number of items in this band*  4    start index of this band
+*  5-   next-state values in this band...
+*/
 static int calcSparseBands(const acstate_t* next, int* begin, int* end, int asize, int zmax)
 {
     int last=0;
@@ -1047,23 +1022,22 @@ static int calcSparseBands(const acstate_t* next, int* begin, int* end, int asiz
     return nbands;
 }
 
-
 /*
- *   Sparse Bands
- *
- *   Row Format:
- *   Word
- *   1    SPARSEBANDS format indicator
- *   2    bool indicates a pattern match in this state
- *   3    number of sparse bands
- *   4    number of elements in this band
- *   5    start index of this band
- *   6-   list of next states
- *
- *   m    number of elements in this band
- *   m+1  start index of this band
- *   m+2- list of next states
- */
+*   Sparse Bands
+*
+*   Row Format:
+*   Word
+*   1    SPARSEBANDS format indicator
+*   2    bool indicates a pattern match in this state
+*   3    number of sparse bands
+*   4    number of elements in this band
+*   5    start index of this band
+*   6-   list of next states
+*
+*   m    number of elements in this band
+*   m+1  start index of this band
+*   m+2- list of next states
+*/
 static int Conv_Full_DFA_To_SparseBands(ACSM_STRUCT2* acsm)
 {
     acstate_t** NextState = acsm->acsmNextState;
@@ -1098,15 +1072,13 @@ static int Conv_Full_DFA_To_SparseBands(ACSM_STRUCT2* acsm)
 
         int m = 0;
         p[m++] = ACF_SPARSE_BANDS;
-        p[m++] = 0;              /* no matches */
+        p[m++] = 0; /* no matches */
         p[m++] = nbands;
 
         for ( int i=0; i<nbands; i++ )
         {
-                                 /* # states in this band */
-            p[m++] = band_end[i] - band_begin[i] + 1;
-                                 /* start index */
-            p[m++] = band_begin[i];
+            p[m++] = band_end[i] - band_begin[i] + 1;  /* # states in this band */
+            p[m++] = band_begin[i];   /* start index */
 
             for ( int j=band_begin[i]; j<=band_end[i]; j++ )
             {
@@ -1116,20 +1088,19 @@ static int Conv_Full_DFA_To_SparseBands(ACSM_STRUCT2* acsm)
                     return -1;
                 }
 
-                p[m++] = full[j];/* some states may be state zero */
+                p[m++] = full[j];  /* some states may be state zero */
             }
         }
 
-        NextState[k] = p;        /* now we are a sparse-banded formatted state transition array  */
+        NextState[k] = p; /* now we are a sparse-banded formatted state transition array  */
     }
 
     return 0;
 }
 
-
 /*
- *  Create a new AC state machine
- */
+*  Create a new AC state machine
+*/
 ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
 {
     ACSM_STRUCT2* p = (ACSM_STRUCT2*)AC_MALLOC(sizeof (ACSM_STRUCT2), ACSM2_MEMORY_TYPE__NONE);
@@ -1145,74 +1116,18 @@ ACSM_STRUCT2* acsmNew2(const MpseAgent* agent, int format)
         p->acsmSparseMaxRowNodes = 256;
         p->acsmSparseMaxZcnt = 10;
         p->dfa = false;
-
-        // get default platform
-        cl::Platform::get(&(p->all_platforms));
-
-        if(p->all_platforms.size()==0)
-        {
-            printf("No platforms detected\n");
-        }
-
-        p->default_platform=p->all_platforms[0];
-
-        //get default device of the default platform, also print how many found
-        p->default_platform.getDevices(CL_DEVICE_TYPE_GPU, &(p->all_devices));
-
-        if(p->all_devices.size()==0)
-        {
-            printf("No devices detected\n");
-        }
-
-        p->default_device=p->all_devices[0];
-
-        //printf("GPUs on Odriod: " << p->all_devices.size()<<"\n";
-        //printf("Using device: "<< p->default_device.getInfo<CL_DEVICE_NAME>()<<"\n";
-
-        p->context = cl::Context(p->default_device);
-        //cl::Context context({default_device});
-
-        p->queue = cl::CommandQueue(p->context,p->default_device);
-
-        // Read source file
-        std::ifstream sourceFile("/usr/local/src/findMatches.cl");
-        std::string sourceCode(
-            std::istreambuf_iterator<char>(sourceFile),
-            (std::istreambuf_iterator<char>())
-            );
-
-        p->sources.push_back(    //curly brackets needed around arguments?
-        {
-            sourceCode.c_str(),sourceCode.length()
-        });
-        //std::cout << sources;
-
-        p->program = cl::Program(p->context,p->sources);
-        if(p->program.build(
-        {
-            p->default_device
-        }
-        )!=CL_SUCCESS)
-        {
-            printf("Error CL building");
-            //<<p->program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(p->default_device)<<"\n";
-            std::exit(1);
-        }
-
-        p->kernel = cl::Kernel(p->program, "findMatches");
     }
 
     return p;
 }
 
-
 /*
- *   Add a pattern to the list of patterns for this state machine
- *
- */
+*   Add a pattern to the list of patterns for this state machine
+*
+*/
 int acsmAddPattern2(
-ACSM_STRUCT2* p, const uint8_t* pat, unsigned n, bool nocase,
-bool negative, void* user)
+    ACSM_STRUCT2* p, const uint8_t* pat, unsigned n, bool nocase,
+    bool negative, void* user)
 {
     ACSM_PATTERN2* plist;
 
@@ -1244,10 +1159,9 @@ bool negative, void* user)
     return 0;
 }
 
-
 /*
- *  Copy a boolean match flag int NextState table, for caching purposes.
- */
+*  Copy a boolean match flag int NextState table, for caching purposes.
+*/
 static void acsmUpdateMatchStates(ACSM_STRUCT2* acsm)
 {
     acstate_t state;
@@ -1262,15 +1176,15 @@ static void acsmUpdateMatchStates(ACSM_STRUCT2* acsm)
         {
             switch (acsm->sizeofstate)
             {
-                case 1:
-                    *((uint8_t*)p + 1) = 1;
-                    break;
-                case 2:
-                    *((uint16_t*)p + 1) = 1;
-                    break;
-                default:
-                    p[1] = 1;
-                    break;
+            case 1:
+                *((uint8_t*)p + 1) = 1;
+                break;
+            case 2:
+                *((uint16_t*)p + 1) = 1;
+                break;
+            default:
+                p[1] = 1;
+                break;
             }
 
             summary.num_match_states++;
@@ -1278,8 +1192,7 @@ static void acsmUpdateMatchStates(ACSM_STRUCT2* acsm)
     }
 }
 
-
-static void acsmBuildMatchStateTrees2(SnortConfig* sc, ACSM_STRUCT2* acsm)
+static void acsmBuildMatchStateTrees2(snort::SnortConfig* sc, ACSM_STRUCT2* acsm)
 {
     ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
     ACSM_PATTERN2* mlist;
@@ -1310,21 +1223,19 @@ static void acsmBuildMatchStateTrees2(SnortConfig* sc, ACSM_STRUCT2* acsm)
     }
 }
 
-
 void acsmCompressStates(
-ACSM_STRUCT2* acsm,
-int flag
-)
+    ACSM_STRUCT2* acsm,
+    int flag
+    )
 {
     if (acsm == nullptr)
         return;
     acsm->compress_states = flag;
 }
 
-
 /*
- *   Compile State Machine - NFA or DFA and Full or Banded or Sparse or SparseBands
- */
+*   Compile State Machine - NFA or DFA and Full or Banded or Sparse or SparseBands
+*/
 static inline int _acsmCompile2(ACSM_STRUCT2* acsm)
 {
     ACSM_PATTERN2* plist;
@@ -1333,20 +1244,19 @@ static inline int _acsmCompile2(ACSM_STRUCT2* acsm)
     for (plist = acsm->acsmPatterns; plist != nullptr; plist = plist->next)
         acsm->acsmMaxStates += plist->n;
 
-    acsm->acsmMaxStates++;       /* one extra */
+    acsm->acsmMaxStates++; /* one extra */
 
     /* Alloc a List based State Transition table */
     acsm->acsmTransTable =
         (trans_node_t**)AC_MALLOC(sizeof(trans_node_t*) * acsm->acsmMaxStates,
-        ACSM2_MEMORY_TYPE__TRANSTABLE);
+            ACSM2_MEMORY_TYPE__TRANSTABLE);
     MEMASSERT(acsm->acsmTransTable, "_acsmCompile2");
 
     /* Alloc a MatchList table - this has a list of pattern matches for each state, if any */
     acsm->acsmMatchList =
         (ACSM_PATTERN2**)AC_MALLOC(sizeof(ACSM_PATTERN2*) * acsm->acsmMaxStates,
-        ACSM2_MEMORY_TYPE__MATCHLIST);
+            ACSM2_MEMORY_TYPE__MATCHLIST);
     MEMASSERT(acsm->acsmMatchList, "_acsmCompile2");
-    acsm->acsmLenList = (int *) calloc(acsm->acsmMaxStates,sizeof(int));
 
     /* Initialize state zero as a branch */
     acsm->acsmNumStates = 0;
@@ -1388,7 +1298,7 @@ static inline int _acsmCompile2(ACSM_STRUCT2* acsm)
     /* Alloc a failure table - this has a failure state, and a match list for each state */
     acsm->acsmFailState =
         (acstate_t*)AC_MALLOC(sizeof(acstate_t) * acsm->acsmNumStates,
-        ACSM2_MEMORY_TYPE__FAILSTATE);
+            ACSM2_MEMORY_TYPE__FAILSTATE);
 
     MEMASSERT(acsm->acsmFailState, "_acsmCompile2");
 
@@ -1455,271 +1365,218 @@ static inline int _acsmCompile2(ACSM_STRUCT2* acsm)
     return 0;
 }
 
-
-int acsmCompile2(SnortConfig* sc, ACSM_STRUCT2* acsm)
+int acsmCompile2(snort::SnortConfig* sc, ACSM_STRUCT2* acsm)
 {
-    acsmCompressStates(acsm, 0);
-
-    if(int rval = _acsmCompile2(acsm))
+    if ( int rval = _acsmCompile2(acsm) )
         return rval;
 
-    if(acsm->agent)
+    if ( acsm->agent )
         acsmBuildMatchStateTrees2(sc, acsm);
 
-    acsm->nTotal = 0;
-    acsm->totalFound = 0;
-    acsm->buffSize = 0;
-    acsm->resultArray = new int [acsm->acsmNumStates]{};
-
-    if(USE_GPU)
-    {
-        //printf("Build list array with states: %d \n", acsm->acsmNumStates);
-        acstate_t* p;
-        acstate_t** NextState = acsm->acsmNextState;
-        acsm->stateArray = new int [acsm->acsmNumStates*258];
-        for (int i=0; i<acsm->acsmNumStates; i++)
-        {
-            p = NextState[i];
-            if ( !p )
-                continue;
-            for (int j=0; j<258; j++ )
-            {
-                acsm->stateArray[(i * 258) + j] = p[j];
-            }
-        }
-
-        cl_int err;
-
-        acsm->stateBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, acsm->acsmNumStates*258*sizeof(int), acsm->stateArray);
-        acsm->xlatBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, 256 * sizeof(uint8_t), xlatcase);
-        acsm->matchBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, acsm->acsmNumStates*sizeof(int));
-
-        acsm->countsBuffer = cl::Buffer(acsm->context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, KERNEL_SIZE*sizeof(int));
-        acsm->matchLenBuffer = cl::Buffer(acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, acsm->acsmMaxStates*sizeof(int), acsm->acsmLenList);
-
-        /*
-        if(err != CL_SUCCESS)
-            printf("Error CL compile");
-            std::exit(1);
-        */
-    }
     return 0;
-
 }
 
-
 /*
- *   Get the NextState from the NFA, all NFA storage formats use this
- */
+*   Get the NextState from the NFA, all NFA storage formats use this
+*/
 static inline acstate_t get_next_state_nfa(acstate_t* ps, acstate_t state, unsigned input)
 {
     acstate_t fmt = *ps++;
 
-    ps++;                        /* skip bMatchState */
+    ps++;  /* skip bMatchState */
 
     switch ( fmt )
     {
-        case  ACF_BANDED:
+    case  ACF_BANDED:
+    {
+        acstate_t n = ps[0];
+        unsigned index = ps[1];
+
+        if ( input <  index     )
         {
-            acstate_t n = ps[0];
-            unsigned index = ps[1];
-
-            if ( input <  index     )
-            {
-                if (state==0)
-                {
-                    return 0;
-                }
-                else
-                {
-                    return (acstate_t)ACSM_FAIL_STATE2;
-                }
-            }
-            if ( input >= index + n )
-            {
-                if (state==0)
-                {
-                    return 0;
-                }
-                else
-                {
-                    return (acstate_t)ACSM_FAIL_STATE2;
-                }
-            }
-            if ( ps[input-index] == 0  )
-            {
-                if ( state != 0 )
-                {
-                    return ACSM_FAIL_STATE2;
-                }
-            }
-
-            return (acstate_t)ps[input-index];
-        }
-
-        case ACF_SPARSE:
-        {
-            acstate_t n = *ps++; /* number of sparse index-value entries */
-
-            for (; n>0; n-- )
-            {
-                if ( ps[0] > input )
-                    /* cannot match the input, already a higher value than the input
-                     */
-                {
-                                 /* default state */
-                    return (acstate_t)ACSM_FAIL_STATE2;
-                }
-                else if ( ps[0] == input )
-                {
-                    return ps[1];/* next state */
-                }
-                ps+=2;
-            }
-            if ( state == 0 )
+            if (state==0)
             {
                 return 0;
             }
-            return ACSM_FAIL_STATE2;
-        }
-
-        case ACF_SPARSE_BANDS:
-        {
-            int nb  = *ps++;     /* number of bands */
-
-            while ( nb > 0 )     /* for each band */
-            {
-                                 /* number of elements */
-                acstate_t n = *ps++;
-                                 /* 1st element value */
-                unsigned index = *ps++;
-
-                if ( input <  index )
-                {
-                    if ( state != 0 )
-                    {
-                        return (acstate_t)ACSM_FAIL_STATE2;
-                    }
-                    return (acstate_t)0;
-                }
-                if ( (input >=  index) && (input < (index + n)) )
-                {
-                    if ( ps[input-index] == 0 )
-                    {
-                        if ( state != 0 )
-                        {
-                            return ACSM_FAIL_STATE2;
-                        }
-                    }
-                    return (acstate_t)ps[input-index];
-                }
-                nb--;
-                ps += n;
-            }
-            if ( state != 0 )
+            else
             {
                 return (acstate_t)ACSM_FAIL_STATE2;
             }
-            return (acstate_t)0;
+        }
+        if ( input >= index + n )
+        {
+            if (state==0)
+            {
+                return 0;
+            }
+            else
+            {
+                return (acstate_t)ACSM_FAIL_STATE2;
+            }
+        }
+        if ( ps[input-index] == 0  )
+        {
+            if ( state != 0 )
+            {
+                return ACSM_FAIL_STATE2;
+            }
         }
 
-        case ACF_FULL:
+        return (acstate_t)ps[input-index];
+    }
+
+    case ACF_SPARSE:
+    {
+        acstate_t n = *ps++; /* number of sparse index-value entries */
+
+        for (; n>0; n-- )
         {
-            if ( ps[input] == 0 )
+            if ( ps[0] > input )   /* cannot match the input, already a higher value than the input
+                                      */
+            {
+                return (acstate_t)ACSM_FAIL_STATE2; /* default state */
+            }
+            else if ( ps[0] == input )
+            {
+                return ps[1]; /* next state */
+            }
+            ps+=2;
+        }
+        if ( state == 0 )
+        {
+            return 0;
+        }
+        return ACSM_FAIL_STATE2;
+    }
+
+    case ACF_SPARSE_BANDS:
+    {
+        int nb  = *ps++;   /* number of bands */
+
+        while ( nb > 0 )   /* for each band */
+        {
+            acstate_t n = *ps++;  /* number of elements */
+            unsigned index = *ps++;  /* 1st element value */
+
+            if ( input <  index )
             {
                 if ( state != 0 )
                 {
-                    return ACSM_FAIL_STATE2;
+                    return (acstate_t)ACSM_FAIL_STATE2;
                 }
+                return (acstate_t)0;
             }
-            return ps[input];
+            if ( (input >=  index) && (input < (index + n)) )
+            {
+                if ( ps[input-index] == 0 )
+                {
+                    if ( state != 0 )
+                    {
+                        return ACSM_FAIL_STATE2;
+                    }
+                }
+                return (acstate_t)ps[input-index];
+            }
+            nb--;
+            ps += n;
         }
+        if ( state != 0 )
+        {
+            return (acstate_t)ACSM_FAIL_STATE2;
+        }
+        return (acstate_t)0;
+    }
+
+    case ACF_FULL:
+    {
+        if ( ps[input] == 0 )
+        {
+            if ( state != 0 )
+            {
+                return ACSM_FAIL_STATE2;
+            }
+        }
+        return ps[input];
+    }
     }
 
     return 0;
 }
 
-
 /*
- *   Get the NextState from the DFA Next State Transition table
- *   Full and banded are supported separately, this is for
- *   sparse and sparse-bands.  But note that for optimization
- *   purposes, a given row may be full.
- */
+*   Get the NextState from the DFA Next State Transition table
+*   Full and banded are supported separately, this is for
+*   sparse and sparse-bands.  But note that for optimization
+*   purposes, a given row may be full.
+*/
 static inline acstate_t SparseGetNextStateDFA(
-acstate_t* ps, acstate_t, unsigned input)
+    acstate_t* ps, acstate_t, unsigned input)
 {
     switch ( ps[0] )
     {
-        case ACF_FULL:
-        {
-            return ps[2+input];
-        }
+    case ACF_FULL:
+    {
+        return ps[2+input];
+    }
 
-        case ACF_SPARSE:
-        {
-            acstate_t n = ps[2]; /* number of entries/ key+next pairs */
-            ps += 3;
+    case ACF_SPARSE:
+    {
+        acstate_t n = ps[2]; /* number of entries/ key+next pairs */
+        ps += 3;
 
-            for (; n>0; n-- )
+        for (; n>0; n-- )
+        {
+            if ( input < ps[0]  )   /* cannot match the input, already a higher value than the
+                                      input  */
             {
-                if ( input < ps[0]  )
-                    /* cannot match the input, already a higher value than the
-                                                          input  */
-                {
-                                 /* default state */
-                    return (acstate_t)0;
-                }
-                else if ( ps[0] == input )
-                {
-                    return ps[1];/* next state */
-                }
-                ps += 2;
+                return (acstate_t)0; /* default state */
             }
-            return (acstate_t)0;
-        }
-
-        case ACF_SPARSE_BANDS:
-        {
-                                 /* number of bands */
-            acstate_t nb  =  ps[2];
-
-            ps += 3;
-
-            while ( nb > 0 )     /* for each band */
+            else if ( ps[0] == input )
             {
-                                 /* number of elements in this band */
-                acstate_t n = ps[0];
-                                 /* start index/char of this band */
-                unsigned index = ps[1];
-
-                if ( input <  index )
-                {
-                    return (acstate_t)0;
-                }
-                if ( (input < (index + n)) )
-                {
-                    return (acstate_t)ps[2+input-index];
-                }
-                nb--;
-                ps += 2 + n;
+                return ps[1]; /* next state */
             }
-            return (acstate_t)0;
+            ps += 2;
         }
+        return (acstate_t)0;
+    }
+
+    case ACF_SPARSE_BANDS:
+    {
+        acstate_t nb  =  ps[2]; /* number of bands */
+
+        ps += 3;
+
+        while ( nb > 0 )   /* for each band */
+        {
+            acstate_t n = ps[0];  /* number of elements in this band */
+            unsigned index = ps[1];  /* start index/char of this band */
+
+            if ( input <  index )
+            {
+                return (acstate_t)0;
+            }
+            if ( (input < (index + n)) )
+            {
+                return (acstate_t)ps[2+input-index];
+            }
+            nb--;
+            ps += 2 + n;
+        }
+        return (acstate_t)0;
+    }
     }
 
     return 0;
 }
 
-
 /*
- *   Search Text or Binary Data for Pattern matches
- *
- *   Sparse & Sparse-Banded Matrix search
- */
+*   Search Text or Binary Data for Pattern matches
+*
+*   Sparse & Sparse-Banded Matrix search
+*/
 int acsm_search_dfa_sparse(
-ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
-void* context, int* current_state)
+    ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
+    void* context, int* current_state)
 {
     acstate_t state;
     ACSM_PATTERN2* mlist;
@@ -1768,391 +1625,20 @@ void* context, int* current_state)
     return nfound;
 }
 
-
 void acsmx2_print_qinfo()
 {
 }
 
-
-/* gpusearch
- */
-int acsm_search_dfa_full_gpu(
-ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context,
-int* current_state)
-/* Tx: packet
- * n: packet size
- */
-{
-    /* intialise buffers the first time the state machine is used */
-    if(!acsm->buffSize && n > 0) {
-        acsm->searchLaunched = 0;
-        acsm->currentBuffer = 1;
-        acsm->buffSize = 2000000;
-
-        acsm->textBuffer1 = cl::Buffer(
-            acsm->context,
-            CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
-            sizeof(uint8_t) * acsm->buffSize);
-
-        acsm->textBuffer2 = cl::Buffer(
-            acsm->context,
-            CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
-            sizeof(uint8_t) * acsm->buffSize);
-
-        acsm->mapPtr = (uint8_t*) acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer1,
-            CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
-            0, sizeof(uint8_t) * acsm->buffSize);
-
-        acsm->mapPtr2 = (uint8_t* )acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer2,
-            CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
-            0, sizeof(uint8_t)*acsm->buffSize);
-    }
-
-    /* if the buffer is not full, store the payload data in the buffer and return 0 */
-    if(acsm->nTotal < (acsm->buffSize - 3000) && n > 0) {
-        if(acsm->currentBuffer == 1) {
-            memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
-            acsm->nTotal += n;
-            return 0;
-        }
-        else {
-            memcpy(&(acsm->mapPtr2[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
-            acsm->nTotal += n;
-            return 0;
-        }
-    }
-
-    /* add current packet to the buffer */
-    if(acsm->currentBuffer == 1) {
-        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
-        acsm->nTotal += n;
-
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
-        acsm->kernel.setArg(2, acsm->textBuffer1);
-    }
-    else {
-        memcpy(&(acsm->mapPtr2[acsm->nTotal]), Tx, sizeof(uint8_t) * n);
-        acsm->nTotal += n;
-
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
-        acsm->kernel.setArg(2, acsm->textBuffer2);
-    }
-
-    if(acsm->searchLaunched) {
-        acsm->queue.finish();
-        //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
-        //acsm->totalFound += acsm->resultMap[0];
-        //Handle results
-        int c=0;
-
-        for (int i=0;i<KERNEL_SIZE;i++)
-        {
-            c+=acsm->countsMap[i];
-        }
-        acsm->totalFound = c;
-
-        //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
-        //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
-
-        acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
-        acsm->searchLaunched = 0;
-    }
-
-    // Used for flushing, return if there is no objects to flush
-    if(!(acsm->nTotal)) {
-        return 0;
-    }
-
-    clock_t timer = clock();
-    int * len = &acsm->nTotal;
-    cl_int err;
-
-    // Create memory buffers
-    cl::Buffer lengthBuffer = cl::Buffer(
-        acsm->context,
-        CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
-        sizeof(int*), len, &err);
-
-    if(err != CL_SUCCESS)
-        printf("Buffer error %d \n", err);
-
-    // Set arguments to kernel
-    err = acsm->kernel.setArg(0, acsm->stateBuffer);
-    err = acsm->kernel.setArg(1, acsm->xlatBuffer);
-    //err = acsm->kernel.setArg(2, acsm->testBuffer);
-    err = acsm->kernel.setArg(3, lengthBuffer);
-    err = acsm->kernel.setArg(4, acsm->matchBuffer);
-    err = acsm->kernel.setArg(5, acsm->countsBuffer);
-    err = acsm->kernel.setArg(6, acsm->matchLenBuffer);
-
-    if(err != CL_SUCCESS)
-        printf("Error in setarg result %d \n", err);
-
-    /* specify vector size */
-    cl::NDRange global(KERNEL_SIZE);
-    cl::NDRange local(1);
-    err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
-
-    if(err != CL_SUCCESS)
-        printf("Error in kernel execution! %d \n", err);
-
-    //acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(acsm->matchBuffer,CL_FALSE, CL_MAP_READ, 0, acsm->acsmNumStates*sizeof(int));
-
-    /* enqueueMapBuffer is used as an alternative to clEnqueueRead/Write.
-     * this maps a memory object on the device to a mem region on host
-     */
-    acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(
-        acsm->countsBuffer,CL_FALSE, CL_MAP_READ|CL_MAP_WRITE, 0, KERNEL_SIZE*sizeof(int));
-
-    /* do some kind of buffer alternation? */
-    if(acsm->currentBuffer==1) {
-        acsm->currentBuffer=2;
-        acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer1, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
-    }
-    else {
-        acsm->currentBuffer=1;
-        acsm->mapPtr2 = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer2, CL_FALSE, CL_MAP_WRITE, 0, sizeof(uint8_t)*acsm->buffSize);
-    }
-
-    acsm->queue.flush();
-    acsm->searchLaunched = 1;
-    acsm->nTotal = 0;
-
-    /* if packet size is not zero */
-    if(!n) {
-        acsm->queue.finish();
-
-        //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
-        //acsm->totalFound += acsm->resultMap[0];
-
-        int c = 0;
-
-        for (int i=0;i<KERNEL_SIZE;i++)
-            c += acsm->countsMap[i];
-
-        /* update global match count */
-        acsm->totalFound += c;
-
-        //Handle results
-        //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
-        //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
-
-        acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
-        acsm->searchLaunched = 0;
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer2, acsm->mapPtr2);
-    }
-    //printf("Exiting GPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
-    return acsm->totalFound;
-}
-
-
-int acsm_search_dfa_full_gpu_singleBuff(
-ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match, void* context, int* current_state)
-{
-    /* create buffer first invocation */
-    if(!acsm->buffSize && n > 0) {
-        acsm->buffSize  = 2000000;
-        acsm->textBuffer1 = cl::Buffer(
-                acsm->context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
-                sizeof(uint8_t)*acsm->buffSize);
-        acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
-                acsm->textBuffer1, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE,
-                0, sizeof(uint8_t)*acsm->buffSize);
-    }
-
-    /* if the buffer is not full, store the payload data in the buffer and return */
-    if(acsm->nTotal < (acsm->buffSize-3000) && n > 0)
-    {
-        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t)*n);
-        acsm->nTotal += n;
-        return 0;
-    }
-
-    /* add current packet to the buffer */
-    if(n > 0) {
-        memcpy(&(acsm->mapPtr[acsm->nTotal]), Tx, sizeof(uint8_t)*n);
-        acsm->nTotal += n;
-    }
-    acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
-
-    /* for flushing, return if there is no data to flush */
-    if(!(acsm->nTotal))
-        return 0;
-
-    clock_t timer = clock();
-    int * len = &acsm->nTotal;
-    cl_int err;
-
-    /* Create length buffer */
-    cl::Buffer lengthBuffer = cl::Buffer(
-            acsm->context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
-            sizeof(int*), len, &err);
-
-    if(err != CL_SUCCESS) {
-        printf("Error in buffer: %d\n", err);
-    }
-
-    /* Set arguments to kernel */
-    err = acsm->kernel.setArg(0, acsm->stateBuffer);
-    err = acsm->kernel.setArg(1, acsm->xlatBuffer);
-    err = acsm->kernel.setArg(2, acsm->textBuffer1);
-    err = acsm->kernel.setArg(3, lengthBuffer);
-    err = acsm->kernel.setArg(4, acsm->matchBuffer);
-    err = acsm->kernel.setArg(5, acsm->countsBuffer);
-    err = acsm->kernel.setArg(6, acsm->matchLenBuffer);
-
-    /* vn: not sure if this err actually changes */
-    if(err != CL_SUCCESS) {
-        printf("Error in setarg %d \n", err);
-    }
-
-    /* Run the kernel on specific ND range */
-    cl::NDRange global(KERNEL_SIZE);
-    cl::NDRange local(1);
-    err = acsm->queue.enqueueNDRangeKernel(acsm->kernel, cl::NullRange, global, local);
-
-    if(err != CL_SUCCESS) {
-        printf("Error in kernel execution!! %d \n", err);
-    }
-
-    /*
-    acsm->resultMap = (int*)acsm->queue.enqueueMapBuffer(
-            acsm->matchBuffer, CL_FALSE, CL_MAP_READ|CL_MAP_WRITE,
-            0, acsm->acsmNumStates*sizeof(int));
-    */
-
-    acsm->countsMap = (int*)acsm->queue.enqueueMapBuffer(
-            acsm->countsBuffer, CL_FALSE, CL_MAP_READ|CL_MAP_WRITE,
-            0, KERNEL_SIZE*sizeof(int));
-
-    acsm->mapPtr = (uint8_t*)acsm->queue.enqueueMapBuffer(
-            acsm->textBuffer1, CL_FALSE, CL_MAP_WRITE,
-            0, sizeof(uint8_t)*acsm->buffSize);
-
-    acsm->queue.finish();
-
-    //printf("Found: %d matches on GPU \n",acsm->resultMap[0]);
-
-    /* Handle results */
-    int c=0;
-
-    for (int i=0;i<KERNEL_SIZE;i++) {
-        c+=acsm->countsMap[i];
-    }
-
-    //acsm->totalFound += acsm->resultMap[0];
-    acsm->totalFound = c;
-
-    //memset(&(acsm->resultMap[0]),0,acsm->acsmNumStates*sizeof(int));
-    //memset(&(acsm->countsMap[0]),0,KERNEL_SIZE*sizeof(int));
-
-    //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
-    acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
-
-    acsm->nTotal = 0;
-
-    /* When n is 0 (flush) unmap objects since they will not be used more
-     */
-    if(!n) {
-        //acsm->queue.enqueueUnmapMemObject(acsm->matchBuffer, acsm->resultMap);
-        acsm->queue.enqueueUnmapMemObject(acsm->countsBuffer, acsm->countsMap);
-        acsm->queue.enqueueUnmapMemObject(acsm->textBuffer1, acsm->mapPtr);
-    }
-
-    //printf("Exiting GPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
-    return acsm->totalFound;
-}
-
-
-/* cpusearch */
-int acsm_search_dfa_full_cpu(
-ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
-void* context, int* current_state
-)
-{
-
-    uint8_t* Tend;
-    int sindex;
-    acstate_t state;
-
-    /*-------------added-------------*/
-    if(!acsm->buffSize && n > 0)
-    {
-
-        acsm->buffSize  = 2000000;
-        acsm->textBuffer = new uint8_t[acsm->buffSize]{0};
-    }
-
-    if(acsm->nTotal < (acsm->buffSize-3000) && n > 0)
-    {
-        memcpy(&(acsm->textBuffer[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
-        acsm->nTotal += n;
-        return  0;
-    }
-    clock_t timer = clock();
-    memcpy(&(acsm->textBuffer[acsm->nTotal]),Tx,sizeof(uint8_t)*n);
-    acsm->nTotal += n;
-
-    //Used for flushing, return if there is no objects to flush
-    if(!(acsm->nTotal))
-        return 0;
-
-    uint8_t* T = acsm->textBuffer;
-    Tend = T + acsm->nTotal;
-    //int * resultArray = new int[acsm->acsmNumStates]{0};
-
-    /*-------end added----------*/
-
-    if (current_state == nullptr)
-        return 0;
-
-    state = *current_state;
-
-    int counter = 0;
-    acstate_t* ps;
-    acstate_t** NextState = acsm->acsmNextState;
-
-    for (; T < Tend; T++ )
-    {
-        ps = NextState[ state ];
-        sindex = xlatcase[T[0]];
-        if (ps[1])
-        {
-            counter++;
-            //resultArray[state] +=1;
-        }
-        state = ps[2u + sindex];
-    }
-
-    //resultArray[0] += counter;
-
-    //printf("CPU  Found: %d  matches on cpu \n",resultArray[0]);
-    //printf("executing pattern matching on cpu");
-    acsm->nTotal = 0;
-    //acsm->totalFound = resultArray[0];
-    acsm->totalFound = counter;
-
-    //printf("the search on CPU took : %f seconds \n",  difftime(clock(),timer)/CLOCKS_PER_SEC);
-    //*current_state = state;
-    return acsm->totalFound;
-}
-
-
 /*
- *   Full format DFA search
- *   Do not change anything here without testing, caching and prefetching
- *   performance is very sensitive to any changes.
- *
- *   Perf-Notes:
- *    1) replaced ConvertCaseEx with inline xlatcase - this improves performance 5-10%
- *    2) using 'nocase' improves performance again by 10-15%, since memcmp is not needed
- *    3)
- */
+*   Full format DFA search
+*   Do not change anything here without testing, caching and prefetching
+*   performance is very sensitive to any changes.
+*
+*   Perf-Notes:
+*    1) replaced ConvertCaseEx with inline xlatcase - this improves performance 5-10%
+*    2) using 'nocase' improves performance again by 10-15%, since memcmp is not needed
+*    3)
+*/
 #define AC_SEARCH \
     for (; T < Tend; T++ ) \
     { \
@@ -2166,7 +1652,7 @@ void* context, int* current_state
                 index = T - Tx; \
                 nfound++; \
                 if (match (mlist->udata, mlist->rule_option_tree, index, context, \
-                mlist->neg_list) > 0) \
+                    mlist->neg_list) > 0) \
                 { \
                     *current_state = state; \
                     return nfound; \
@@ -2177,24 +1663,22 @@ void* context, int* current_state
     }
 
 int acsm_search_dfa_full(
-ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
-void* context, int* current_state
-)
+    ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
+    void* context, int* current_state
+    )
 {
     ACSM_PATTERN2* mlist;
     const uint8_t* Tend;
     const uint8_t* T;
-    const uint8_t* text;
     int index;
     int sindex;
     int nfound = 0;
-    int * len = &n;
     acstate_t state;
     ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
 
     T = Tx;
-    text = Tx;
     Tend = Tx + n;
+
     if (current_state == nullptr)
         return 0;
 
@@ -2202,30 +1686,30 @@ void* context, int* current_state
 
     switch (acsm->sizeofstate)
     {
-        case 1:
-        {
-            uint8_t* ps;
-            uint8_t** NextState = (uint8_t**)acsm->acsmNextState;
-            AC_SEARCH;
-        }
-        break;
-        case 2:
-        {
-            uint16_t* ps;
-            uint16_t** NextState = (uint16_t**)acsm->acsmNextState;
-            AC_SEARCH;
-        }
-        break;
-        default:
-        {
-            acstate_t* ps;
-            acstate_t** NextState = acsm->acsmNextState;
-            AC_SEARCH;
-        }
-        break;
+    case 1:
+    {
+        uint8_t* ps;
+        uint8_t** NextState = (uint8_t**)acsm->acsmNextState;
+        AC_SEARCH;
+    }
+    break;
+    case 2:
+    {
+        uint16_t* ps;
+        uint16_t** NextState = (uint16_t**)acsm->acsmNextState;
+        AC_SEARCH;
+    }
+    break;
+    default:
+    {
+        acstate_t* ps;
+        acstate_t** NextState = acsm->acsmNextState;
+        AC_SEARCH;
+    }
+    break;
     }
 
-/* Check the last state for a pattern match */
+    /* Check the last state for a pattern match */
     mlist = MatchList[state];
     if (mlist)
     {
@@ -2243,15 +1727,15 @@ void* context, int* current_state
 }
 
 /*
- *   Full format DFA search
- *   Do not change anything here without testing, caching and prefetching
- *   performance is very sensitive to any changes.
- *
- *   Perf-Notes:
- *    1) replaced ConvertCaseEx with inline xlatcase - this improves performance 5-10%
- *    2) using 'nocase' improves performance again by 10-15%, since memcmp is not needed
- *    3)
- */
+*   Full format DFA search
+*   Do not change anything here without testing, caching and prefetching
+*   performance is very sensitive to any changes.
+*
+*   Perf-Notes:
+*    1) replaced ConvertCaseEx with inline xlatcase - this improves performance 5-10%
+*    2) using 'nocase' improves performance again by 10-15%, since memcmp is not needed
+*    3)
+*/
 #define AC_SEARCH_ALL \
     for (; T < Tend; T++ ) \
     { \
@@ -2260,15 +1744,15 @@ void* context, int* current_state
         if (ps[1]) \
         { \
             for ( mlist = MatchList[state]; \
-            mlist!= nullptr; \
-            mlist = mlist->next ) \
+                mlist!= nullptr; \
+                mlist = mlist->next ) \
             { \
                 index = T - Tx; \
                 if ( mlist->nocase || (memcmp (mlist->casepatrn, T - mlist->n, mlist->n) == 0)) \
                 { \
                     nfound++; \
                     if (match (mlist->udata, mlist->rule_option_tree, index, context, \
-                    mlist->neg_list) > 0) \
+                        mlist->neg_list) > 0) \
                     { \
                         *current_state = state; \
                         return nfound; \
@@ -2279,109 +1763,87 @@ void* context, int* current_state
         state = ps[2u + sindex]; \
     }
 
-                int acsm_search_dfa_full_all(
-                ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
-                void* context, int* current_state)
-                {
-                    ACSM_PATTERN2* mlist;
-                    const uint8_t* Tend;
-                    const uint8_t* T;
-                    int index;
-                    int sindex;
-                    int nfound = 0;
-                    acstate_t state;
-                    ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
+int acsm_search_dfa_full_all(
+    ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
+    void* context, int* current_state)
+{
+    ACSM_PATTERN2* mlist;
+    const uint8_t* Tend;
+    const uint8_t* T;
+    int index;
+    int sindex;
+    int nfound = 0;
+    acstate_t state;
+    ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
 
-                    T = Tx;
-                    Tend = Tx + n;
+    T = Tx;
+    Tend = Tx + n;
 
-                    if (current_state == nullptr)
-                        return 0;
+    if (current_state == nullptr)
+        return 0;
 
-                    state = *current_state;
+    state = *current_state;
 
-                    switch (acsm->sizeofstate)
-                    {
-                        case 1:
-                        {
-                            uint8_t* ps;
-                            uint8_t** NextState = (uint8_t**)acsm->acsmNextState;
-            //AC_SEARCH;
-                            for (; T < Tend; T++ )
-                            {
-                                ps = NextState[ state ];
-                                sindex = xlatcase[T[0]];
-                                if (ps[1])
-                                {
-                                    mlist = MatchList[state];
-                                    if (mlist)
-                                    {
-                                        index = T - Tx;
-                                        nfound++;
-                                        if (match (mlist->udata, mlist->rule_option_tree, index, context,
-                                            mlist->neg_list) > 0)
-                                        {
-                                            *current_state = state;
-                                            return nfound; \
-                                        }
-                                    }
-                                }
-                                state = ps[2u + sindex];
-                            }
-                        }
-                        break;
-                        case 2:
-                        {
-                            uint16_t* ps;
-                            uint16_t** NextState = (uint16_t**)acsm->acsmNextState;
-                            AC_SEARCH_ALL;
-                        }
-                        break;
-                        default:
-                        {
-                            acstate_t* ps;
-                            acstate_t** NextState = acsm->acsmNextState;
-                            AC_SEARCH_ALL;
-                        }
-                        break;
-                    }
+    switch (acsm->sizeofstate)
+    {
+    case 1:
+    {
+        uint8_t* ps;
+        uint8_t** NextState = (uint8_t**)acsm->acsmNextState;
+        AC_SEARCH_ALL;
+    }
+    break;
+    case 2:
+    {
+        uint16_t* ps;
+        uint16_t** NextState = (uint16_t**)acsm->acsmNextState;
+        AC_SEARCH_ALL;
+    }
+    break;
+    default:
+    {
+        acstate_t* ps;
+        acstate_t** NextState = acsm->acsmNextState;
+        AC_SEARCH_ALL;
+    }
+    break;
+    }
 
     /* Check the last state for a pattern match */
-                    for ( mlist = MatchList[state];
-                        mlist!= nullptr;
-                        mlist = mlist->next )
-                    {
-                        index = T - Tx;
+    for ( mlist = MatchList[state];
+        mlist!= nullptr;
+        mlist = mlist->next )
+    {
+        index = T - Tx;
 
-                        if ( mlist->nocase || (memcmp (mlist->casepatrn, T - mlist->n, mlist->n) == 0))
-                        {
-                            nfound++;
-                            if (match(mlist->udata, mlist->rule_option_tree, index, context, mlist->neg_list) > 0)
-                            {
-                                *current_state = state;
-                                return nfound;
-                            }
-                        }
-                    }
+        if ( mlist->nocase || (memcmp (mlist->casepatrn, T - mlist->n, mlist->n) == 0))
+        {
+            nfound++;
+            if (match(mlist->udata, mlist->rule_option_tree, index, context, mlist->neg_list) > 0)
+            {
+                *current_state = state;
+                return nfound;
+            }
+        }
+    }
 
-                    *current_state = state;
-
-                    return nfound;
-                }
+    *current_state = state;
+    return nfound;
+}
 
 /*
- *   Banded-Row format DFA search
- *   Do not change anything here, caching and prefetching
- *   performance is very sensitive to any changes.
- *
- *   ps[0] = storage fmt
- *   ps[1] = bool match flag
- *   ps[2] = # elements in band
- *   ps[3] = index of 1st element
- */
+*   Banded-Row format DFA search
+*   Do not change anything here, caching and prefetching
+*   performance is very sensitive to any changes.
+*
+*   ps[0] = storage fmt
+*   ps[1] = bool match flag
+*   ps[2] = # elements in band
+*   ps[3] = index of 1st element
+*/
 int acsm_search_dfa_banded(
-ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
-void* context, int* current_state)
+    ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
+    void* context, int* current_state)
 {
     acstate_t** NextState = acsm->acsmNextState;
     ACSM_PATTERN2** MatchList = acsm->acsmMatchList;
@@ -2446,12 +1908,11 @@ void* context, int* current_state)
     return nfound;
 }
 
-
 // Search Text or Binary Data for Pattern matches
 
 int acsm_search_nfa(
-ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
-void* context, int* current_state)
+    ACSM_STRUCT2* acsm, const uint8_t* Tx, int n, MpseMatch match,
+    void* context, int* current_state)
 {
     int nfound = 0;
     acstate_t** NextState= acsm->acsmNextState;
@@ -2495,10 +1956,9 @@ void* context, int* current_state)
     return nfound;
 }
 
-
 /*
- *   Free all memory
- */
+*   Free all memory
+*/
 void acsmFree2(ACSM_STRUCT2* acsm)
 {
     int i;
@@ -2547,12 +2007,10 @@ void acsmFree2(ACSM_STRUCT2* acsm)
     AC_FREE(acsm, 0, ACSM2_MEMORY_TYPE__NONE);
 }
 
-
 int acsmPatternCount2(ACSM_STRUCT2* acsm)
 {
     return acsm->numPatterns;
 }
-
 
 static void Print_DFA_MatchList(ACSM_STRUCT2* acsm, int state)
 {
@@ -2566,11 +2024,10 @@ static void Print_DFA_MatchList(ACSM_STRUCT2* acsm, int state)
     }
 }
 
-
 static void Print_DFA(ACSM_STRUCT2* acsm)
 {
     int k,i;
-    acstate_t* p, state, n, fmt, index, nb, out;
+    acstate_t* p, state, n, fmt, index, nb;
     acstate_t** NextState = acsm->acsmNextState;
 
     printf("Print DFA - %d active states\n",acsm->acsmNumStates);
@@ -2628,9 +2085,6 @@ static void Print_DFA(ACSM_STRUCT2* acsm)
         }
         else if ( fmt == ACF_FULL )
         {
-            out = *p++;
-
-            printf("Output State=%d: \n", out);
             for ( i=0; i<acsm->acsmAlphabetSize; i++ )
             {
                 state = p[i];
@@ -2651,13 +2105,11 @@ static void Print_DFA(ACSM_STRUCT2* acsm)
     }
 }
 
-
 int acsmPrintDetailInfo2(ACSM_STRUCT2* acsm)
 {
     Print_DFA(acsm);
     return 0;
 }
-
 
 /*
  *   Global summary of all info and all state machines built during this run
@@ -2727,7 +2179,7 @@ int acsmPrintSummaryInfo2()
     LogStat("transition memory", acsm2_transtable_memory/scale);
     LogStat("fail state memory", acsm2_failstate_memory/scale);
 
-    #if 0                        // FIXIT-L clean up format; not all this should be printed all the time
+#if 0  // FIXIT-L clean up format; not all this should be printed all the time
     if (acsm2_dfa_memory > 0)
     {
         if (summary.acsm.compress_states)
@@ -2742,11 +2194,10 @@ int acsmPrintSummaryInfo2()
             LogMessage("|   DFA             : %.2f\n", acsm2_dfa_memory/scale);
         }
     }
-    #endif
+#endif
 
     return 0;
 }
-
 
 #ifdef ACSMX2S_MAIN
 // Write a state table to disk
@@ -2821,44 +2272,41 @@ static void Write_DFA(ACSM_STRUCT2* acsm, char* f)
     fclose(fp);
 }
 
-
 static int acsmSearch2(
-ACSM_STRUCT2* acsm, uint8_t* Tx, int n, MpseMatch match,
-void* context, int* current_state)
+    ACSM_STRUCT2* acsm, uint8_t* Tx, int n, MpseMatch match,
+    void* context, int* current_state)
 {
     if ( !acsm->dfa )
         return acsm_search_nfa(acsm, Tx, n, match, context, current_state);
 
     switch ( acsm->acsmFormat )
     {
-        case ACF_FULL:
-            return acsm_search_dfa_full(acsm, Tx, n, match, context, current_state);
+    case ACF_FULL:
+        return acsm_search_dfa_full(acsm, Tx, n, match, context, current_state);
 
-        case ACF_BANDED:
-            return acsm_search_dfa_banded(acsm, Tx, n, match, context, current_state);
+    case ACF_BANDED:
+        return acsm_search_dfa_banded(acsm, Tx, n, match, context, current_state);
 
-        case ACF_SPARSE:
-        case ACF_SPARSE_BANDS:
-            return acsm_search_dfa_sparse(acsm, Tx, n, match, context, current_state);
+    case ACF_SPARSE:
+    case ACF_SPARSE_BANDS:
+        return acsm_search_dfa_sparse(acsm, Tx, n, match, context, current_state);
     }
     return 0;
 }
 
-
 /*
- *  Text Data Buffer
- */
+*  Text Data Buffer
+*/
 uint8_t text[512];
 
 /*
- *    A Match is found
- */
+*    A Match is found
+*/
 int MatchFound(void* id, int index, void* data)
 {
     fprintf (stdout, "%s\n", (char*)id);
     return 0;
 }
-
 
 int main(int argc, char** argv)
 {
@@ -2954,4 +2402,6 @@ int main(int argc, char** argv)
 
     return 0;
 }
+
 #endif
+

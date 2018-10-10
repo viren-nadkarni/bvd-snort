@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,7 +33,7 @@
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
-void LogMessage(const char*,...) { }
+using namespace snort;
 
 THREAD_LOCAL SimpleStats ha_stats;
 THREAD_LOCAL ProfileStats ha_perf_stats;
@@ -42,13 +42,12 @@ void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
 void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*) { }
 void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*, FILE*) { }
 
+namespace snort
+{
+void LogMessage(const char*,...) { }
 void ParseWarning(WarningGroup, const char*, ...) { }
-
 char* snort_strdup(const char* str) { return strdup(str); }
-
-#ifdef DEBUG_MSGS
-void Debug::print(const char*, int, uint64_t, const char*, ...) { }
-#endif
+}
 
 static bool s_port_1_set = false;
 static bool s_use_daq = false;
@@ -76,11 +75,11 @@ bool HighAvailabilityManager::instantiate(PortBitSet* mod_ports, bool mod_use_da
 
 TEST_GROUP(high_availability_module_test)
 {
-    void setup()
+    void setup() override
     {
     }
 
-    void teardown()
+    void teardown() override
     {
     }
 };

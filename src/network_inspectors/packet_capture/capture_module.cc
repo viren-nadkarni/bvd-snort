@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,21 +26,16 @@
 
 #include <lua.hpp>
 
+#include "main/analyzer_command.h"
 #include "profiler/profiler.h"
 
 #include "packet_capture.h"
 
+using namespace snort;
 using namespace std;
 
 static int enable(lua_State*);
 static int disable(lua_State*);
-
-const PegInfo cap_names[] =
-{
-    { CountType::SUM, "processed", "packets processed against filter" },
-    { CountType::SUM, "captured", "packets matching dumped after matching filter" },
-    { CountType::END, nullptr, nullptr }
-};
 
 static const Parameter s_capture[] =
 {
@@ -60,19 +55,64 @@ static const Command cap_cmds[] =
     { nullptr, nullptr, nullptr, nullptr }
 };
 
+static const PegInfo cap_names[] =
+{
+    { CountType::SUM, "processed", "packets processed against filter" },
+    { CountType::SUM, "captured", "packets matching dumped after matching filter" },
+    { CountType::END, nullptr, nullptr }
+};
+
 THREAD_LOCAL CaptureStats cap_count_stats;
 THREAD_LOCAL ProfileStats cap_prof_stats;
 
+//-------------------------------------------------------------------------
+// class stuff
+//-------------------------------------------------------------------------
+class PacketCaptureDebug : public AnalyzerCommand
+{
+public:
+    PacketCaptureDebug(const char* f);
+    void execute(Analyzer&) override;
+    const char* stringify() override { return "PACKET_CAPTURE_DEBUG"; }
+private:
+    bool enable = false;
+    std::string filter;
+};
+
+// -----------------------------------------------------------------------------
+// static functions
+// -----------------------------------------------------------------------------
 static int enable(lua_State* L)
 {
-    packet_capture_enable(lua_tostring(L, 1));
+    main_broadcast_command(new PacketCaptureDebug(lua_tostring(L, 1)), true);
     return 0;
 }
 
 static int disable(lua_State*)
 {
-    packet_capture_disable();
+    main_broadcast_command(new PacketCaptureDebug(nullptr), true);
     return 0;
+}
+
+// -----------------------------------------------------------------------------
+// non-static functions
+// -----------------------------------------------------------------------------
+
+PacketCaptureDebug::PacketCaptureDebug(const char* f)
+{
+    if (f)
+    {
+        filter = f;
+        enable = true;
+    } 
+}
+
+void PacketCaptureDebug::execute(Analyzer&)
+{
+    if (enable)
+        packet_capture_enable(filter);
+    else
+        packet_capture_disable();
 }
 
 CaptureModule::CaptureModule() :

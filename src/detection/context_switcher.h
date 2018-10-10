@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -40,8 +40,12 @@
 
 #include <vector>
 
+namespace snort
+{
+class Flow;
 class IpsContext;
 class IpsContextData;
+}
 
 class ContextSwitcher
 {
@@ -49,25 +53,25 @@ public:
     ContextSwitcher(unsigned max);
     ~ContextSwitcher();
 
-    void push(IpsContext*);
-    IpsContext* pop();
+    void push(snort::IpsContext*);
+    snort::IpsContext* pop();
 
     void start();
     void stop();
     void abort();
 
-    IpsContext* interrupt();
-    IpsContext* complete();
+    snort::IpsContext* interrupt();
+    snort::IpsContext* complete();
 
     unsigned suspend();
     void resume(unsigned suspended);
 
-    IpsContext* get_context() const;
-    IpsContext* get_context(unsigned) const;
-    IpsContext* get_next() const;
+    snort::IpsContext* get_context() const;
+    snort::IpsContext* get_context(unsigned) const;
+    snort::IpsContext* get_next() const;
 
-    IpsContextData* get_context_data(unsigned id) const;
-    void set_context_data(unsigned id, IpsContextData*) const;
+    snort::IpsContextData* get_context_data(unsigned id) const;
+    void set_context_data(unsigned id, snort::IpsContextData*) const;
 
     unsigned idle_count() const;
     unsigned busy_count() const;
@@ -76,12 +80,12 @@ public:
     bool can_hold() const
     { return idle_count() > 5; }  // FIXIT-H define appropriate const
 
-    bool on_hold(class Flow*);
+    bool on_hold(snort::Flow*);
 
 private:
-    std::vector<IpsContext*> idle;
-    std::vector<IpsContext*> busy;
-    std::vector<IpsContext*> hold;
+    std::vector<snort::IpsContext*> idle;
+    std::vector<snort::IpsContext*> busy;
+    std::vector<snort::IpsContext*> hold;
 };
 
 #endif

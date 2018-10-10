@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,6 +32,8 @@
 
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
+
+using namespace snort;
 
 #define MSG_SIZE 100
 #define TEST_KEY 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47
@@ -93,20 +95,20 @@ class StreamHAClient : public FlowHAClient
 {
 public:
     StreamHAClient() : FlowHAClient(10, true) { }
-    ~StreamHAClient() { }
-    bool consume(Flow*&, FlowKey*, HAMessage*)
+    ~StreamHAClient() override = default;
+    bool consume(Flow*&, FlowKey*, HAMessage*) override
     {
         s_stream_consume_called = true;
         return true;
     }
-    bool produce(Flow*, HAMessage* msg)
+    bool produce(Flow*, HAMessage* msg) override
     {
         for ( uint8_t i=0; i<10; i++ )
             *(msg->cursor)++ = i;
         return true;
     }
     uint8_t get_message_size() { return 10; }
-    bool is_update_required(Flow*) { return s_stream_update_required; }
+    bool is_update_required(Flow*) override { return s_stream_update_required; }
     bool fit(HAMessage*,uint8_t) { return true; }
     bool place(HAMessage*,uint8_t*,uint8_t) { return true; }
 
@@ -117,20 +119,20 @@ class OtherHAClient : public FlowHAClient
 {
 public:
     OtherHAClient() : FlowHAClient(5, false) { }
-    ~OtherHAClient() { }
+    ~OtherHAClient() override = default;
     bool consume(Flow*&, HAMessage*)
     {
         s_other_consume_called = true;
         return true;
     }
-    bool produce(Flow*, HAMessage* msg)
+    bool produce(Flow*, HAMessage* msg) override
     {
         for ( uint8_t i=0; i<5; i++ )
             *(msg->cursor)++ = i;
         return true;
     }
     uint8_t get_message_size() { return 5; }
-    bool is_update_required(Flow*) { return s_other_update_required; }
+    bool is_update_required(Flow*) override { return s_other_update_required; }
     bool fit(HAMessage*,uint8_t) { return true; }
     bool place(HAMessage*,uint8_t*,uint8_t) { return true; }
 
@@ -150,12 +152,11 @@ void Stream::delete_flow(const FlowKey* flowkey)
     s_delete_session_called = true;
 }
 
+namespace snort
+{
 void ErrorMessage(const char*,...) { }
 void LogMessage(const char*,...) { }
-
-#ifdef DEBUG_MSGS
-void Debug::print(const char*, int, uint64_t, const char*, ...) { }
-#endif
+}
 
 void packet_gettimeofday(struct timeval* tv)
 { *tv = s_packet_time; }
@@ -165,9 +166,7 @@ Flow::Flow() { ha_state = new FlowHAState; key = new FlowKey; }
 SideChannel* SideChannelManager::get_side_channel(SCPort)
 { return &s_side_channel; }
 
-SideChannel::~SideChannel() { }
-
-SideChannel::SideChannel() { }
+SideChannel::SideChannel() = default;
 
 Connector::Direction SideChannel::get_direction()
 { return Connector::CONN_DUPLEX; }
@@ -218,12 +217,12 @@ SCMessage* SideChannel::alloc_transmit_message(uint32_t len)
 
 TEST_GROUP(high_availability_manager_test)
 {
-    void setup()
+    void setup() override
     {
         MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
     }
 
-    void teardown()
+    void teardown() override
     {
         MemoryLeakWarningPlugin::turnOnNewDeleteOverloads();
     }
@@ -256,8 +255,8 @@ TEST(high_availability_manager_test, inst_init_term)
 
 TEST_GROUP(flow_ha_state_test)
 {
-    void setup() { }
-    void teardown() { }
+    void setup() override { }
+    void teardown() override { }
 };
 
 TEST(flow_ha_state_test, timing_test)
@@ -319,7 +318,7 @@ TEST(flow_ha_state_test, state_test)
 
 TEST_GROUP(high_availability_test)
 {
-    void setup()
+    void setup() override
     {
         MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
         HighAvailabilityManager::pre_config_init();
@@ -333,7 +332,7 @@ TEST_GROUP(high_availability_test)
         s_other_ha_client = new OtherHAClient;
     }
 
-    void teardown()
+    void teardown() override
     {
         delete s_other_ha_client;
         delete s_ha_client;

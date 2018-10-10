@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,11 +27,15 @@
 
 #include <map>
 
-#include "service_plugins/service_detector.h"
 #include "log/messages.h"
 #include "sfip/sf_ip.h"
 #include "time/packet_time.h"
 #include "utils/util.h"
+
+#include "appid_debug.h"
+#include "service_plugins/service_detector.h"
+
+using namespace snort;
 
 ServiceDiscoveryState::ServiceDiscoveryState()
 {
@@ -43,21 +47,35 @@ ServiceDiscoveryState::ServiceDiscoveryState()
 
 ServiceDiscoveryState::~ServiceDiscoveryState()
 {
-    if ( brute_force_mgr )
-        delete brute_force_mgr;
+    delete tcp_brute_force_mgr;
+    delete udp_brute_force_mgr;
 }
 
 ServiceDetector* ServiceDiscoveryState::select_detector_by_brute_force(IpProtocol proto)
 {
-    if ( state == SERVICE_ID_STATE::SEARCHING_BRUTE_FORCE )
+    if (proto == IpProtocol::TCP)
     {
-        if ( !brute_force_mgr )
-            brute_force_mgr = new AppIdDetectorList(proto);
-
-        service = brute_force_mgr->next();
-        if ( !service )
-            state = SERVICE_ID_STATE::FAILED;
+        if ( !tcp_brute_force_mgr )
+            tcp_brute_force_mgr = new AppIdDetectorList(IpProtocol::TCP);
+        service = tcp_brute_force_mgr->next();
+        if (appidDebug->is_active())
+            LogMessage("AppIdDbg %s Brute-force state %s\n", appidDebug->get_debug_session(),
+                service? "" : "failed - no more TCP detectors");
     }
+    else if (proto == IpProtocol::UDP)
+    {
+        if ( !udp_brute_force_mgr )
+            udp_brute_force_mgr = new AppIdDetectorList(IpProtocol::UDP);
+        service = udp_brute_force_mgr->next();
+        if (appidDebug->is_active())
+            LogMessage("AppIdDbg %s Brute-force state %s\n", appidDebug->get_debug_session(),
+                service? "" : "failed - no more UDP detectors");
+    }
+    else
+        service = nullptr;
+
+    if ( !service )
+        state = SERVICE_ID_STATE::FAILED;
 
     return service;
 }
@@ -74,13 +92,13 @@ void ServiceDiscoveryState::set_service_id_valid(ServiceDetector* sd)
 
     if ( !valid_count )
     {
+        valid_count = 1;
         detract_count = 0;
         last_detract.clear();
         invalid_client_count = 0;
         last_invalid_client.clear();
     }
-
-    if ( valid_count < STATE_ID_MAX_VALID_COUNT)
+    else if ( valid_count < STATE_ID_MAX_VALID_COUNT)
         valid_count++;
 }
 
@@ -90,7 +108,7 @@ void ServiceDiscoveryState::set_service_id_valid(ServiceDetector* sd)
  *  - invalid_client_count: If our service detector search had trouble
  *    simply because of unrecognized client data, then consider retrying
  *    the search again. */
-void ServiceDiscoveryState::set_service_id_failed(AppIdSession* asd, const SfIp* client_ip,
+void ServiceDiscoveryState::set_service_id_failed(AppIdSession& asd, const SfIp* client_ip,
     unsigned invalid_delta)
 {
     invalid_client_count += invalid_delta;
@@ -142,11 +160,15 @@ void ServiceDiscoveryState::set_service_id_failed(AppIdSession* asd, const SfIp*
             }
         }
     }
-    else if ( ( state == SERVICE_ID_STATE::SEARCHING_PORT_PATTERN ) &&
-        ( asd->service_search_state == SESSION_SERVICE_SEARCH_STATE::PENDING ) &&
-        ( asd->service_candidates.empty() ) )
+    else if ( ( state == SERVICE_ID_STATE::SEARCHING_PORT_PATTERN ) and
+        ( asd.service_search_state == SESSION_SERVICE_SEARCH_STATE::PENDING ) and
+        asd.service_candidates.empty() and
+        !asd.get_session_flags(APPID_SESSION_MID | APPID_SESSION_OOO) )
     {
-        state = SEARCHING_BRUTE_FORCE;
+        if ( ( asd.protocol == IpProtocol::TCP ) or ( asd.protocol == IpProtocol::UDP ) )
+            state = SEARCHING_BRUTE_FORCE;
+        else
+            state = FAILED;
     }
 }
 
@@ -221,7 +243,7 @@ void AppIdServiceState::clean()
         for ( auto& kv : *service_state_cache )
             delete kv.second;
 
-        service_state_cache->empty();
+        service_state_cache->clear();
         delete service_state_cache;
         service_state_cache = nullptr;
     }
@@ -296,18 +318,19 @@ void AppIdServiceState::remove(const SfIp* ip, IpProtocol proto, uint16_t port, 
     }
 }
 
-void AppIdServiceState::check_reset(AppIdSession* asd, const SfIp* ip, uint16_t port)
+void AppIdServiceState::check_reset(AppIdSession& asd, const SfIp* ip, uint16_t port)
 {
     ServiceDiscoveryState* sds = AppIdServiceState::get(ip, IpProtocol::TCP, port,
-        asd->is_decrypted());
+        asd.is_decrypted());
     if ( sds )
     {
         if ( !sds->get_reset_time() )
             sds->set_reset_time(packet_time() );
         else if ( ( packet_time() - sds->get_reset_time() ) >= 60 )
         {
-            AppIdServiceState::remove(ip, IpProtocol::TCP, port, asd->is_decrypted());
-            asd->set_session_flags(APPID_SESSION_SERVICE_DELETED);
+            AppIdServiceState::remove(ip, IpProtocol::TCP, port, asd.is_decrypted());
+            // FIXIT-L - Remove if this flag not used anywhere
+            asd.set_session_flags(APPID_SESSION_SERVICE_DELETED);
         }
     }
 }

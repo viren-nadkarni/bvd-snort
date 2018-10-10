@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,6 +23,8 @@
 
 #include "codecs/codec_module.h"
 #include "framework/codec.h"
+
+using namespace snort;
 
 #define CD_BAD_PROTO_NAME "bad_proto"
 #define CD_BAD_PROTO_HELP "bad protocol id"

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,6 +27,8 @@
 #include "protocols/ip.h"
 
 #include "pp_raw_buffer_iface.h"
+
+using namespace snort;
 
 template<typename Header>
 static void set_header(lua_State* L, ip::IpApi& ip_api, RawBuffer& rb)
@@ -76,7 +78,7 @@ static const luaL_Reg methods[] =
     {
         "set_ip4",
         [](lua_State* L)
-        { return set<IP4Hdr>(L); }
+        { return set<ip::IP4Hdr>(L); }
     },
     {
         "set_ip6",

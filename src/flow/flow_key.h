@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,10 +29,13 @@
 #include "utils/cpp_macros.h"
 
 struct HashFnc;
+
+namespace snort
+{
 struct SfIp;
 
 PADDING_GUARD_BEGIN
-struct FlowKey
+struct SO_PUBLIC FlowKey
 {
     uint32_t   ip_l[4]; /* Low IP */
     uint32_t   ip_h[4]; /* High IP */
@@ -52,13 +55,13 @@ struct FlowKey
         addresses at this time. */
     bool init(
         PktType, IpProtocol,
-        const SfIp *srcIP, uint16_t srcPort,
-        const SfIp *dstIP, uint16_t dstPort,
+        const snort::SfIp *srcIP, uint16_t srcPort,
+        const snort::SfIp *dstIP, uint16_t dstPort,
         uint16_t vlanId, uint32_t mplsId, uint16_t addrSpaceId);
 
     bool init(
         PktType, IpProtocol,
-        const SfIp *srcIP, const SfIp *dstIP,
+        const snort::SfIp *srcIP, const snort::SfIp *dstIP,
         uint32_t id, uint16_t vlanId,
         uint32_t mplsId, uint16_t addrSpaceId);
 
@@ -73,17 +76,19 @@ struct FlowKey
 private:
     bool init4(
         IpProtocol,
-        const SfIp *srcIP, uint16_t srcPort,
-        const SfIp *dstIP, uint16_t dstPort,
+        const snort::SfIp *srcIP, uint16_t srcPort,
+        const snort::SfIp *dstIP, uint16_t dstPort,
         uint32_t mplsId, bool order = true);
 
     bool init6(
         IpProtocol,
-        const SfIp *srcIP, uint16_t srcPort,
-        const SfIp *dstIP, uint16_t dstPort,
+        const snort::SfIp *srcIP, uint16_t srcPort,
+        const snort::SfIp *dstIP, uint16_t dstPort,
         uint32_t mplsId, bool order = true);
 };
 PADDING_GUARD_END
+
+}
 
 #endif
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,15 +25,15 @@
 #include "dce_common.h"
 #include "stream/stream_splitter.h"
 
-class DceHttpProxySplitter : public StreamSplitter
+class DceHttpProxySplitter : public snort::StreamSplitter
 {
 public:
     DceHttpProxySplitter(bool c2s);
 
-    Status scan(Flow*, const uint8_t* data, uint32_t len,
+    Status scan(snort::Flow*, const uint8_t* data, uint32_t len,
         uint32_t flags, uint32_t* fp) override;
 
-    const StreamBuffer reassemble(Flow*, unsigned, unsigned,
+    const snort::StreamBuffer reassemble(snort::Flow*, unsigned, unsigned,
         const uint8_t*, unsigned, uint32_t, unsigned&) override;
 
     bool is_paf() override

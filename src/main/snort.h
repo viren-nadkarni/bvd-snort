@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2005 Martin Roesch <roesch@sourcefire.com>
 //
@@ -26,6 +26,10 @@
 
 #include "main/snort_types.h"
 
+class ContextSwitcher;
+
+namespace snort
+{
 class Flow;
 struct Packet;
 struct SnortConfig;
@@ -37,6 +41,7 @@ class Snort
 public:
     static SnortConfig* get_reload_config(const char* fname);
     static SnortConfig* get_updated_policy(SnortConfig*, const char* fname, const char* iname);
+    static SnortConfig* get_updated_module(SnortConfig*, const char* name);
     static void setup(int argc, char* argv[]);
     static bool drop_privileges();
     static void do_pidfile();
@@ -57,15 +62,18 @@ public:
 
     static DAQ_Verdict process_packet(
         Packet*, const DAQ_PktHdr_t*, const uint8_t* pkt, bool is_frag=false);
-	static int packet_flush();
+
     static DAQ_Verdict packet_callback(void*, const DAQ_PktHdr_t*, const uint8_t*);
 
     static void inspect(Packet*);
 
     static void set_main_hook(MainHook_f);
-    static class ContextSwitcher* get_switcher();
+    static ContextSwitcher* get_switcher();
 
     SO_PUBLIC static Packet* get_packet();
+
+    static bool get_pause() { return pause; }
+    static void clear_pause() { pause = false; }
 
 private:
     static void init(int, char**);
@@ -76,7 +84,10 @@ private:
     static bool initializing;
     static bool reloading;
     static bool privileges_dropped;
+    static bool pause;
+    static bool was_paused;
 };
+}
 
 #endif
 

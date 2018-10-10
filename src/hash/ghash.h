@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,6 +27,9 @@
 #include "main/snort_types.h"
 
 struct HashFnc;
+
+namespace snort
+{
 
 #define GHASH_NOMEM    (-2)
 #define GHASH_ERR      (-1)
@@ -74,6 +77,6 @@ SO_PUBLIC GHashNode* ghash_findnext(GHash*);
 SO_PUBLIC int ghash_set_keyops(GHash*,
 unsigned (* hash_fcn)(HashFnc* p, const unsigned char* d, int n),
 int (* keycmp_fcn)(const void* s1, const void* s2, size_t n));
-
+}
 #endif
 

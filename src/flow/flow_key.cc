@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,6 +29,8 @@
 #include "protocols/icmp4.h"
 #include "protocols/icmp6.h"
 #include "utils/util.h"
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // icmp foo
@@ -101,7 +103,7 @@ inline bool FlowKey::init4(
 
     if (ip_proto == IpProtocol::ICMPV4)
         update_icmp4(srcIP, srcPort, dstIP, dstPort);
-    
+
     src = srcIP->get_ip4_value();
     dst = dstIP->get_ip4_value();
 
@@ -322,7 +324,7 @@ uint32_t FlowKey::hash(HashFnc* hf, const unsigned char* p, int)
 
     a += d[9];   // port lo & port hi
     b += d[10];  // vlan tag, address space id
-    c += d[11];  // ip_proto, pkt_type, version, and 8bits of zeroed pad, 
+    c += d[11];  // ip_proto, pkt_type, version, and 8 bits of zeroed pad
 
     finalize(a, b, c);
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,11 +23,14 @@
 #define APP_ID_CONFIG_H
 
 #include <array>
+#include <string>
 
 #include "application_ids.h"
 #include "framework/decode_data.h"
+#include "main/snort_config.h"
 #include "protocols/ipv6.h"
 #include "sfip/sf_ip.h"
+#include "target_based/snort_protocols.h"
 #include "utils/sflsq.h"
 
 #define APP_ID_MAX_DIRS         16
@@ -35,60 +38,51 @@
 #define MAX_ZONES               1024
 
 struct NetworkSet;
+class AppIdInspector;
 class AppInfoManager;
 
 extern unsigned appIdPolicyId;
 extern uint32_t app_id_netmasks[];
 
-extern int16_t snortId_for_unsynchronized;
-extern int16_t snortId_for_ftp_data;
-extern int16_t snortId_for_http2;
+extern SnortProtocolId snortId_for_unsynchronized;
+extern SnortProtocolId snortId_for_ftp_data;
+extern SnortProtocolId snortId_for_http2;
 
 struct PortExclusion
 {
     int family;
-    ip::snort_in6_addr ip;
-    ip::snort_in6_addr netmask;
-};
-
-struct AppIdSessionLogFilter
-{
-    AppIdSessionLogFilter()
-    {
-        sip.clear();
-        dip.clear();
-    }
-
-    SfIp sip;
-    bool sip_flag = false;
-    SfIp dip;
-    bool dip_flag = false;
-    uint16_t sport = 0;
-    uint16_t dport = 0;
-    PktType protocol = PktType::NONE;
-    bool log_all_sessions = false;
+    snort::ip::snort_in6_addr ip;
+    snort::ip::snort_in6_addr netmask;
 };
 
 class AppIdModuleConfig
 {
 public:
-    AppIdModuleConfig();
+    AppIdModuleConfig() = default;
     ~AppIdModuleConfig();
 
 #ifdef USE_RNA_CONFIG
     const char* conf_file = nullptr;
+#endif
+    // FIXIT-L: DECRYPT_DEBUG - Move this to ssl-module
+#ifdef REG_TEST
+    // To manually restart appid detection for an SSL-decrypted flow (single session only),
+    // indicate the first packet from where the flow is decrypted (usually immediately
+    // after certificate-exchange). Such manual detection is disabled by default (0).
+    uint32_t first_decrypted_packet_debug = 0;
 #endif
     bool stats_logging_enabled = false;
     unsigned long app_stats_period = 0;
     unsigned long app_stats_rollover_size = 0;
     unsigned long app_stats_rollover_time = 0;
     const char* app_detector_dir = nullptr;
-    const char* thirdparty_appid_dir = nullptr;
+    std::string tp_appid_path = "";
+    std::string tp_appid_config = "";
     uint32_t instance_id = 0;
     uint32_t memcap = 0;
     bool debug = false;
     bool dump_ports = false;
-    AppIdSessionLogFilter session_log_filter;
+    bool log_all_sessions = false;
 
     bool safe_search_enabled = true;
     bool dns_host_reporting = true;
@@ -102,6 +96,7 @@ public:
     uint32_t rtmp_max_packets = 15;
     uint32_t max_tp_flow_depth = 5;
     uint32_t tp_allow_probes = 0;
+    uint32_t http_response_version_enabled = 0;
 };
 
 typedef std::array<SF_LIST*, APP_ID_PORT_ARRAY_SIZE> AppIdPortExclusions;
@@ -112,7 +107,8 @@ public:
     AppIdConfig(AppIdModuleConfig*);
     ~AppIdConfig();
 
-    bool init_appid();
+    bool init_appid(snort::SnortConfig*, AppIdInspector*);
+    static void pterm();
     void cleanup();
     void show();
     void set_safe_search_enforcement(bool enabled);
@@ -140,14 +136,15 @@ public:
 private:
     void read_port_detectors(const char* files);
     void configure_analysis_networks(char* toklist[], uint32_t flag);
-    int add_port_exclusion(AppIdPortExclusions&, const ip::snort_in6_addr* ip,
-        const ip::snort_in6_addr* netmask, int family, uint16_t port);
+    int add_port_exclusion(AppIdPortExclusions&, const snort::ip::snort_in6_addr* ip,
+        const snort::ip::snort_in6_addr* netmask, int family, uint16_t port);
     void process_port_exclusion(char* toklist[]);
     void process_config_directive(char* toklist[], int /* reload */);
     int load_analysis_config(const char* config_file, int reload, int instance_id);
     void display_port_config();
-
-    AppInfoManager& app_info_mgr;
+    //FIXIT-M: RELOAD - Remove static, once app_info_mgr cleanup is
+    //removed from AppIdConfig::pterm
+    static AppInfoManager& app_info_mgr;
 };
 
 #endif

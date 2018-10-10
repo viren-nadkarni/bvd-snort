@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -48,6 +48,7 @@
 
 #include "plugin_manager.h"
 
+using namespace snort;
 using namespace std;
 
 struct ModHook
@@ -391,7 +392,7 @@ static bool set_var(const char* fqn, Value& val)
     if ( val.get_type() != Value::VT_STR )
         return false;
 
-    if ( get_ips_policy() == nullptr )
+    if ( snort::get_ips_policy() == nullptr )
         return true;
 
     trace("var", fqn, val);
@@ -467,14 +468,18 @@ static bool set_value(const char* fqn, Value& v)
         return found;
     }
 
+    if ( mod->get_usage() == Module::GLOBAL &&
+         only_inspection_policy() && !default_inspection_policy() )
+        return true;
+
     if ( mod->get_usage() != Module::INSPECT && only_inspection_policy() )
-            return true;
+        return true;
 
     if ( mod->get_usage() != Module::DETECT && only_ips_policy() )
-            return true;
+        return true;
 
     if ( mod->get_usage() != Module::CONTEXT && only_network_policy() )
-            return true;
+        return true;
 
     // now we must traverse the mod params to get the leaf
     string s = fqn;
@@ -679,13 +684,17 @@ SO_PUBLIC bool open_table(const char* s, int idx)
     if ( !h || (h->api && h->api->type == PT_IPS_OPTION) )
         return false;
 
-    // FIXIT-M only basic modules and inspectors can be reloaded at present
-    if ( ( Snort::is_reloading() )
-            and h->api and h->api->type != PT_INSPECTOR )
+    // FIXIT-M only basic modules, inspectors and ips actions can be reloaded at present
+    if ( ( snort::Snort::is_reloading() ) and h->api
+            and h->api->type != PT_INSPECTOR and h->api->type != PT_IPS_ACTION )
         return false;
 
     Module* m = h->mod;
     const Parameter* p = nullptr;
+
+    if ( m->get_usage() == Module::GLOBAL &&
+         only_inspection_policy() && !default_inspection_policy() )
+        return true;
 
     if ( m->get_usage() != Module::INSPECT && only_inspection_policy() )
         return true;
@@ -746,6 +755,10 @@ SO_PUBLIC void close_table(const char* s, int idx)
 
     if ( ModHook* h = get_hook(key.c_str()) )
     {
+        if ( h->mod->get_usage() == Module::GLOBAL &&
+             only_inspection_policy() && !default_inspection_policy() )
+            return;
+
         if ( h->mod->get_usage() != Module::INSPECT && only_inspection_policy() )
             return;
 
@@ -1053,6 +1066,20 @@ void ModuleManager::show_module(const char* name)
     }
     if ( !c )
         cout << "no match" << endl;
+}
+
+void ModuleManager::reload_module(const char* name, snort::SnortConfig* sc)
+{
+    if ( ModHook* h = get_hook(name) )
+    {
+        PluginManager::instantiate(h->api, h->mod, sc);
+
+    }
+    else
+    {
+        cout << "Module " << name <<" doesn't exist";
+        cout << endl;
+    }
 }
 
 static bool selected(const Module* m, const char* pfx, bool exact)
@@ -1404,14 +1431,17 @@ void ModuleManager::dump_msg_map(const char* pfx)
         cout << "no match" << endl;
 }
 
-void ModuleManager::dump_stats(SnortConfig*, const char* skip)
+void ModuleManager::dump_stats(SnortConfig*, const char* skip, bool dynamic)
 {
     for ( auto p : s_modules )
     {
         if ( !skip || !strstr(skip, p->mod->get_name()) )
         {
             std::lock_guard<std::mutex> lock(stats_mutex);
-            p->mod->show_stats();
+            if (dynamic)
+                p->mod->show_dynamic_stats();
+            else
+                p->mod->show_stats();
         }
     }
 }
@@ -1421,10 +1451,10 @@ void ModuleManager::accumulate(SnortConfig*)
     for ( auto p : s_modules )
     {
         std::lock_guard<std::mutex> lock(stats_mutex);
+        p->mod->prep_counts();
         p->mod->sum_stats(true);
     }
     std::lock_guard<std::mutex> lock(stats_mutex);
-    pc_sum();
 }
 
 void ModuleManager::reset_stats(SnortConfig*)

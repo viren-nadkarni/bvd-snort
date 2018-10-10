@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -99,13 +99,13 @@ struct POPSearchInfo
     int length;
 };
 
-class PopMime : public MimeSession
+class PopMime : public snort::MimeSession
 {
-    using MimeSession::MimeSession;
+    using snort::MimeSession::MimeSession;
 private:
     void decode_alert() override;
-    void reset_state(Flow* ssn) override;
-    bool is_end_of_data(Flow* ssn) override;
+    void reset_state(snort::Flow* ssn) override;
+    bool is_end_of_data(snort::Flow* ssn) override;
 };
 
 struct POPData
@@ -117,14 +117,14 @@ struct POPData
     PopMime* mime_ssn;
 };
 
-class PopFlowData : public FlowData
+class PopFlowData : public snort::FlowData
 {
 public:
     PopFlowData();
     ~PopFlowData() override;
 
     static void init()
-    { inspector_id = FlowData::create_flow_data_id(); }
+    { inspector_id = snort::FlowData::create_flow_data_id(); }
 
 public:
     static unsigned inspector_id;

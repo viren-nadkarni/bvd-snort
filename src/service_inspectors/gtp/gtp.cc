@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,10 +26,11 @@
 
 #include "gtp.h"
 
-#include "main/snort_debug.h"
 #include "protocols/packet.h"
 
 #include "gtp_inspect.h"
+
+using namespace snort;
 
 #define GTPMSG_ZERO_LEN offsetof(GTPMsg, msg_id)
 
@@ -60,9 +61,6 @@ static inline int GTP_Process(const GTPConfig& config, Packet* p, GTP_Roptions* 
     pRopts->gtp_header = gtpMsg.gtp_header;
     pRopts->msg_id = gtpMsg.msg_id;
 
-    DEBUG_WRAP(DebugFormat(DEBUG_GTP, "GTP message version: %d\n", gtpMsg.version));
-    DEBUG_WRAP(DebugFormat(DEBUG_GTP, "GTP message type: %d\n", gtpMsg.msg_type));
-
     return status;
 }
 
@@ -89,11 +87,7 @@ void GTPmain(const GTPConfig& config, Packet* packetp)
         pRopts = GTPGetNewSession(packetp);
 
         if ( !pRopts )
-        {
-            /* Could not get/create the session data for this packet. */
-            DEBUG_WRAP(DebugMessage(DEBUG_GTP, "Create session error - not inspecting.\n"));
             return;
-        }
     }
 
     GTP_Process(config, packetp, pRopts);

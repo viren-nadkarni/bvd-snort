@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,9 +27,15 @@
 #include <cstdint>
 #include <cstdio>
 
-struct SnortConfig;
-struct OptTreeNode;
+#include "target_based/snort_protocols.h"
+
+namespace snort
+{
 struct GHash;
+struct SnortConfig;
+}
+
+struct OptTreeNode;
 
 /* this contains a list of the URLs for various reference systems */
 struct ReferenceSystemNode
@@ -39,7 +45,7 @@ struct ReferenceSystemNode
     ReferenceSystemNode* next;
 };
 
-ReferenceSystemNode* ReferenceSystemAdd(SnortConfig*, const char*, const char* = nullptr);
+ReferenceSystemNode* ReferenceSystemAdd(snort::SnortConfig*, const char*, const char* = nullptr);
 
 /* XXX: update to point to the ReferenceURLNode in the referenceURL list */
 struct ReferenceNode
@@ -49,7 +55,7 @@ struct ReferenceNode
     ReferenceNode* next;
 };
 
-void AddReference(SnortConfig*, ReferenceNode**, const char*, const char*);
+void AddReference(snort::SnortConfig*, ReferenceNode**, const char*, const char*);
 
 /* struct for rule classification */
 struct ClassType
@@ -63,14 +69,14 @@ struct ClassType
 };
 
 /* NOTE:  These methods can only be used during parse time */
-void AddClassification(SnortConfig*, const char* type, const char* name, int priority);
+void AddClassification(snort::SnortConfig*, const char* type, const char* name, int priority);
 
-ClassType* ClassTypeLookupByType(SnortConfig*, const char*);
+ClassType* ClassTypeLookupByType(snort::SnortConfig*, const char*);
 
 struct SignatureServiceInfo
 {
     char* service;
-    int16_t service_ordinal;
+    SnortProtocolId snort_protocol_id;
 };
 
 struct OtnKey
@@ -97,15 +103,15 @@ struct SigInfo
     uint32_t priority;
     uint32_t num_services;
 
-    bool text_rule;
+    bool builtin;
     Target target;
 };
 
-GHash* OtnLookupNew();
-void OtnLookupAdd(GHash*, OptTreeNode*);
-OptTreeNode* OtnLookup(GHash*, uint32_t gid, uint32_t sid);
-void OtnLookupFree(GHash*);
-void OtnRemove(GHash*, OptTreeNode*);
+snort::GHash* OtnLookupNew();
+void OtnLookupAdd(snort::GHash*, OptTreeNode*);
+OptTreeNode* OtnLookup(snort::GHash*, uint32_t gid, uint32_t sid);
+void OtnLookupFree(snort::GHash*);
+void OtnRemove(snort::GHash*, OptTreeNode*);
 
 void OtnDeleteData(void* data);
 void OtnFree(void* data);

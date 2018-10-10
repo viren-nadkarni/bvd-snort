@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,6 +33,7 @@
 #include "module_manager.h"
 #include "plugin_manager.h"
 
+using namespace snort;
 using namespace std;
 
 struct Option
@@ -165,7 +166,7 @@ const char* IpsManager::get_option_keyword()
 }
 
 bool IpsManager::option_begin(
-    SnortConfig* sc, const char* key, int /*proto*/)
+    SnortConfig* sc, const char* key, SnortProtocolId)
 {
     Option* opt = get_opt(key);
 
@@ -244,7 +245,7 @@ bool IpsManager::option_set(
 }
 
 bool IpsManager::option_end(
-    SnortConfig* sc, OptTreeNode* otn, int proto,
+    SnortConfig* sc, OptTreeNode* otn, SnortProtocolId snort_protocol_id,
     const char* key, RuleOptType& type)
 {
     if ( current_keyword.empty() )
@@ -253,9 +254,9 @@ bool IpsManager::option_end(
     assert(!strcmp(current_keyword.c_str(), key));
 
 #ifdef NDEBUG
-    UNUSED(proto);
+    UNUSED(snort_protocol_id);
 #else
-    assert(proto == otn->proto);
+    assert(snort_protocol_id == otn->snort_protocol_id);
 #endif
 
     Module* mod = current_module;

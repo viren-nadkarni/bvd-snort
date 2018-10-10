@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,6 +33,8 @@
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
+using namespace snort;
+
 THREAD_LOCAL SimpleStats sc_stats;
 THREAD_LOCAL ProfileStats sc_perf_stats;
 
@@ -58,14 +60,13 @@ void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
 void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*) { }
 void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*, FILE*) { }
 
+namespace snort
+{
 void ParseWarning(WarningGroup, const char*, ...) { }
-
-#ifdef DEBUG_MSGS
-void Debug::print(const char*, int, uint64_t, const char*, ...) { }
-#endif
 
 char* snort_strdup(const char* s)
 { return strdup(s); }
+}
 
 TEST_GROUP(side_channel_module)
 { };

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,15 +32,20 @@
 #include <CppUTest/TestHarness.h>
 #include <CppUTestExt/MockSupport.h>
 
+using namespace snort;
 using namespace HttpEnums;
 
+namespace snort
+{
 // Stubs whose sole purpose is to make the test code link
 unsigned FlowData::flow_data_id = 0;
 FlowData::FlowData(unsigned, Inspector*) {}
-FlowData::~FlowData() {}
-int DetectionEngine::queue_event(unsigned int, unsigned int, RuleType) { return 0; }
-THREAD_LOCAL PegCount HttpModule::peg_counts[1];
+FlowData::~FlowData() = default;
+int DetectionEngine::queue_event(unsigned int, unsigned int, Actions::Type) { return 0; }
 fd_status_t File_Decomp_StopFree(fd_session_t*) { return File_Decomp_OK; }
+}
+
+THREAD_LOCAL PegCount HttpModule::peg_counts[1];
 
 class HttpUnitTestSetup
 {
@@ -57,7 +62,7 @@ TEST_GROUP(http_transaction_test)
     SectionType* const section_type = HttpUnitTestSetup::get_section_type(flow_data);
     SectionType* const type_expected = HttpUnitTestSetup::get_type_expected(flow_data);
 
-    void teardown()
+    void teardown() override
     {
         delete flow_data;
     }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,7 +27,6 @@
 #include <cassert>
 
 #include "detection/detection_util.h"
-#include "main/snort_types.h"
 #include "utils/util.h"
 
 #include "file_decomp_pdf.h"
@@ -37,7 +36,7 @@
 #include "catch/snort_catch.h"
 #endif
 
-SNORT_FORCED_INCLUSION_DEFINITION(file_decomp);
+using namespace snort;
 
 static const char PDF_Sig[5] = { '%', 'P', 'D', 'F', '-' };
 static const char SWF_ZLIB_Sig[3] = { 'C', 'W', 'S' };
@@ -232,6 +231,8 @@ static fd_status_t Process_Decompression(fd_session_t* SessionPtr)
     return( Ret_Code );
 }
 
+namespace snort
+{
 /* The caller provides Compr_Depth, Decompr_Depth and Modes in the session object.
    Based on the requested Modes, gear=up to initialize the potential decompressors. */
 fd_status_t File_Decomp_Init(fd_session_t* SessionPtr)
@@ -242,7 +243,6 @@ fd_status_t File_Decomp_Init(fd_session_t* SessionPtr)
         return( File_Decomp_Error );
 
     SessionPtr->State = STATE_READY;
-    SessionPtr->File_Type = FILE_TYPE_NONE;
     SessionPtr->Decomp_Type = FILE_COMPRESSION_TYPE_NONE;
 
     for ( Sig=0; Signature_Map[Sig].Sig != nullptr; Sig++ )
@@ -280,6 +280,7 @@ fd_session_t* File_Decomp_New()
     New_Session->Next_In = nullptr;
     New_Session->Avail_Out = 0;
     New_Session->Next_Out = nullptr;
+    New_Session->File_Type = FILE_TYPE_NONE;
 
     return New_Session;
 }
@@ -393,6 +394,8 @@ void File_Decomp_Alert(fd_session_t* SessionPtr, int Event)
         (SessionPtr->Alert_Callback)(SessionPtr->Alert_Context, Event);
 }
 
+} // namespace snort
+
 //--------------------------------------------------------------------------
 // unit tests 
 //--------------------------------------------------------------------------
@@ -432,6 +435,7 @@ TEST_CASE("File_Decomp_New", "[file_decomp]")
     REQUIRE(p_s->Avail_Out == 0);
     REQUIRE(p_s->Next_In == nullptr);
     REQUIRE(p_s->Next_Out == nullptr);
+    REQUIRE(p_s->File_Type == FILE_TYPE_NONE);
     File_Decomp_Free(p_s);
 }
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,6 +31,7 @@ int main_dump_stats(lua_State* = nullptr);
 int main_rotate_stats(lua_State* = nullptr);
 int main_reload_config(lua_State* = nullptr);
 int main_reload_policy(lua_State* = nullptr);
+int main_reload_module(lua_State* = nullptr);
 int main_reload_daq(lua_State* = nullptr);
 int main_reload_hosts(lua_State* = nullptr);
 int main_process(lua_State* = nullptr);

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,19 +32,22 @@
 #include "flow/prune_stats.h"
 #include "main/snort.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "packet_io/active.h"
 #include "protocols/vlan.h"
+#include "stream/base/stream_module.h"
 #include "target_based/sftarget_hostentry.h"
 #include "target_based/snort_protocols.h"
 #include "utils/util.h"
 
 #include "tcp/tcp_session.h"
+#include "libtcp/tcp_stream_session.h"
 
 #ifdef UNIT_TEST
 #include "catch/snort_catch.h"
 #include "libtcp/stream_tcp_unit_test.h"
 #endif
+
+using namespace snort;
 
 // this should not be publicly accessible
 extern THREAD_LOCAL class FlowControl* flow_con;
@@ -160,7 +163,12 @@ void Stream::check_flow_closed(Packet* p)
     if (flow->session_state & STREAM_STATE_CLOSED)
     {
         assert(flow_con);
-        flow_con->delete_flow(flow, PruneReason::NONE);
+        
+        // this will get called on each onload
+        // eventually all onloads will occur and delete will be called
+        if ( not flow->is_offloaded() )
+            flow_con->delete_flow(flow, PruneReason::NONE);
+
         p->flow = nullptr;
     }
     else if (flow->session_state & STREAM_STATE_BLOCK_PENDING)
@@ -210,6 +218,10 @@ void Stream::stop_inspection(
     int32_t /*bytes*/, int /*response*/)
 {
     assert(flow && flow->session);
+
+    trace_logf(stream, "stop inspection on flow, dir %s \n",
+	       dir == SSN_DIR_BOTH ? "BOTH": 
+	       ((dir == SSN_DIR_FROM_CLIENT) ? "FROM_CLIENT" : "FROM_SERVER"));
 
     switch (dir)
     {
@@ -377,28 +389,28 @@ bool Stream::expected_flow(Flow* f, Packet* p)
 // app proto id foo
 //-------------------------------------------------------------------------
 
-int Stream::set_application_protocol_id_expected(
+int Stream::set_snort_protocol_id_expected(
     const Packet* ctrlPkt, PktType type, IpProtocol ip_proto,
     const SfIp* srcIP, uint16_t srcPort,
     const SfIp* dstIP, uint16_t dstPort,
-    int16_t appId, FlowData* fd)
+    SnortProtocolId snort_protocol_id, FlowData* fd)
 {
     assert(flow_con);
 
     return flow_con->add_expected(
-        ctrlPkt, type, ip_proto, srcIP, srcPort, dstIP, dstPort, appId, fd);
+        ctrlPkt, type, ip_proto, srcIP, srcPort, dstIP, dstPort, snort_protocol_id, fd);
 }
 
-void Stream::set_application_protocol_id(
+void Stream::set_snort_protocol_id(
     Flow* flow, const HostAttributeEntry* host_entry, int /*direction*/)
 {
-    int16_t application_protocol;
+    SnortProtocolId snort_protocol_id;
 
     if (!flow || !host_entry)
         return;
 
     /* Cool, its already set! */
-    if (flow->ssn_state.application_protocol != 0)
+    if (flow->ssn_state.snort_protocol_id != UNKNOWN_PROTOCOL_ID)
         return;
 
     if (flow->ssn_state.ipprotocol == 0)
@@ -406,7 +418,7 @@ void Stream::set_application_protocol_id(
         set_ip_protocol(flow);
     }
 
-    application_protocol = getApplicationProtocolId(
+    snort_protocol_id = get_snort_protocol_id_from_host_table(
         host_entry, flow->ssn_state.ipprotocol,
         flow->server_port, SFAT_SERVICE);
 
@@ -414,32 +426,32 @@ void Stream::set_application_protocol_id(
     // FIXIT-M from client doesn't imply need to swap
     if (direction == FROM_CLIENT)
     {
-        if ( application_protocol &&
+        if ( snort_protocol_id &&
             (flow->ssn_state.session_flags & SSNFLAG_MIDSTREAM) )
             flow->ssn_state.session_flags |= SSNFLAG_CLIENT_SWAP;
     }
 #endif
 
-    if (flow->ssn_state.application_protocol != application_protocol)
+    if (flow->ssn_state.snort_protocol_id != snort_protocol_id)
     {
-        flow->ssn_state.application_protocol = application_protocol;
+        flow->ssn_state.snort_protocol_id = snort_protocol_id;
     }
 }
 
-int16_t Stream::get_application_protocol_id(Flow* flow)
+SnortProtocolId Stream::get_snort_protocol_id(Flow* flow)
 {
     /* Not caching the source and dest host_entry in the session so we can
      * swap the table out after processing this packet if we need
      * to.  */
 
     if (!flow)
-        return 0;
+        return UNKNOWN_PROTOCOL_ID;
 
-    if ( flow->ssn_state.application_protocol == -1 )
-        return 0;
+    if ( flow->ssn_state.snort_protocol_id == INVALID_PROTOCOL_ID )
+        return UNKNOWN_PROTOCOL_ID;
 
-    if (flow->ssn_state.application_protocol != 0)
-        return flow->ssn_state.application_protocol;
+    if (flow->ssn_state.snort_protocol_id != UNKNOWN_PROTOCOL_ID)
+        return flow->ssn_state.snort_protocol_id;
 
     if (flow->ssn_state.ipprotocol == 0)
     {
@@ -448,32 +460,32 @@ int16_t Stream::get_application_protocol_id(Flow* flow)
 
     if ( HostAttributeEntry* host_entry = SFAT_LookupHostEntryByIP(&flow->server_ip) )
     {
-        set_application_protocol_id(flow, host_entry, FROM_SERVER);
+        set_snort_protocol_id(flow, host_entry, FROM_SERVER);
 
-        if (flow->ssn_state.application_protocol != 0)
-            return flow->ssn_state.application_protocol;
+        if (flow->ssn_state.snort_protocol_id != UNKNOWN_PROTOCOL_ID)
+            return flow->ssn_state.snort_protocol_id;
     }
 
     if ( HostAttributeEntry* host_entry = SFAT_LookupHostEntryByIP(&flow->client_ip) )
     {
-        set_application_protocol_id(flow, host_entry, FROM_CLIENT);
+        set_snort_protocol_id(flow, host_entry, FROM_CLIENT);
 
-        if (flow->ssn_state.application_protocol != 0)
-            return flow->ssn_state.application_protocol;
+        if (flow->ssn_state.snort_protocol_id != UNKNOWN_PROTOCOL_ID)
+            return flow->ssn_state.snort_protocol_id;
     }
 
-    flow->ssn_state.application_protocol = -1;
-    return 0;
+    flow->ssn_state.snort_protocol_id = INVALID_PROTOCOL_ID;
+    return UNKNOWN_PROTOCOL_ID;
 }
 
-int16_t Stream::set_application_protocol_id(Flow* flow, int16_t id)
+SnortProtocolId Stream::set_snort_protocol_id(Flow* flow, SnortProtocolId id)
 {
     if (!flow)
-        return 0;
+        return UNKNOWN_PROTOCOL_ID;
 
-    if (flow->ssn_state.application_protocol != id)
+    if (flow->ssn_state.snort_protocol_id != id)
     {
-        flow->ssn_state.application_protocol = id;
+        flow->ssn_state.snort_protocol_id = id;
     }
 
     if (!flow->ssn_state.ipprotocol)
@@ -608,10 +620,6 @@ bool Stream::blocked_flow(Flow* flow, Packet* p)
         ((p->is_from_client()) &&
         (flow->ssn_state.session_flags & SSNFLAG_DROP_CLIENT)) )
     {
-        DebugFormat(DEBUG_STREAM_STATE,
-            "Blocking %s packet as session was blocked\n",
-            p->is_from_server() ?  "server" : "client");
-
         DetectionEngine::disable_content(p);
         Active::drop_packet(p);
         active_response(p, flow);
@@ -627,10 +635,6 @@ bool Stream::ignored_flow(Flow* flow, Packet* p)
         ((p->is_from_client()) &&
         (flow->ssn_state.ignore_direction & SSN_DIR_FROM_SERVER)) )
     {
-        DebugFormat(DEBUG_STREAM_STATE,
-            "Stream Ignoring packet from %s. Session marked as ignore\n",
-            p->is_from_client() ? "sender" : "responder");
-
         DetectionEngine::disable_all(p);
         return true;
     }
@@ -657,7 +661,6 @@ bool Stream::expired_flow(Flow* flow, Packet* p)
     if ( (flow->session_state & STREAM_STATE_TIMEDOUT)
         || StreamExpire(p, flow) )
     {
-        DebugMessage(DEBUG_STREAM, "Stream IP session timeout!\n");
         flow->ssn_state.session_flags |= SSNFLAG_TIMEDOUT;
         return true;
     }
@@ -788,6 +791,23 @@ bool Stream::missed_packets(Flow* flow, uint8_t dir)
     assert(flow && flow->session);
     return flow->session->are_packets_missing(dir);
 }
+
+uint16_t Stream::get_mss(Flow* flow, bool to_server)
+{
+    assert(flow and flow->session and flow->pkt_type == PktType::TCP);
+
+    TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
+    return tcp_session->get_mss(to_server);
+}
+
+uint8_t Stream::get_tcp_options_len(Flow* flow, bool to_server)
+{
+    assert(flow and flow->session and flow->pkt_type == PktType::TCP);
+
+    TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
+    return tcp_session->get_tcp_options_len(to_server);
+}
+
 
 #ifdef UNIT_TEST
 

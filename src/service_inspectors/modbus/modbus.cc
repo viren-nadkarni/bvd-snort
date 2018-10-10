@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,6 +32,8 @@
 #include "modbus_decode.h"
 #include "modbus_module.h"
 #include "modbus_paf.h"
+
+using namespace snort;
 
 THREAD_LOCAL ModbusStats modbus_stats;
 
@@ -158,7 +160,7 @@ static const InspectApi modbus_api =
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU,
+    PROTO_BIT__PDU,
     nullptr,
     "modbus",
     modbus_init,

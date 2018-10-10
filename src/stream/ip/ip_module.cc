@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,6 +27,7 @@
 #include "ip_session.h"
 #include "stream_ip.h"
 
+using namespace snort;
 using namespace std;
 
 #define DEFRAG_IPOPTIONS_STR \
@@ -111,7 +112,7 @@ static const Parameter s_params[] =
       "alert if fragment length is below this limit before or after trimming" },
 
     { "min_ttl", Parameter::PT_INT, "1:255", "1",
-      "discard fragments with ttl below the minimum" },
+      "discard fragments with TTL below the minimum" },
 
     { "policy", Parameter::PT_ENUM, IP_POLICIES, "linux",
       "fragment reassembly policy" },

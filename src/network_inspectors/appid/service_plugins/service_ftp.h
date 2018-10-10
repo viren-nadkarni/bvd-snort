@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -34,11 +34,9 @@ public:
     int validate(AppIdDiscoveryArgs&) override;
 
 private:
-    void create_expected_session(AppIdSession* asd,const Packet* pkt, const SfIp* cliIp,
-        uint16_t cliPort, const SfIp* srvIp, uint16_t srvPort, IpProtocol proto,
-        int flags, APPID_SESSION_DIRECTION dir);
-
-    int16_t ftp_data_app_id = 0;
+    void create_expected_session(AppIdSession& asd,const snort::Packet* pkt,
+        const snort::SfIp* cliIp, uint16_t cliPort, const snort::SfIp* srvIp,
+        uint16_t srvPort, IpProtocol proto, int flags, AppidSessionDirection dir);
 };
 #endif
 

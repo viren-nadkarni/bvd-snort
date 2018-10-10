@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,8 @@
 
 #include "packet.h"
 
+namespace snort
+{
 namespace ip
 {
 IpOptionIteratorIter::IpOptionIteratorIter(const IpOptions* first_opt) : opt(first_opt)
@@ -74,4 +76,5 @@ IpOptionIteratorIter IpOptionIterator::end() const
     return IpOptionIteratorIter(reinterpret_cast<const IpOptions*>(end_ptr));
 }
 } // namespace ip
+} // namespace snort
 

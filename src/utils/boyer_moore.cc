@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -47,10 +47,10 @@
 
 #include "boyer_moore.h"
 
-#include "main/snort_debug.h"
-
 #include "util.h"
 
+namespace snort
+{
 /****************************************************************
  *
  *  Function: make_skip(char *, int)
@@ -151,9 +151,6 @@ int* make_shift(const char* ptrn, int plen)
 int mSearch(
     const char* buf, int blen, const char* ptrn, int plen, const int* skip, const int* shift)
 {
-    DebugFormat(DEBUG_PATTERN_MATCH,"buf: %p  blen: %d  ptrn: %p  "
-        "plen: %d\n", buf, blen, ptrn, plen);
-
     if (plen == 0)
         return -1;
 
@@ -223,4 +220,4 @@ int mSearchCI(
 
     return -1;
 }
-
+}

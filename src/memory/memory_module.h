@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,13 +23,13 @@
 
 #include "framework/module.h"
 
-class MemoryModule : public Module
+class MemoryModule : public snort::Module
 {
 public:
     MemoryModule();
 
-    bool set(const char*, Value&, SnortConfig*) override;
-    bool end(const char*, int, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+    bool end(const char*, int, snort::SnortConfig*) override;
 
     Usage get_usage() const override
     { return GLOBAL; }

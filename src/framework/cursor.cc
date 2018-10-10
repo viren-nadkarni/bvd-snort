@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,8 @@
 #include "detection/detection_util.h"
 #include "protocols/packet.h"
 
+using namespace snort;
+
 Cursor::Cursor(Packet* p)
 {
     reset(p);
@@ -47,13 +49,9 @@ void Cursor::reset(Packet* p)
     {
         set("alt_data", buf.data, buf.len);
     }
-    else if ( IsLimitedDetect(p) )
-    {
-        set("pkt_data", p->data, p->alt_dsize);
-    }
     else
     {
-        set("pkt_data", p->data, p->dsize);
+        set("pkt_data", p->data, p->get_detect_limit());
     }
 }
 

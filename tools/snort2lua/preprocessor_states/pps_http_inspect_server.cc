@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,20 +33,6 @@ class HttpInspectServer : public ConversionState
 public:
     HttpInspectServer(Converter& c) : ConversionState(c) { }
     bool convert(std::istringstream& data_stream) override;
-    bool reverse_depths(const std::string& opt_name, std::istringstream& stream)
-    {
-        int val;
-
-        if (stream >> val)
-        {
-            val = !val ? -1 : ( val == -1 ? 0 : val );
-            table_api.add_option(opt_name, val);
-            return true;
-        }
-
-        table_api.add_comment("snort.conf missing argument for: " + opt_name + " <int>");
-        return false;
-    }
 
 private:
     static int binding_id;
@@ -233,12 +219,12 @@ bool HttpInspectServer::convert(std::istringstream& data_stream)
         else if (keyword == "server_flow_depth" || keyword == "flow_depth")
         {
             table_api.add_diff_option_comment(keyword, "response_depth");
-            tmpval = reverse_depths("response_depth", data_stream);
+            tmpval = parse_int_option_reverse_m10("response_depth", data_stream);
         }
         else if (keyword == "client_flow_depth")
         {
             table_api.add_diff_option_comment("client_flow_depth", "request_depth");
-            tmpval = reverse_depths("request_depth", data_stream);
+            tmpval = parse_int_option_reverse_m10("request_depth", data_stream);
         }
         else if (keyword == "chunk_length")
             parse_deleted_option("chunk_length", data_stream);

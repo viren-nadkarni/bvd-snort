@@ -5,7 +5,7 @@
 set(prefix "${CMAKE_INSTALL_PREFIX}")
 set(exec_prefix "\${prefix}")
 set(bindir "\${exec_prefix}/bin")
-set(libdir "\${exec_prefix}/lib")
+set(libdir "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
 set(includedir "\${prefix}/include")
 set(datarootdir "\${prefix}/share")
 set(datadir "\${datarootdir}")
@@ -16,8 +16,28 @@ if(DAQ_INCLUDE_DIR)
     set(DAQ_CPPFLAGS "-I${DAQ_INCLUDE_DIR}")
 endif()
 
+if(DISABLE_MEMORY_MANAGER)
+    set(NO_MEM_MGR_CPPFLAGS "-DNO_MEM_MGR")
+endif()
+
+if(DISABLE_SNORT_PROFILER)
+    set(NO_PROFILER_CPPFLAGS "-DNO_PROFILER")
+endif()
+
 if(DNET_INCLUDE_DIR)
     set(DNET_CPPFLAGS "-I${DNET_INCLUDE_DIR}")
+endif()
+
+if(ENABLE_APPID_THIRD_PARTY)
+    set(TP_APPID_CPPFLAGS "-DENABLE_APPID_THIRD_PARTY")
+endif()
+
+if(ENABLE_DEEP_PROFILING)
+    set(DEEP_PROFILING_CPPFLAGS "-DDEEP_PROFILING")
+endif()
+
+if(ENABLE_TSC_CLOCK)
+    set(TSC_CPPFLAGS "-DUSE_TSC_CLOCK")
 endif()
 
 if(FLATBUFFERS_INCLUDE_DIR)
@@ -69,5 +89,5 @@ configure_file(
 )
 
 install (FILES ${CMAKE_BINARY_DIR}/snort.pc
-    DESTINATION "lib/pkgconfig/"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig/"
 )

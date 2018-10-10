@@ -1,5 +1,6 @@
 
 set (INCLUDES
+    analyzer_command.h
     policy.h
     snort_config.h
     snort_debug.h
@@ -15,11 +16,10 @@ if ( ENABLE_SHELL )
     set ( SHELL_SOURCES control.cc control.h control_mgmt.cc control_mgmt.h )
 endif ( ENABLE_SHELL )
 
-add_library (main STATIC
+add_library (main OBJECT
     analyzer.cc
     analyzer.h
     analyzer_command.cc
-    analyzer_command.h
     build.h
     help.cc
     help.h
@@ -43,14 +43,6 @@ add_library (main STATIC
     ${DEBUG_MSGS_SOURCES}
     ${INCLUDES}
     ${SHELL_SOURCES}
-)
-
-
-target_link_libraries(main
-    time
-    codecs
-    detection
-    packet_io
 )
 
 install (FILES ${INCLUDES}

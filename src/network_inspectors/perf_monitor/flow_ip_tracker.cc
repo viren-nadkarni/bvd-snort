@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,6 +27,8 @@
 #include "log/messages.h"
 #include "protocols/packet.h"
 
+using namespace snort;
+
 #define TRACKER_NAME PERF_NAME "_flow_ip"
 
 struct FlowStateKey
@@ -35,13 +37,11 @@ struct FlowStateKey
     SfIp ipB;
 };
 
-THREAD_LOCAL FlowIPTracker* perf_flow_ip;
-
 FlowStateValue* FlowIPTracker::find_stats(const SfIp* src_addr, const SfIp* dst_addr,
     int* swapped)
 {
     FlowStateKey key;
-    FlowStateValue* value;
+    FlowStateValue* value = nullptr;
 
     if (src_addr->less_than(*dst_addr))
     {
@@ -63,9 +63,6 @@ FlowStateValue* FlowIPTracker::find_stats(const SfIp* src_addr, const SfIp* dst_
 
         if (!node)
         {
-            DEBUG_WRAP(DebugMessage(DEBUG_STREAM,
-                "Key/Value pair didn't exist in the flow stats table and we couldn't add it!\n");
-                );
             return nullptr;
         }
         memset(node->data, 0, sizeof(FlowStateValue));
@@ -75,8 +72,7 @@ FlowStateValue* FlowIPTracker::find_stats(const SfIp* src_addr, const SfIp* dst_
     return value;
 }
 
-FlowIPTracker::FlowIPTracker(PerfConfig* perf) :
-    PerfTracker(perf, perf->output == PERF_FILE, TRACKER_NAME)
+FlowIPTracker::FlowIPTracker(PerfConfig* perf) : PerfTracker(perf, TRACKER_NAME)
 {
     formatter->register_section("flow_ip");
     formatter->register_field("ip_a", ip_a);
@@ -114,7 +110,7 @@ FlowIPTracker::FlowIPTracker(PerfConfig* perf) :
     formatter->finalize_fields();
 
     ip_map = xhash_new(1021, sizeof(FlowStateKey), sizeof(FlowStateValue),
-        perfmon_config->flowip_memcap, 1, nullptr, nullptr, 1);
+        perf->flowip_memcap, 1, nullptr, nullptr, 1);
 
     if (!ip_map)
         FatalError("Unable to allocate memory for FlowIP stats\n");
@@ -122,7 +118,7 @@ FlowIPTracker::FlowIPTracker(PerfConfig* perf) :
 
 FlowIPTracker::~FlowIPTracker()
 {
-    if (ip_map)
+    if ( ip_map )
         xhash_delete(ip_map);
 }
 

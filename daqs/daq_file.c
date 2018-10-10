@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,16 +24,14 @@
 
 #include "daq_user.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-#include <sys/types.h>
 #include <sys/time.h>
-#include <sys/unistd.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <daq_api.h>
 #include <sfbpf_dlt.h>

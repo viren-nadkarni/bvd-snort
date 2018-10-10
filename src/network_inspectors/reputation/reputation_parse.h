@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,8 +22,11 @@
 
 #include "reputation_config.h"
 
-void IpListInit(uint32_t,ReputationConfig *config);
-void EstimateNumEntries(ReputationConfig* config);
-void LoadListFile(char* filename, INFO info, ReputationConfig* config);
+#define MANIFEST_FILENAME "zone.info"
+
+void ip_list_init(uint32_t,ReputationConfig *config);
+void estimate_num_entries(ReputationConfig* config);
+int read_manifest(const char* filename, ReputationConfig* config);
+void add_black_white_List(ReputationConfig* config);
 
 #endif

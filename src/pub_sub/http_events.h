@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,7 +31,9 @@
 
 class HttpMsgHeader;
 
-class SO_PUBLIC HttpEvent : public DataEvent
+namespace snort
+{
+class SO_PUBLIC HttpEvent : public snort::DataEvent
 {
 public:
     HttpEvent(HttpMsgHeader* http_msg_header_) :
@@ -59,6 +61,6 @@ private:
     const uint8_t* get_header(unsigned, uint64_t, int32_t&);
 
 };
-
+}
 #endif
 

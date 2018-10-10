@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,29 +28,31 @@
 #include "framework/inspector.h"
 #include "ps_detect.h"
 
+namespace snort
+{
 struct SfIp;
+}
 struct PS_PROTO;
 struct PS_TRACKER;
 struct PS_PKT;
 
-class PortScan : public Inspector
+class PortScan : public snort::Inspector
 {
 public:
     PortScan(class PortScanModule*);
     ~PortScan() override;
 
-    void show(SnortConfig*) override;
-    void eval(Packet*) override;
+    void show(snort::SnortConfig*) override;
+    void eval(snort::Packet*) override;
 
     void tinit() override;
     void tterm() override;
 
 private:
-    void ps_parse(SnortConfig*, char*);
+    void ps_parse(snort::SnortConfig*, char*);
 
-    bool ps_ignore_ip(
-        const SfIp* scanner, uint16_t scanner_port,
-        const SfIp* scanned, uint16_t scanned_port);
+    bool ps_ignore_ip( const snort::SfIp* scanner, uint16_t scanner_port,
+        const snort::SfIp* scanned, uint16_t scanned_port);
 
     bool ps_filter_ignore(PS_PKT*);
     int ps_get_proto(PS_PKT*, int* proto);
@@ -62,9 +64,8 @@ private:
 
     void ps_proto_update_window(unsigned window, PS_PROTO*, time_t pkt_time);
 
-    int ps_proto_update(
-        PS_PROTO*, int ps_cnt, int pri_cnt, unsigned window, const SfIp* ip,
-        u_short port, time_t pkt_time);
+    int ps_proto_update( PS_PROTO*, int ps_cnt, int pri_cnt, unsigned window, const snort::SfIp* ip,
+        unsigned short port, time_t pkt_time);
 
     void ps_tracker_update_ip(PS_PKT*, PS_TRACKER* scanner, PS_TRACKER* scanned);
     void ps_tracker_update_tcp(PS_PKT*, PS_TRACKER* scanner, PS_TRACKER* scanned);

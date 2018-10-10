@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -175,6 +175,11 @@ namespace preprocessors
                 retval = false;
             }
         }
+
+        // Auto enable for firewall
+        table_api.open_top_level_table("reject");
+        table_api.add_option("reset", "both");
+        table_api.close_table();
 
         return retval;
     }

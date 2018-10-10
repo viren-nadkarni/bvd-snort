@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -45,12 +45,15 @@
     (c) ^= (b); (c) -= rot(b,24); \
 }
 
+namespace snort
+{
 SO_PUBLIC void mix_str(
     uint32_t& a, uint32_t& b, uint32_t& c,
     // n == 0 => strlen(s)
     const char* s, unsigned n = 0);
 
 SO_PUBLIC size_t str_to_hash(const uint8_t *str, int length);
+}
 
 struct HashFnc
 {

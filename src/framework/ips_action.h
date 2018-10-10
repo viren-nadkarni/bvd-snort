@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,14 +29,17 @@
 #include "framework/base_api.h"
 #include "main/snort_types.h"
 
-struct Packet;
-
 // this is the current version of the api
 #define ACTAPI_VERSION ((BASE_API_VERSION << 16) | 0)
 
 //-------------------------------------------------------------------------
 // api for class
 //-------------------------------------------------------------------------
+
+namespace snort
+{
+struct Packet;
+struct SnortConfig;
 
 enum ActionType
 {
@@ -47,8 +50,6 @@ enum ActionType
     ACT_REMOTE,
     ACT_MAX
 };
-
-struct SnortConfig;
 
 class SO_PUBLIC IpsAction
 {
@@ -76,7 +77,7 @@ typedef void (* ActDelFunc)(IpsAction*);
 struct ActionApi
 {
     BaseApi base;
-    RuleType type;
+    Actions::Type type;
 
     IpsActFunc pinit;
     IpsActFunc pterm;
@@ -86,6 +87,6 @@ struct ActionApi
     ActNewFunc ctor;
     ActDelFunc dtor;
 };
-
+}
 #endif
 

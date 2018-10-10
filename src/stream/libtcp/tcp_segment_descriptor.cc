@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,11 +26,10 @@
 #include "tcp_segment_descriptor.h"
 
 #include "detection/rules.h"
-#include "main/snort_debug.h"
 #include "protocols/tcp_options.h"
 #include "stream/tcp/tcp_defs.h"
 
-using namespace tcp;
+using namespace snort;
 
 TcpSegmentDescriptor::TcpSegmentDescriptor(Flow* flow, Packet* pkt, TcpEventLogger& tel) :
     flow(flow), pkt(pkt)
@@ -49,44 +48,36 @@ TcpSegmentDescriptor::TcpSegmentDescriptor(Flow* flow, Packet* pkt, TcpEventLogg
     {
         end_seq++;
         if ( !tcph->is_ack() )
-            tel.log_internal_event(INTERNAL_EVENT_SYN_RECEIVED);
+            tel.log_internal_event(SESSION_EVENT_SYN_RX);
     }
 }
 
 uint32_t TcpSegmentDescriptor::init_mss(uint16_t* value)
 {
-    DebugMessage(DEBUG_STREAM_STATE, "Getting MSS...\n");
-
-    TcpOptIterator iter(tcph, pkt);
-    for ( const TcpOption& opt : iter )
+    tcp::TcpOptIterator iter(tcph, pkt);
+    for ( const tcp::TcpOption& opt : iter )
     {
-        if ( opt.code == TcpOptCode::MAXSEG )
+        if ( opt.code == tcp::TcpOptCode::MAXSEG )
         {
             *value = extract_16bits(opt.data);
-            DebugFormat(DEBUG_STREAM_STATE, "Found MSS %hu\n", *value);
             return TF_MSS;
         }
     }
 
     *value = 0;
 
-    DebugMessage(DEBUG_STREAM_STATE, "No MSS...\n");
-
     return TF_NONE;
 }
 
 uint32_t TcpSegmentDescriptor::init_wscale(uint16_t* value)
 {
-    DebugMessage(DEBUG_STREAM_STATE, "Getting wscale...\n");
+    tcp::TcpOptIterator iter(tcph, pkt);
 
-    TcpOptIterator iter(tcph, pkt);
-
-    for (const TcpOption& opt : iter)
+    for (const tcp::TcpOption& opt : iter)
     {
-        if (opt.code == TcpOptCode::WSCALE)
+        if (opt.code == tcp::TcpOptCode::WSCALE)
         {
             *value = (uint16_t)opt.data[0];
-            DebugFormat(DEBUG_STREAM_STATE, "Found wscale %d\n", *value);
 
             // If scale specified in option is larger than 14, use 14 because of limitation
             // in the math of shifting a 32bit value (max scaled window is 2^30th).
@@ -99,7 +90,6 @@ uint32_t TcpSegmentDescriptor::init_wscale(uint16_t* value)
     }
 
     *value = 0;
-    DebugMessage(DEBUG_STREAM_STATE, "No wscale...\n");
 
     return TF_NONE;
 }
@@ -108,7 +98,8 @@ bool TcpSegmentDescriptor::has_wscale()
 {
     uint16_t wscale;
 
-    DebugMessage(DEBUG_STREAM_STATE, "Checking for wscale...\n");
+    if ( !(pkt->ptrs.decode_flags & DECODE_WSCALE) )
+        return false;
 
     return ( init_wscale(&wscale) & TF_WSCALE ) != TF_NONE;
 }

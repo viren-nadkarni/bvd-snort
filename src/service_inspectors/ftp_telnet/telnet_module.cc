@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,7 @@
 
 #include "ftpp_si.h"
 
+using namespace snort;
 using namespace std;
 
 //-------------------------------------------------------------------------
@@ -35,22 +36,22 @@ using namespace std;
 //-------------------------------------------------------------------------
 
 #define TELNET_AYT_OVERFLOW_STR                  \
-    "consecutive telnet AYT commands beyond threshold"
+    "consecutive Telnet AYT commands beyond threshold"
 #define TELNET_ENCRYPTED_STR                     \
-    "telnet traffic encrypted"
+    "Telnet traffic encrypted"
 #define TELNET_SB_NO_SE_STR                      \
-    "telnet subnegotiation begin command without subnegotiation end"
+    "Telnet subnegotiation begin command without subnegotiation end"
 
 static const Parameter s_params[] =
 {
     { "ayt_attack_thresh", Parameter::PT_INT, "-1:", "-1",
-      "alert on this number of consecutive telnet AYT commands" },
+      "alert on this number of consecutive Telnet AYT commands" },
 
     { "check_encrypted", Parameter::PT_BOOL, nullptr, "false",
       "check for end of encryption" },
 
     { "encrypted_traffic", Parameter::PT_BOOL, nullptr, "false",
-      "check for encrypted telnet and ftp" },
+      "check for encrypted Telnet and FTP" },
 
     { "normalize", Parameter::PT_BOOL, nullptr, "false",
       "eliminate escape sequences" },
@@ -61,8 +62,8 @@ static const Parameter s_params[] =
 static const PegInfo telnet_pegs[] =
 {
     { CountType::SUM, "total_packets", "total packets" },
-    { CountType::NOW, "concurrent_sessions", "total concurrent telnet sessions" },
-    { CountType::MAX, "max_concurrent_sessions", "maximum concurrent telnet sessions" },
+    { CountType::NOW, "concurrent_sessions", "total concurrent Telnet sessions" },
+    { CountType::MAX, "max_concurrent_sessions", "maximum concurrent Telnet sessions" },
 
     { CountType::END, nullptr, nullptr }
 };

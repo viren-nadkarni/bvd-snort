@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,40 +26,39 @@
 #include "appid_module.h"
 
 #include <climits>
+#include <lua.hpp>
 
-#include "app_info_table.h"
-#include "appid_peg_counts.h"
 #include "log/messages.h"
+#include "main/analyzer_command.h"
 #include "profiler/profiler.h"
 #include "utils/util.h"
 
+#include "app_info_table.h"
+#include "appid_debug.h"
+#include "appid_peg_counts.h"
+
+using namespace snort;
 using namespace std;
+
+Trace TRACE_NAME(appid_module);
 
 //-------------------------------------------------------------------------
 // appid module
 //-------------------------------------------------------------------------
 
 THREAD_LOCAL ProfileStats appidPerfStats;
-
-static const Parameter session_log_filter[] =
-{
-    { "src_ip", Parameter::PT_ADDR, nullptr, "0.0.0.0/32",
-      "source ip address in CIDR format" },
-    { "dst_ip", Parameter::PT_ADDR, nullptr, "0.0.0.0/32",
-      "destination ip address in CIDR format" },
-    { "src_port", Parameter::PT_PORT, "1:", nullptr, "source port" },
-    { "dst_port", Parameter::PT_PORT, "1:", nullptr, "destination port" },
-    { "protocol", Parameter::PT_STRING, nullptr, nullptr,"ip protocol" },
-    { "log_all_sessions", Parameter::PT_BOOL, nullptr, "false",
-      "enable logging for all appid sessions" },
-    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
-};
+THREAD_LOCAL AppIdStats appid_stats;
 
 static const Parameter s_params[] =
 {
 #ifdef USE_RNA_CONFIG
     { "conf", Parameter::PT_STRING, nullptr, nullptr,
       "RNA configuration file" },  // FIXIT-L eliminate reference to "RNA"
+#endif
+    // FIXIT-L: DECRYPT_DEBUG - Move this to ssl-module
+#ifdef REG_TEST
+    { "first_decrypted_packet_debug", Parameter::PT_INT, "0:", "0",
+      "the first packet of an already decrypted SSL flow (debug single session only)" },
 #endif
     { "memcap", Parameter::PT_INT, "0:", "0",
       "disregard - not implemented" },  // FIXIT-M implement or delete appid.memcap
@@ -79,15 +78,106 @@ static const Parameter s_params[] =
       "enable appid debug logging" },
     { "dump_ports", Parameter::PT_BOOL, nullptr, "false",
       "enable dump of appid port information" },
-#ifdef REMOVED_WHILE_NOT_IN_USE
-    { "thirdparty_appid_dir", Parameter::PT_STRING, nullptr, nullptr,
-      "directory to load thirdparty appid detectors from" },
-#endif
-    { "session_log_filter", Parameter::PT_TABLE, session_log_filter, nullptr,
-      "session log filter options" },
+    { "tp_appid_path", Parameter::PT_STRING, nullptr, nullptr,
+      "path to third party appid dynamic library" },
+    { "tp_appid_config", Parameter::PT_STRING, nullptr, nullptr,
+      "path to third party appid configuration file" },
     { "log_all_sessions", Parameter::PT_BOOL, nullptr, "false",
       "enable logging of all appid sessions" },
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+class AcAppIdDebug : public AnalyzerCommand
+{
+public:
+    AcAppIdDebug(AppIdDebugSessionConstraints* cs);
+    void execute(Analyzer&) override;
+    const char* stringify() override { return "APPID_DEBUG"; }
+
+private:
+    AppIdDebugSessionConstraints constraints = { };
+    bool enable = false;
+};
+
+AcAppIdDebug::AcAppIdDebug(AppIdDebugSessionConstraints* cs)
+{
+    if (cs)
+    {
+        constraints.set(*cs);
+        enable = true;
+    }
+}
+
+void AcAppIdDebug::execute(Analyzer&)
+{
+    if (appidDebug)
+    {
+        if (enable)
+            appidDebug->set_constraints("appid", &constraints);
+        else
+            appidDebug->set_constraints("appid", nullptr);
+    }
+    // FIXIT-L Add a warning if command was called without appid configured?
+}
+
+static int enable_debug(lua_State* L)
+{
+    int proto = luaL_optint(L, 1, 0);
+    const char* sipstr = luaL_optstring(L, 2, nullptr);
+    int sport = luaL_optint(L, 3, 0);
+    const char* dipstr = luaL_optstring(L, 4, nullptr);
+    int dport = luaL_optint(L, 5, 0);
+
+    AppIdDebugSessionConstraints constraints = { };
+    if (sipstr)
+    {
+        if (constraints.sip.set(sipstr) != SFIP_SUCCESS)
+            LogMessage("Invalid source IP address provided: %s\n", sipstr);
+        else if (constraints.sip.is_set())
+            constraints.sip_flag = true;
+    }
+
+    if (dipstr)
+    {
+        if (constraints.dip.set(dipstr) != SFIP_SUCCESS)
+            LogMessage("Invalid destination IP address provided: %s\n", dipstr);
+        else if (constraints.dip.is_set())
+            constraints.dip_flag = true;
+    }
+
+    if (proto)
+        constraints.protocol = (IpProtocol) proto;
+
+    constraints.sport = sport;
+    constraints.dport = dport;
+
+    main_broadcast_command(new AcAppIdDebug(&constraints), true);
+
+    return 0;
+}
+
+static int disable_debug(lua_State*)
+{
+    main_broadcast_command(new AcAppIdDebug(nullptr), true);
+    return 0;
+}
+
+static const Parameter enable_debug_params[] =
+{
+    { "proto", Parameter::PT_INT, nullptr, nullptr, "numerical IP protocol ID filter" },
+    { "src_ip", Parameter::PT_STRING, nullptr, nullptr, "source IP address filter" },
+    { "src_port", Parameter::PT_INT, nullptr, nullptr, "source port filter" },
+    { "dst_ip", Parameter::PT_STRING, nullptr, nullptr, "destination IP address filter" },
+    { "dst_port", Parameter::PT_INT, nullptr, nullptr, "destination port filter" },
+
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+static const Command appid_cmds[] =
+{
+    { "enable_debug", enable_debug, enable_debug_params, "enable appid debugging"},
+    { "disable_debug", disable_debug, nullptr, "disable appid debugging"},
+    { nullptr, nullptr, nullptr, nullptr }
 };
 
 //  FIXIT-M Add appid_rules back in once we start using it.
@@ -99,8 +189,18 @@ static const RuleMap appid_rules[] =
 };
 #endif
 
+static const PegInfo appid_pegs[] =
+{
+    { CountType::SUM, "packets", "count of packets received" },
+    { CountType::SUM, "processed_packets", "count of packets processed" },
+    { CountType::SUM, "ignored_packets", "count of packets ignored" },
+    { CountType::SUM, "total_sessions", "count of sessions created" },
+    { CountType::SUM, "appid_unknown", "count of sessions where appid could not be determined" },
+    { CountType::END, nullptr, nullptr},
+};
+
 AppIdModule::AppIdModule() :
-    Module(MOD_NAME, MOD_HELP, s_params)
+    Module(MOD_NAME, MOD_HELP, s_params, false, &TRACE_NAME(appid_module))
 {
     config = nullptr;
 }
@@ -122,11 +222,17 @@ const AppIdModuleConfig* AppIdModule::get_data()
     return temp;
 }
 
-bool AppIdModule::set(const char*, Value& v, SnortConfig*)
+bool AppIdModule::set(const char* fqn, Value& v, SnortConfig* c)
 {
 #ifdef USE_RNA_CONFIG
     if ( v.is("conf") )
         config->conf_file = snort_strdup(v.get_string());
+    else
+#endif
+    // FIXIT-L: DECRYPT_DEBUG - Move this to ssl-module
+#ifdef REG_TEST
+    if ( v.is("first_decrypted_packet_debug") )
+        config->first_decrypted_packet_debug = v.get_long();
     else
 #endif
     if ( v.is("memcap") )
@@ -141,25 +247,20 @@ bool AppIdModule::set(const char*, Value& v, SnortConfig*)
         config->app_stats_rollover_time = v.get_long();
     else if ( v.is("app_detector_dir") )
         config->app_detector_dir = snort_strdup(v.get_string());
-    else if ( v.is("thirdparty_appid_dir") )
-        config->thirdparty_appid_dir = snort_strdup(v.get_string());
+    else if ( v.is("tp_appid_path") )
+        config->tp_appid_path = std::string(v.get_string());
+    else if ( v.is("tp_appid_config") )
+        config->tp_appid_config = std::string(v.get_string());
     else if ( v.is("instance_id") )
         config->instance_id = v.get_long();
     else if ( v.is("debug") )
         config->debug = v.get_bool();
     else if ( v.is("dump_ports") )
         config->dump_ports = v.get_bool();
-    else if ( v.is("session_log_filter") )
-        config->session_log_filter.log_all_sessions = false;  // FIXIT-L need to implement support
-                                                              // for all log options
     else if ( v.is("log_all_sessions") )
-        config->session_log_filter.log_all_sessions = v.get_bool();
-    else if (v.is("src_ip") )
-        config->session_log_filter.sip.set(v.get_string());
-    else if (v.is("dst_ip") )
-        config->session_log_filter.dip.set(v.get_string());
+        config->log_all_sessions = v.get_bool();
     else
-        return false;
+        return Module::set(fqn, v, c);
 
     return true;
 }
@@ -185,13 +286,28 @@ bool AppIdModule::end(const char*, int, SnortConfig*)
     return true;
 }
 
+const Command* AppIdModule::get_commands() const
+{
+    return appid_cmds;
+}
+
 const PegInfo* AppIdModule::get_pegs() const
 {
-    return AppIdPegCounts::get_peg_info();
+    return appid_pegs;
 }
 
 PegCount* AppIdModule::get_counts() const
 {
-    return AppIdPegCounts::get_peg_counts();
+    return (PegCount*)&appid_stats;
 }
 
+void AppIdModule::sum_stats(bool accumulate_now_stats)
+{
+    AppIdPegCounts::sum_stats();
+    Module::sum_stats(accumulate_now_stats);
+}
+
+void AppIdModule::show_dynamic_stats()
+{
+    AppIdPegCounts::print();
+}

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,10 +23,12 @@
 
 #include "module.h"
 
+using namespace snort;
+
 static const Parameter defaults[] =
 {
     { "trace", Parameter::PT_INT, nullptr, nullptr,
-      "mask for enabling debug traces in module"  },
+      "mask for enabling debug traces in module" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -161,6 +163,19 @@ void Module::reset_stats()
         counts[i] = 0;
 }
 
+PegCount Module::get_global_count(const char* name) const
+{
+    const PegInfo* infos = get_pegs();
+
+    for ( unsigned i = 0; infos[i].name; i++ )
+    {
+        if ( strcmp(name, infos[i].name) == 0 )
+            return counts[i];
+    }
+    assert(false); // wrong name = programmer error
+    return 0;
+}
+
 bool Module::verified_begin(const char* fqn, int idx, SnortConfig* c)
 {
     table_level++;
@@ -181,9 +196,17 @@ bool Module::verified_end(const char* fqn, int idx, SnortConfig* c)
     return end(fqn, idx, c);
 }
 
+void Module::enable_trace()
+{
+    if ( trace )
+        *trace = 1;
+}
+
+namespace snort
+{
 const PegInfo simple_pegs[] =
 {
     { CountType::SUM, "packets", "total packets" },
     { CountType::END, nullptr, nullptr }
 };
-
+}

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -48,6 +48,7 @@ extern const ConvertMap* rule_state_map;
 extern const ConvertMap* ruletype_map;
 extern const ConvertMap* sblock_map;
 extern const ConvertMap* sdrop_map;
+extern const ConvertMap* sidechannel_map;
 extern const ConvertMap* suppress_map;
 extern const ConvertMap* threshold_map;
 extern const ConvertMap* var_map;
@@ -81,6 +82,7 @@ const std::vector<const ConvertMap*> keywords_api =
     ruletype_map,
     sblock_map,
     sdrop_map,
+    sidechannel_map,
     suppress_map,
     threshold_map,
     var_map,

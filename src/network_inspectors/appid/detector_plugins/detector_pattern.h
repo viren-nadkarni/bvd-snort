@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,6 +25,14 @@
 #include "appid_api.h"
 #include "client_plugins/client_detector.h"
 #include "service_plugins/service_detector.h"
+
+#include "main/snort_debug.h"
+extern Trace TRACE_NAME(appid_module);
+
+namespace snort
+{
+class SearchTool;
+}
 
 struct PortPatternNode
 {
@@ -66,10 +74,6 @@ struct PatternService
     unsigned longest;
 };
 
-class SearchTool;
-class ClientDetector;
-class ServiceDetector;
-
 class PatternClientDetector : public ClientDetector
 {
 public:
@@ -87,8 +91,8 @@ private:
 
     PortPatternNode* luaInjectedPatterns = nullptr;
     PatternService* servicePortPattern = nullptr;
-    SearchTool* tcp_pattern_matcher = nullptr;
-    SearchTool* udp_pattern_matcher = nullptr;
+    snort::SearchTool* tcp_pattern_matcher = nullptr;
+    snort::SearchTool* udp_pattern_matcher = nullptr;
 };
 
 class PatternServiceDetector : public ServiceDetector
@@ -109,10 +113,10 @@ private:
 
     PortPatternNode* luaInjectedPatterns = nullptr;
     PatternService* servicePortPattern = nullptr;
-    SearchTool* tcp_pattern_matcher = nullptr;
-    SearchTool* udp_pattern_matcher = nullptr;
-    SearchTool* tcpPortPatternTree[65536] = { nullptr };
-    SearchTool* udpPortPatternTree[65536] = { nullptr };
+    snort::SearchTool* tcp_pattern_matcher = nullptr;
+    snort::SearchTool* udp_pattern_matcher = nullptr;
+    snort::SearchTool* tcpPortPatternTree[65536] = { nullptr };
+    snort::SearchTool* udpPortPatternTree[65536] = { nullptr };
 };
 
 #endif

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,7 +29,13 @@
 
 //-------------------------------------------------------------------------
 
+namespace snort
+{
+struct BaseApi;
+class Module;
 struct SnortConfig;
+}
+
 class Shell;
 
 class ModuleManager
@@ -38,11 +44,11 @@ public:
     static void init();
     static void term();
 
-    static void add_module(class Module*, const struct BaseApi* = nullptr);
-    static Module* get_module(const char*);
-    static Module* get_default_module(const char*, SnortConfig*);
+    static void add_module(snort::Module*, const snort::BaseApi* = nullptr);
+    static snort::Module* get_module(const char*);
+    static snort::Module* get_default_module(const char*, snort::SnortConfig*);
     static const char* get_current_module();
-    static std::list<Module*> get_all_modules();
+    static std::list<snort::Module*> get_all_modules();
 
     static void list_modules(const char* = nullptr);
     static void dump_modules();
@@ -63,15 +69,17 @@ public:
     static void dump_defaults(const char* = nullptr);
 
     static void load_commands(Shell*);
-    static void load_rules(SnortConfig*);
-    static void set_config(SnortConfig*);
+    static void load_rules(snort::SnortConfig*);
+    static void set_config(snort::SnortConfig*);
+    static void reload_module(const char*, snort::SnortConfig*);
 
     static void reset_errors();
     static unsigned get_errors();
 
-    static void dump_stats(SnortConfig*, const char* skip = nullptr);
-    static void accumulate(SnortConfig*);
-    static void reset_stats(SnortConfig*);
+    static void dump_stats(snort::SnortConfig*, const char* skip = nullptr, bool dynamic = false);
+ 
+    static void accumulate(snort::SnortConfig*);
+    static void reset_stats(snort::SnortConfig*);
 
     static std::set<uint32_t> gids;
 };

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -59,8 +59,8 @@ static ConversionState* deleted_ctor(Converter& c)
 /*************************************************
  *************  dynamicoutput ****************
  *************************************************/
-
 static const std::string dynamicoutput = "dynamicoutput";
+
 static const ConvertMap dynamicoutput_api =
 {
     dynamicoutput,
@@ -68,4 +68,18 @@ static const ConvertMap dynamicoutput_api =
 };
 
 const ConvertMap* dynamicoutput_map = &dynamicoutput_api;
+
+/*************************************************
+ *************  sidechannel ****************
+ *************************************************/
+static const std::string sidechannel = "sidechannel";
+
+static const ConvertMap sidechannel_api =
+{
+    sidechannel,
+    deleted_ctor<&sidechannel>,
+};
+
+const ConvertMap* sidechannel_map = &sidechannel_api;
+
 } // namespace keywords

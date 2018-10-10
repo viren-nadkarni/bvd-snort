@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,11 +28,14 @@
 
 #include "framework/base_api.h"
 #include "main/thread.h"
+#include "target_based/snort_protocols.h"
 
-struct Packet;
+class Session;
+
+namespace snort
+{
 struct SnortConfig;
-
-typedef int16_t ServiceId;
+struct Packet;
 
 // this is the current version of the api
 #define INSAPI_VERSION ((BASE_API_VERSION << 16) | 0)
@@ -67,7 +70,10 @@ public:
     // return verification status
     virtual bool configure(SnortConfig*) { return true; }
     virtual void show(SnortConfig*) { }
-    virtual void update(SnortConfig*, const char*) { }
+
+    // Specific to Binders to notify them of an inspector being removed from the policy
+    // FIXIT-L Probably shouldn't be part of the base Inspector class
+    virtual void remove_inspector_binding(SnortConfig*, const char*) { }
 
     // packet thread functions
     // tinit, tterm called on default policy instance only
@@ -85,7 +91,6 @@ public:
     virtual void clear(Packet*) { }
 
     virtual void meta(int, const uint8_t*) { }
-    virtual int exec(int, void*) { return 0; }
 
     // framework support
     unsigned get_ref(unsigned i) { return ref_count[i]; }
@@ -96,8 +101,12 @@ public:
 
     bool is_inactive();
 
-    void set_service(ServiceId id) { srv_id = id; }
-    ServiceId get_service() { return srv_id; }
+    void set_service(SnortProtocolId snort_protocol_id_param)
+    {
+        snort_protocol_id = snort_protocol_id_param;
+    }
+
+    SnortProtocolId get_service() { return snort_protocol_id; }
 
     // for well known buffers
     // well known buffers may be included among generic below,
@@ -138,7 +147,7 @@ protected:
 private:
     const InspectApi* api;
     std::atomic_uint* ref_count;
-    ServiceId srv_id;
+    SnortProtocolId snort_protocol_id;
 };
 
 template <typename T>
@@ -162,7 +171,6 @@ public:
 enum InspectorType
 {
     IT_PASSIVE,  // config only, or data consumer (eg file_log, binder, ftp_client)
-    IT_BINDER,   // maps config to traffic
     IT_WIZARD,   // guesses service inspector
     IT_PACKET,   // processes raw packets only (eg normalize, capture)
     IT_STREAM,   // flow tracking and reassembly (eg ip, tcp, udp)
@@ -176,13 +184,13 @@ enum InspectorType
 typedef Inspector* (* InspectNew)(Module*);
 typedef void (* InspectDelFunc)(Inspector*);
 typedef void (* InspectFunc)();
-typedef class Session* (* InspectSsnFunc)(class Flow*);
+typedef Session* (* InspectSsnFunc)(class Flow*);
 
 struct InspectApi
 {
     BaseApi base;
     InspectorType type;
-    uint16_t proto_bits;
+    uint32_t proto_bits;
 
     const char** buffers;  // null terminated list of exported buffers
     const char* service;   // nullptr when type != IT_SERVICE
@@ -199,6 +207,7 @@ struct InspectApi
 
 inline const char* Inspector::get_name()
 { return api->base.name; }
+}
 
 #endif
 

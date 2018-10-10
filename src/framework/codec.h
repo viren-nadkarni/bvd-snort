@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,9 +32,9 @@
 
 struct TextLog;
 struct _daq_pkthdr;
-struct Packet;
-struct Layer;
-class Flow;
+
+namespace snort
+{
 enum CodecSid : uint32_t;
 
 namespace ip
@@ -53,6 +53,10 @@ namespace icmp
 {
 struct ICMPHdr;
 }
+
+class Flow;
+struct Layer;
+struct Packet;
 
 // Used by root codecs to add their DLT to their HELP string
 #define ADD_DLT(help, x) help " (DLT " STRINGIFY_MX(x) ")"
@@ -122,7 +126,7 @@ struct CodecData
     /* Reset before each decode of packet begins */
 
     /*  Codec specific fields.  These fields are only relevant to codecs. */
-    uint16_t proto_bits;    /* protocols contained within this packet
+    uint32_t proto_bits;    /* protocols contained within this packet
                                  -- will be propogated to Snort++ Packet struct*/
     uint16_t codec_flags;   /* flags used while decoding */
     uint8_t ip_layer_cnt;
@@ -385,6 +389,6 @@ struct CodecApi
     CdNewFunc ctor;   // get eval optional instance data
     CdDelFunc dtor;   // clean up instance data
 };
-
+}
 #endif /* FRAMEWORK_CODEC_H */
 

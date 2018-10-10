@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -39,6 +39,7 @@ extern "C" {
 
 #include "sfdaq_config.h"
 
+using namespace snort;
 using namespace std;
 
 #ifdef DEFAULT_DAQ
@@ -296,7 +297,6 @@ SFDAQInstance::SFDAQInstance(const char* intf)
 {
     if (intf)
         interface_spec = intf;
-    daq_meta_callback = nullptr;
     daq_hand = nullptr;
     daq_dlt = -1;
     s_error = DAQ_SUCCESS;
@@ -559,14 +559,15 @@ bool SFDAQInstance::stop()
     return (err == DAQ_SUCCESS);
 }
 
-void SFDAQInstance::set_metacallback(DAQ_Meta_Func_t meta_callback)
+static int metacallback(void *user, const DAQ_MetaHdr_t* hdr, const uint8_t* data)
 {
-    daq_meta_callback = meta_callback;
+    DataBus::publish(DAQ_META_EVENT, user, hdr->type, data);
+    return 0;
 }
 
 int SFDAQInstance::acquire(int max, DAQ_Analysis_Func_t callback)
 {
-    int err = daq_acquire_with_meta(daq_mod, daq_hand, max, callback, daq_meta_callback, nullptr);
+    int err = daq_acquire_with_meta(daq_mod, daq_hand, max, callback, metacallback, nullptr);
 
     if (err && err != DAQ_READFILE_EOF)
         LogMessage("Can't acquire (%d) - %s\n", err, daq_get_error(daq_mod, daq_hand));
@@ -631,12 +632,12 @@ int SFDAQInstance::modify_flow_opaque(const DAQ_PktHdr_t* hdr, uint32_t opaque)
     return daq_modify_flow(daq_mod, daq_hand, hdr, &mod);
 }
 
-int SFDAQInstance::modify_flow_pkt_trace(const DAQ_PktHdr_t* hdr, DAQ_Verdict verdict,
+int SFDAQInstance::modify_flow_pkt_trace(const DAQ_PktHdr_t* hdr, uint8_t verdict_reason,
     uint8_t* buff, uint32_t buff_len)
 {
     DAQ_ModFlow_t mod;
     DAQ_ModFlowPktTrace_t mod_tr;
-    mod_tr.vreason = (uint8_t)verdict;
+    mod_tr.vreason = verdict_reason;
     mod_tr.pkt_trace_data_len = buff_len;
     mod_tr.pkt_trace_data = buff;
     mod.type = DAQ_MODFLOW_TYPE_PKT_TRACE;

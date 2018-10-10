@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,7 +24,10 @@
 
 #include "service_detector.h"
 
+namespace snort
+{
 class SearchTool;
+}
 class ServiceDiscovery;
 struct MatchedPatterns;
 
@@ -35,6 +38,7 @@ public:
     ~MdnsServiceDetector() override;
 
     int validate(AppIdDiscoveryArgs&) override;
+    void release_thread_resources() override;
 
 private:
     unsigned create_match_list(const char* data, uint16_t dataSize);
@@ -43,12 +47,11 @@ private:
     void destroy_match_list();
     void destory_matcher();
     int validate_reply(const uint8_t* data, uint16_t size);
-    int analyze_user(AppIdSession*, const Packet*, uint16_t size);
+    int analyze_user(AppIdSession&, const snort::Packet*, uint16_t size);
     int reference_pointer(const char* start_ptr, const char** resp_endptr, int* start_index,
         uint16_t data_size, uint8_t* user_name_len, unsigned size);
 
-    SearchTool* matcher = nullptr;
-    MatchedPatterns* patternList= nullptr;
+    snort::SearchTool* matcher = nullptr;
 };
 #endif
 

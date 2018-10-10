@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,38 +25,59 @@
 #include "protocols/ip.h"
 #include "protocols/mpls.h"
 
+namespace snort
+{
 namespace tcp
 {
 struct TCPHdr;
 }
-
 namespace udp
 {
 struct UDPHdr;
 }
-
 namespace icmp
 {
 struct ICMPHdr;
+}
 }
 
 /* NOTE: if A protocol is added, update DecodeFlags! */
 enum class PktType : std::uint8_t
 {
-    NONE=     0x00,
-    IP =      0x01,
-    TCP =     0x02,
-    UDP =     0x04,
-    ICMP =    0x08,
-    ARP =     0x10,
-    PDU  =    0x20,
-    FILE =    0x40,
-    STREAM =  0x22,
-    ANY_IP =  0x0F,
-    ANY_SSN = 0x6F,
-    ANY =     0x7F,
-//  FREE =    0x80,
+    NONE, IP, TCP, UDP, ICMP, PDU, FILE, MAX
 };
+
+// the first several of these bits must map to PktType
+// eg PROTO_BIT__IP == BIT(PktType::IP), etc.
+#define PROTO_BIT__NONE             0x00000
+#define PROTO_BIT__IP               0x00001
+#define PROTO_BIT__TCP              0x00002
+#define PROTO_BIT__UDP              0x00004
+#define PROTO_BIT__ICMP             0x00008
+#define PROTO_BIT__PDU              0x00010
+#define PROTO_BIT__FILE             0x00020
+#define PROTO_BIT__ARP              0x00040
+#define PROTO_BIT__TEREDO           0x00080
+#define PROTO_BIT__GTP              0x00100
+#define PROTO_BIT__MPLS             0x00200
+#define PROTO_BIT__VLAN             0x00400
+#define PROTO_BIT__ETH              0x00800
+#define PROTO_BIT__TCP_EMBED_ICMP   0x01000
+#define PROTO_BIT__UDP_EMBED_ICMP   0x02000
+#define PROTO_BIT__ICMP_EMBED_ICMP  0x04000
+#define PROTO_BIT__ICMP_EMBED_OTHER 0x08000
+#define PROTO_BIT__IP6_EXT          0x10000
+#define PROTO_BIT__OTHER            0x20000
+#define PROTO_BIT__ALL              0x3FFFF
+
+#define PROTO_BIT__ICMP_EMBED \
+    (PROTO_BIT__TCP_EMBED_ICMP | PROTO_BIT__UDP_EMBED_ICMP | \
+    PROTO_BIT__ICMP_EMBED_ICMP | PROTO_BIT__ICMP_EMBED_OTHER)
+
+#define PROTO_BIT__ANY_IP   (PROTO_BIT__IP | PROTO_BIT__TCP | PROTO_BIT__UDP | PROTO_BIT__ICMP)
+#define PROTO_BIT__ANY_PDU  (PROTO_BIT__TCP | PROTO_BIT__UDP | PROTO_BIT__PDU)
+#define PROTO_BIT__ANY_SSN  (PROTO_BIT__ANY_IP | PROTO_BIT__PDU | PROTO_BIT__FILE)
+#define PROTO_BIT__ANY_TYPE (PROTO_BIT__ANY_SSN | PROTO_BIT__ARP)
 
 enum DecodeFlags : std::uint16_t
 {
@@ -78,32 +99,10 @@ enum DecodeFlags : std::uint16_t
     DECODE_C2S =            0x0100,  // user - client to server
     DECODE_SOF =            0x0200,  // user - start of flow
     DECODE_EOF =            0x0400,  // user - end of flow
-    DECODE_GTP =            0x0800,  // gtp encap
-};
+    DECODE_GTP =            0x0800,
 
-// FIXIT-L make this an enum!!
-#define PROTO_BIT__NONE     0x0000
-#define PROTO_BIT__IP       0x0001
-#define PROTO_BIT__ARP      0x0002
-#define PROTO_BIT__TCP      0x0004
-#define PROTO_BIT__UDP      0x0008
-#define PROTO_BIT__ICMP     0x0010
-#define PROTO_BIT__TEREDO   0x0020
-#define PROTO_BIT__GTP      0x0040
-#define PROTO_BIT__MPLS     0x0080
-#define PROTO_BIT__VLAN     0x0100
-#define PROTO_BIT__ETH      0x0200
-#define PROTO_BIT__TCP_EMBED_ICMP  0x0400
-#define PROTO_BIT__UDP_EMBED_ICMP  0x0800
-#define PROTO_BIT__ICMP_EMBED_ICMP 0x1000
-#define PROTO_BIT__ICMP_EMBED_OTHER 0x2000
-#define PROTO_BIT__ICMP_EMBED \
-    (PROTO_BIT__TCP_EMBED_ICMP | PROTO_BIT__UDP_EMBED_ICMP | \
-    PROTO_BIT__ICMP_EMBED_ICMP | PROTO_BIT__ICMP_EMBED_OTHER)
-#define PROTO_BIT__IP6_EXT  0x4000
-#define PROTO_BIT__FREE     0x0000 /* No proto bits free */
-#define PROTO_BIT__OTHER    0x8000  // FIXIT-L delete this after porting is still unused
-#define PROTO_BIT__ALL      0xffff
+    DECODE_WSCALE =         0x1000,
+};
 
 struct DecodeData
 {
@@ -111,9 +110,9 @@ struct DecodeData
      * these three pointers are each referenced literally
      * dozens if not hundreds of times.  NOTHING else should be added!!
      */
-    const tcp::TCPHdr* tcph;
-    const udp::UDPHdr* udph;
-    const icmp::ICMPHdr* icmph;
+    const snort::tcp::TCPHdr* tcph;
+    const snort::udp::UDPHdr* udph;
+    const snort::icmp::ICMPHdr* icmph;
 
     uint16_t sp;            /* source port (TCP/UDP) */
     uint16_t dp;            /* dest port (TCP/UDP) */
@@ -121,8 +120,8 @@ struct DecodeData
     uint16_t decode_flags;
     PktType type;
 
-    ip::IpApi ip_api;
-    mpls::MplsHdr mplsHdr;  // FIXIT-L need to zero this?
+    snort::ip::IpApi ip_api;
+    snort::mpls::MplsHdr mplsHdr;  // FIXIT-L need to zero this?
 
     inline void reset()
     {

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -36,6 +36,7 @@
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 
+using namespace snort;
 using namespace std;
 
 static void replace_parse(const char* args, string& s)

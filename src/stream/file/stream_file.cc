@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,8 @@
 
 #include "file_module.h"
 #include "file_session.h"
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // inspector stuff
@@ -94,7 +96,7 @@ static const InspectApi sfile_api =
         mod_dtor
     },
     IT_STREAM,
-    (unsigned)PktType::FILE,
+    PROTO_BIT__FILE,
     nullptr, // buffers
     nullptr, // service
     nullptr, // pinit

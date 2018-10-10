@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -31,6 +31,8 @@
 #include "utils/util.h"
 
 #include "checksum.h"
+
+using namespace snort;
 
 #define CD_UDP_NAME "udp"
 #define CD_UDP_HELP "support for user datagram protocol"
@@ -262,7 +264,7 @@ bool UdpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
                 COPY4(ph6.dip, ip6h->ip6_dst.u6_addr32);
                 ph6.zero = 0;
                 ph6.protocol = codec.ip6_csum_proto;
-                ph6.len = htons((u_short)raw.len);
+                ph6.len = htons((unsigned short)raw.len);
 
                 csum = checksum::udp_cksum((const uint16_t*)(udph), uhlen, &ph6);
             }
@@ -307,7 +309,7 @@ bool UdpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
     UDPMiscTests(snort, codec, uhlen - udp::UDP_HEADER_LEN);
 
     if (SnortConfig::gtp_decoding() &&
-        (SnortConfig::is_gtp_port(src_port)||SnortConfig::is_gtp_port(dst_port)))
+        (SnortConfig::is_gtp_port(src_port) || SnortConfig::is_gtp_port(dst_port)))
     {
         if ( !(snort.decode_flags & DECODE_FRAG) )
             codec.next_prot_id = ProtocolId::GTP;
@@ -378,7 +380,7 @@ bool UdpCodec::encode(const uint8_t* const raw_in, const uint16_t /*raw_len*/,
     if (ip_api.is_ip4())
     {
         checksum::Pseudoheader ps;
-        const IP4Hdr* const ip4h = ip_api.get_ip4h();
+        const ip::IP4Hdr* const ip4h = ip_api.get_ip4h();
         ps.sip = ip4h->get_src();
         ps.dip = ip4h->get_dst();
         ps.zero = 0;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,6 +28,8 @@
 #include "framework/module.h"
 #include "profiler/profiler.h"
 
+using namespace snort;
+
 #define s_name "file_data"
 
 static THREAD_LOCAL ProfileStats fileDataPerfStats;
@@ -47,12 +49,11 @@ public:
 // class methods
 //-------------------------------------------------------------------------
 
-IpsOption::EvalStatus FileDataOption::eval(Cursor& c, Packet*)
+IpsOption::EvalStatus FileDataOption::eval(Cursor& c, Packet* p)
 {
     Profile profile(fileDataPerfStats);
 
-    DataPointer dp;
-    DetectionEngine::get_file_data(dp);
+    DataPointer dp = DetectionEngine::get_file_data(p->context);
 
     if ( !dp.data || !dp.len )
         return NO_MATCH;

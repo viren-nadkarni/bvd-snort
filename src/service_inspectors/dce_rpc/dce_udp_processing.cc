@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2008-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -39,6 +39,8 @@
 
 #include "dce_common.h"
 #include "dce_udp_module.h"
+
+using namespace snort;
 
 /********************************************************************
  * Macros
@@ -104,10 +106,9 @@ void DCE2_ClProcess(DCE2_SsnData* sd, DCE2_ClTracker* clt)
 {
     const DceRpcClHdr* cl_hdr;
     DCE2_ClActTracker* at;
-    const uint8_t* data_ptr = sd->wire_pkt->data;
-    uint16_t data_len = sd->wire_pkt->dsize;
-
-    DebugMessage(DEBUG_DCE_UDP, "Cl processing ...\n");
+    Packet* p = DetectionEngine::get_current_packet();
+    const uint8_t* data_ptr = p->data;
+    uint16_t data_len = p->dsize;
 
     if (data_len < sizeof(DceRpcClHdr))
     {
@@ -127,40 +128,34 @@ void DCE2_ClProcess(DCE2_SsnData* sd, DCE2_ClTracker* clt)
     if (at == nullptr)
         return;
 
-    if (DCE2_SsnFromClient(sd->wire_pkt))
+    if ( p->is_from_client() )
     {
         switch (DceRpcClPduType(cl_hdr))
         {
         case DCERPC_PDU_TYPE__REQUEST:
-            DebugMessage(DEBUG_DCE_UDP, "Request\n");
             dce2_udp_stats.cl_request++;
             DCE2_ClRequest(sd, at, cl_hdr, data_ptr, data_len);
             break;
 
         case DCERPC_PDU_TYPE__ACK:
-            DebugMessage(DEBUG_DCE_UDP, "Ack\n");
             dce2_udp_stats.cl_ack++;
             break;
 
         case DCERPC_PDU_TYPE__CL_CANCEL:
-            DebugMessage(DEBUG_DCE_UDP, "Cancel\n");
             dce2_udp_stats.cl_cancel++;
             break;
 
         case DCERPC_PDU_TYPE__FACK:
-            DebugMessage(DEBUG_DCE_UDP, "Fack\n");
             dce2_udp_stats.cl_cli_fack++;
             break;
 
         case DCERPC_PDU_TYPE__PING:
-            DebugMessage(DEBUG_DCE_UDP, "Ping\n");
             dce2_udp_stats.cl_ping++;
             break;
 
         case DCERPC_PDU_TYPE__RESPONSE:
         {
-            DebugMessage(DEBUG_DCE_UDP, "Response from client.  Changing stream direction.");
-            Packet* p = sd->wire_pkt;
+            trace_log(dce_udp, "Response from client.  Changing stream direction.\n");
             ip::IpApi* ip_api = &p->ptrs.ip_api;
 
             p->flow->session->update_direction(SSN_DIR_FROM_SERVER,
@@ -170,7 +165,6 @@ void DCE2_ClProcess(DCE2_SsnData* sd, DCE2_ClTracker* clt)
             break;
         }
         default:
-            DebugMessage(DEBUG_DCE_UDP, "Other pdu type\n");
             dce2_udp_stats.cl_other_req++;
             break;
         }
@@ -180,12 +174,10 @@ void DCE2_ClProcess(DCE2_SsnData* sd, DCE2_ClTracker* clt)
         switch (DceRpcClPduType(cl_hdr))
         {
         case DCERPC_PDU_TYPE__RESPONSE:
-            DebugMessage(DEBUG_DCE_UDP, "Response\n");
             dce2_udp_stats.cl_response++;
             break;
 
         case DCERPC_PDU_TYPE__REJECT:
-            DebugMessage(DEBUG_DCE_UDP, "Reject\n");
             dce2_udp_stats.cl_reject++;
 
             if (DceRpcClSeqNum(cl_hdr) == at->seq_num)
@@ -197,32 +189,26 @@ void DCE2_ClProcess(DCE2_SsnData* sd, DCE2_ClTracker* clt)
             break;
 
         case DCERPC_PDU_TYPE__CANCEL_ACK:
-            DebugMessage(DEBUG_DCE_UDP, "Cancel Ack\n");
             dce2_udp_stats.cl_cancel_ack++;
             break;
 
         case DCERPC_PDU_TYPE__FACK:
-            DebugMessage(DEBUG_DCE_UDP, "Fack\n");
             dce2_udp_stats.cl_srv_fack++;
             break;
 
         case DCERPC_PDU_TYPE__FAULT:
-            DebugMessage(DEBUG_DCE_UDP, "Fault\n");
             dce2_udp_stats.cl_fault++;
             break;
 
         case DCERPC_PDU_TYPE__NOCALL:
-            DebugMessage(DEBUG_DCE_UDP, "No call\n");
             dce2_udp_stats.cl_nocall++;
             break;
 
         case DCERPC_PDU_TYPE__WORKING:
-            DebugMessage(DEBUG_DCE_UDP, "Working\n");
             dce2_udp_stats.cl_working++;
             break;
 
         default:
-            DebugMessage(DEBUG_DCE_UDP, "Other pdu type\n");
             dce2_udp_stats.cl_other_resp++;
             break;
         }
@@ -308,8 +294,6 @@ static void DCE2_ClRequest(DCE2_SsnData* sd, DCE2_ClActTracker* at, const DceRpc
 {
     const uint32_t seq_num = DceRpcClSeqNum(cl_hdr);
 
-    DebugMessage(DEBUG_DCE_UDP, "Processing Request ...\n");
-
     if (seq_num > at->seq_num)
     {
         /* This is the normal case where the sequence number is incremented
@@ -326,7 +310,7 @@ static void DCE2_ClRequest(DCE2_SsnData* sd, DCE2_ClActTracker* at, const DceRpc
         return;
     }
 
-    DCE2_ResetRopts(&sd->ropts);
+    DCE2_ResetRopts(sd, nullptr);
 
     if (!DceRpcClFrag(cl_hdr))  /* It's a full request */
     {
@@ -365,7 +349,7 @@ static void DCE2_ClRequest(DCE2_SsnData* sd, DCE2_ClActTracker* at, const DceRpc
     sd->ropts.iface_vers = DceRpcClIfaceVers(cl_hdr);
     sd->ropts.opnum = DceRpcClOpnum(cl_hdr);
     sd->ropts.stub_data = (const uint8_t*)cl_hdr + sizeof(DceRpcClHdr);
-    DceEndianness* endianness = (DceEndianness*)sd->wire_pkt->endianness;
+    DceEndianness* endianness = (DceEndianness*)DetectionEngine::get_current_packet()->endianness;
     endianness->hdr_byte_order = DceRpcClByteOrder(cl_hdr);
     endianness->data_byte_order = DceRpcClByteOrder(cl_hdr);
     DCE2_Detect(sd);
@@ -502,7 +486,7 @@ static void DCE2_ClHandleFrag(DCE2_SsnData* sd, DCE2_ClActTracker* at, const Dce
     sd->ropts.first_frag = DceRpcClFirstFrag(cl_hdr);
     DCE2_CopyUuid(&sd->ropts.iface, &ft->iface, DCERPC_BO_FLAG__NONE);
     sd->ropts.iface_vers = ft->iface_vers;
-    DceEndianness* endianness = (DceEndianness*)sd->wire_pkt->endianness;
+    DceEndianness* endianness = (DceEndianness*)DetectionEngine::get_current_packet()->endianness;
     endianness->hdr_byte_order = DceRpcClByteOrder(cl_hdr);
 
     if (ft->data_byte_order != DCE2_SENTINEL)
@@ -571,20 +555,15 @@ static void DCE2_ClFragReassemble(
         fnode = (DCE2_ClFragNode*)DCE2_ListNext(ft->frags))
     {
         if (fnode->frag_len > rlen)
-        {
-            DebugMessage(DEBUG_DCE_UDP,
-                "Size of fragments exceeds reassembly buffer size. "
-                "Using as many fragments as will fit.");
             break;
-        }
 
         memcpy(const_cast<uint8_t*>(rdata), fnode->frag_data, fnode->frag_len);
         DCE2_MOVE(rdata, rlen, fnode->frag_len);
         stub_len += fnode->frag_len;
     }
 
-    Packet* rpkt = DCE2_GetRpkt(
-        sd->wire_pkt, DCE2_RPKT_TYPE__UDP_CL_FRAG, dce2_cl_rbuf, stub_len);
+    Packet* rpkt = DCE2_GetRpkt(DetectionEngine::get_current_packet(),
+        DCE2_RPKT_TYPE__UDP_CL_FRAG, dce2_cl_rbuf, stub_len);
 
     if ( !rpkt )
         return;
@@ -598,7 +577,7 @@ static void DCE2_ClFragReassemble(
     sd->ropts.first_frag = 1;
     DCE2_CopyUuid(&sd->ropts.iface, &ft->iface, DCERPC_BO_FLAG__NONE);
     sd->ropts.iface_vers = ft->iface_vers;
-    DceEndianness* endianness = (DceEndianness*)sd->wire_pkt->endianness;
+    DceEndianness* endianness = (DceEndianness*)DetectionEngine::get_current_packet()->endianness;
     endianness->hdr_byte_order = DceRpcClByteOrder(cl_hdr);
 
     if (ft->data_byte_order != DCE2_SENTINEL)

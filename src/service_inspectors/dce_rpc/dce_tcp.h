@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -70,18 +70,18 @@ struct dce2TcpStats
 };
 
 extern THREAD_LOCAL dce2TcpStats dce2_tcp_stats;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_main;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_session;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_new_session;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_session_state;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_detect;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_log;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_co_seg;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_co_frag;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_co_reass;
-extern THREAD_LOCAL ProfileStats dce2_tcp_pstat_co_ctx;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_main;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_session;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_new_session;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_session_state;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_detect;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_log;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_co_seg;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_co_frag;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_co_reass;
+extern THREAD_LOCAL snort::ProfileStats dce2_tcp_pstat_co_ctx;
 
-inline bool DCE2_TcpAutodetect(Packet* p)
+inline bool DCE2_TcpAutodetect(snort::Packet* p)
 {
     if (p->dsize >= sizeof(DceRpcCoHdr))
     {
@@ -91,7 +91,7 @@ inline bool DCE2_TcpAutodetect(Packet* p)
             && (DceRpcCoVersMin(co_hdr) == DCERPC_PROTO_MINOR_VERS__0)
             && ((p->is_from_client()
             && DceRpcCoPduType(co_hdr) == DCERPC_PDU_TYPE__BIND)
-            || (DCE2_SsnFromServer(p)
+            || (p->is_from_server()
             && DceRpcCoPduType(co_hdr) == DCERPC_PDU_TYPE__BIND_ACK))
             && (DceRpcCoFragLen(co_hdr) >= sizeof(DceRpcCoHdr)))
         {
@@ -112,7 +112,7 @@ struct DCE2_TcpSsnData
     DCE2_CoTracker co_tracker;
 };
 
-class Dce2TcpFlowData : public FlowData
+class Dce2TcpFlowData : public snort::FlowData
 {
 public:
     Dce2TcpFlowData();
@@ -120,7 +120,7 @@ public:
 
     static void init()
     {
-        inspector_id = FlowData::create_flow_data_id();
+        inspector_id = snort::FlowData::create_flow_data_id();
     }
 
 public:
@@ -128,7 +128,7 @@ public:
     DCE2_TcpSsnData dce2_tcp_session;
 };
 
-DCE2_TcpSsnData* get_dce2_tcp_session_data(Flow*);
+DCE2_TcpSsnData* get_dce2_tcp_session_data(snort::Flow*);
 
 #endif
 

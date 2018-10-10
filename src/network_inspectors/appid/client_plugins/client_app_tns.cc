@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -95,32 +95,6 @@ struct ClientTNSMsg
 };
 #pragma pack()
 
-#ifdef REMOVED_WHILE_NOT_IN_USE
-static const char* msg_type[] =
-{
-    nullptr,
-    "Connect",
-    "Accept",
-    "Acknowledge",
-    "Refuse",
-    "Redirect",
-    "Data",
-    "Null",
-    nullptr,
-    "Abort",
-    nullptr,
-    "Resend",
-    "Marker",
-    "Attention",
-    "Control",
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr
-};
-#endif
-
 TnsClientDetector::TnsClientDetector(ClientDiscovery* cdm)
 {
     handler = cdm;
@@ -131,7 +105,7 @@ TnsClientDetector::TnsClientDetector(ClientDiscovery* cdm)
 
     tcp_patterns =
     {
-        { (const uint8_t*)TNS_BANNER, TNS_BANNER_LEN, -1, 0, APP_ID_ORACLE_DATABASE },
+        { (const uint8_t*)TNS_BANNER, TNS_BANNER_LEN, 2, 0, APP_ID_ORACLE_DATABASE },
     };
 
     appid_registry =
@@ -358,7 +332,7 @@ inprocess:
     return APPID_INPROCESS;
 
 done:
-    add_app(args.asd, APP_ID_ORACLE_TNS, APP_ID_ORACLE_DATABASE, fd->version);
+    add_app(args.asd, APP_ID_ORACLE_TNS, APP_ID_ORACLE_DATABASE, fd->version, args.change_bits);
     if (user_start && user_end && ((user_size = user_end - user_start) > 0))
     {
         /* we truncate extra long usernames */

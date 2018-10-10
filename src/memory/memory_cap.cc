@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -39,6 +39,8 @@
 #ifdef UNIT_TEST
 #include "catch/snort_catch.h"
 #endif
+
+using namespace snort;
 
 namespace memory
 {
@@ -86,11 +88,6 @@ inline bool free_space(size_t requested, size_t cap, Tracker& trk, Handler& hand
 {
     if ( requested > cap )
     {
-        DebugFormat(
-            DEBUG_MEMORY,
-            "Requested memory (%zu bytes) > cap (%zu bytes)\n",
-            requested, cap);
-
         return false;
     }
 
@@ -141,7 +138,7 @@ bool MemoryCap::free_space(size_t n)
     if ( !thread_cap )
         return true;
 
-    const auto& config = *SnortConfig::get_conf()->memory;
+    const auto& config = *snort::SnortConfig::get_conf()->memory;
     return memory::free_space(n, thread_cap, s_tracker, prune_handler) || config.soft;
 }
 
@@ -172,7 +169,7 @@ bool MemoryCap::over_threshold()
 void MemoryCap::calculate(unsigned num_threads)
 {
     assert(!is_packet_thread());
-    const MemoryConfig& config = *SnortConfig::get_conf()->memory;
+    const MemoryConfig& config = *snort::SnortConfig::get_conf()->memory;
 
     auto main_thread_used = s_tracker.used();
 
@@ -209,12 +206,12 @@ void MemoryCap::print()
     if ( !MemoryModule::is_active() )
         return;
 
-    const MemoryConfig& config = *SnortConfig::get_conf()->memory;
+    const MemoryConfig& config = *snort::SnortConfig::get_conf()->memory;
 
-    if ( SnortConfig::log_verbose() or s_tracker.allocations )
+    if ( snort::SnortConfig::log_verbose() or s_tracker.allocations )
         LogLabel("memory (heap)");
 
-    if ( SnortConfig::log_verbose() )
+    if ( snort::SnortConfig::log_verbose() )
     {
         LogMessage("    global cap: %zu\n", config.cap);
         LogMessage("    global preemptive threshold percent: %zu\n", config.threshold);

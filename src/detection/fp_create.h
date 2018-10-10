@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,7 +30,10 @@
 #include <string>
 #include "ports/port_group.h"
 
+namespace snort
+{
 struct SnortConfig;
+}
 
 struct PMX
 {
@@ -50,8 +53,8 @@ struct NCListNode
 **  engine.  It reads in the snort list of RTNs and OTNs and
 **  assigns them to PORT_MAPS.
 */
-int fpCreateFastPacketDetection(SnortConfig*);
-void fpDeleteFastPacketDetection(SnortConfig*);
+int fpCreateFastPacketDetection(snort::SnortConfig*);
+void fpDeleteFastPacketDetection(snort::SnortConfig*);
 void get_pattern_info(const PatternMatchData* pmd,
     const char* pattern, int pattern_length, std::string& hex, std::string& txt,
     std::string& opts);

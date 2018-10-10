@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -22,8 +22,7 @@
 #define DETECTION_UTIL_H
 
 // this is a legacy junk-drawer file that needs to be refactored
-// it provides file and alt data pointers, event trace foo, and
-// some http stuff.
+// it provides file and alt data and event trace foo.
 
 #include "main/snort_config.h"
 
@@ -41,22 +40,15 @@ struct DataBuffer
     unsigned len;
 };
 
-#define SetDetectLimit(pktPtr, altLen) \
-{ \
-    (pktPtr)->alt_dsize = altLen; \
-}
-
-#define IsLimitedDetect(pktPtr) ((pktPtr)->packet_flags & PKT_HTTP_DECODE)
-
 // FIXIT-L event trace should be placed in its own files
 void EventTrace_Init();
 void EventTrace_Term();
 
-void EventTrace_Log(const Packet*, const OptTreeNode*, int action);
+void EventTrace_Log(const snort::Packet*, const OptTreeNode*, int action);
 
 inline int EventTrace_IsEnabled()
 {
-    return ( SnortConfig::get_conf()->event_trace_max > 0 );
+    return ( snort::SnortConfig::get_conf()->event_trace_max > 0 );
 }
 
 #endif

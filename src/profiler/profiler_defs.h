@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,6 +27,8 @@
 #include "rule_profiler_defs.h"
 #include "time_profiler_defs.h"
 
+namespace snort
+{
 #define ROOT_NODE "total"
 
 struct ProfilerConfig
@@ -80,7 +82,7 @@ private:
     MemoryContext memory;
 };
 
-class SO_PUBLIC ProfileExclude
+class ProfileExclude
 {
 public:
     ProfileExclude(ProfileStats& stats) : ProfileExclude(stats.time, stats.memory) { }
@@ -93,6 +95,56 @@ private:
 
 using get_profile_stats_fn = ProfileStats* (*)(const char*);
 
-using Profile = ProfileContext;
+class NoMemContext
+{
+public:
+    NoMemContext(ProfileStats& stats) :
+        time(stats.time) { }
 
+private:
+    TimeContext time;
+};
+
+class NoMemExclude
+{
+public:
+    NoMemExclude(ProfileStats& stats) : NoMemExclude(stats.time, stats.memory) { }
+    NoMemExclude(TimeProfilerStats& time, MemoryTracker&) : time(time) { }
+
+private:
+    TimeExclude time;
+};
+
+class ProfileDisabled
+{
+public:
+    ProfileDisabled(ProfileStats&) { }
+    ProfileDisabled(TimeProfilerStats&, MemoryTracker&) { }
+};
+
+#ifdef NO_PROFILER
+using Profile = ProfileDisabled;
+using DeepProfile = ProfileDisabled;
+using NoProfile = ProfileDisabled;
+#else
+#ifdef NO_MEM_MGR
+using Profile = NoMemContext;
+using NoProfile = NoMemExclude;
+#ifdef DEEP_PROFILING
+using DeepProfile = NoMemContext;
+#else
+using DeepProfile = ProfileDisabled;
+#endif
+#else
+using Profile = ProfileContext;
+using NoProfile = ProfileExclude;
+#ifdef DEEP_PROFILING
+using DeepProfile = ProfileContext;
+#else
+using DeepProfile = ProfileDisabled;
+#endif
+#endif
+#endif
+
+}
 #endif

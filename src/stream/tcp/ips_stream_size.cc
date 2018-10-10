@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,8 @@
 #include "profiler/profiler_defs.h"
 
 #include "tcp_session.h"
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // stream_size
@@ -93,7 +95,7 @@ bool SizeOption::operator==(const IpsOption& ips) const
 
 IpsOption::EvalStatus SizeOption::eval(Cursor&, Packet* pkt)
 {
-    Profile profile(streamSizePerfStats);
+    DeepProfile profile(streamSizePerfStats);
 
     if ( !pkt->flow || pkt->flow->pkt_type != PktType::TCP )
         return NO_MATCH;
@@ -103,26 +105,26 @@ IpsOption::EvalStatus SizeOption::eval(Cursor&, Packet* pkt)
     uint32_t client_size;
     uint32_t server_size;
 
-    if (tcpssn->client->get_snd_nxt() > tcpssn->client->get_iss())
+    if (tcpssn->client.get_snd_nxt() > tcpssn->client.get_iss())
     {
         /* the normal case... */
-        client_size = tcpssn->client->get_snd_nxt() - tcpssn->client->get_iss();
+        client_size = tcpssn->client.get_snd_nxt() - tcpssn->client.get_iss();
     }
     else
     {
         /* the seq num wrapping case... */
-        client_size = tcpssn->client->get_iss() - tcpssn->client->get_snd_nxt();
+        client_size = tcpssn->client.get_iss() - tcpssn->client.get_snd_nxt();
     }
 
-    if (tcpssn->server->get_snd_nxt() > tcpssn->server->get_iss())
+    if (tcpssn->server.get_snd_nxt() > tcpssn->server.get_iss())
     {
         /* the normal case... */
-        server_size = tcpssn->server->get_snd_nxt() - tcpssn->server->get_iss();
+        server_size = tcpssn->server.get_snd_nxt() - tcpssn->server.get_iss();
     }
     else
     {
         /* the seq num wrapping case... */
-        server_size = tcpssn->server->get_iss() - tcpssn->server->get_snd_nxt();
+        server_size = tcpssn->server.get_iss() - tcpssn->server.get_snd_nxt();
     }
 
     switch ( direction )

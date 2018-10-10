@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -90,14 +90,13 @@ NntpServiceDetector::NntpServiceDetector(ServiceDiscovery* sd)
 }
 
 
-static int nntp_validate_reply(const uint8_t* data, uint16_t* offset,
-    uint16_t size)
+static int nntp_validate_reply(const uint8_t* data, uint16_t* offset, uint16_t size)
 {
     const ServiceNNTPCode* code_hdr;
     int code;
 
     /* Trim any blank lines (be a little tolerant) */
-    for (; *offset<size; (*offset)++)
+    for (; *offset < size; (*offset)++)
     {
         if (data[*offset] != 0x0D && data[*offset] != 0x0A)
             break;
@@ -105,7 +104,7 @@ static int nntp_validate_reply(const uint8_t* data, uint16_t* offset,
 
     if (size - *offset < (int)sizeof(ServiceNNTPCode))
     {
-        for (; *offset<size; (*offset)++)
+        for (; *offset < size; (*offset)++)
         {
             if (!isspace(data[*offset]))
                 return -1;
@@ -160,8 +159,7 @@ static int nntp_validate_reply(const uint8_t* data, uint16_t* offset,
     return 0;
 }
 
-static int nntp_validate_data(const uint8_t* data, uint16_t* offset,
-    uint16_t size, int* flags)
+static int nntp_validate_data(const uint8_t* data, uint16_t* offset, uint16_t size, int* flags)
 {
     if (*flags & NNTP_CR_RECEIVED)
     {
@@ -267,7 +265,6 @@ int NntpServiceDetector::validate(AppIdDiscoveryArgs& args)
     ServiceNNTPData* nd;
     uint16_t offset;
     int code;
-    AppIdSession* asd = args.asd;
     const uint8_t* data = args.data;
     uint16_t size = args.size;
 
@@ -276,11 +273,11 @@ int NntpServiceDetector::validate(AppIdDiscoveryArgs& args)
     if (args.dir != APP_ID_FROM_RESPONDER)
         goto inprocess;
 
-    nd = (ServiceNNTPData*)data_get(asd);
+    nd = (ServiceNNTPData*)data_get(args.asd);
     if (!nd)
     {
         nd = (ServiceNNTPData*)snort_calloc(sizeof(ServiceNNTPData));
-        data_add(asd, nd, &snort_free);
+        data_add(args.asd, nd, &snort_free);
         nd->state = NNTP_STATE_CONNECTION;
     }
 
@@ -344,14 +341,14 @@ int NntpServiceDetector::validate(AppIdDiscoveryArgs& args)
     }
 
 inprocess:
-    service_inprocess(asd, args.pkt, args.dir);
+    service_inprocess(args.asd, args.pkt, args.dir);
     return APPID_INPROCESS;
 
 success:
-    return add_service(asd, args.pkt, args.dir, APP_ID_NNTP);
+    return add_service(args.change_bits, args.asd, args.pkt, args.dir, APP_ID_NNTP);
 
 fail:
-    fail_service(asd, args.pkt, args.dir);
+    fail_service(args.asd, args.pkt, args.dir);
     return APPID_NOMATCH;
 }
 

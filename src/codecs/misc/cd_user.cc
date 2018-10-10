@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,8 @@
 #include "daqs/daq_user.h"
 #include "framework/codec.h"
 #include "packet_io/sfdaq.h"
+
+using namespace snort;
 
 #define CD_NAME "user"
 #define CD_HELP_STR "support for user sessions"

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,19 +26,25 @@
 #include <string>
 #include <vector>
 
-#include "application_ids.h"
-
-#include "protocols/protocol_ids.h"
-#include "search_engines/search_tool.h"
 #include "flow/flow.h"
+#include "protocols/protocol_ids.h"
+#include "pub_sub/appid_events.h"
+#include "search_engines/search_tool.h"
 #include "utils/util.h"
+
+#include "appid_types.h"
+#include "application_ids.h"
 
 class AppIdInspector;
 class AppIdSession;
 class AppIdDetector;
 class ServiceDetector;
 struct ServiceDetectorPort;
+
+namespace snort
+{
 struct Packet;
+}
 
 #define SCAN_HTTP_VIA_FLAG          (1<<0)
 #define SCAN_HTTP_USER_AGENT_FLAG   (1<<1)
@@ -53,8 +59,7 @@ class AppIdPatternMatchNode
 {
 public:
     AppIdPatternMatchNode(AppIdDetector* detector, int start, unsigned len)
-        : service(detector), pattern_start_pos(start), size(len)
-    {}
+        : service(detector), pattern_start_pos(start), size(len) { }
 
     bool valid_match(int end_position)
     {
@@ -92,10 +97,11 @@ public:
     static void initialize_plugins(AppIdInspector* ins);
     static void finalize_plugins();
     static void release_plugins();
+    static void tterm();
 
     virtual void initialize() = 0;
     virtual void register_detector(const std::string&, AppIdDetector*,  IpProtocol);
-    virtual void add_pattern_data(AppIdDetector*, SearchTool*, int position,
+    virtual void add_pattern_data(AppIdDetector*, snort::SearchTool*, int position,
         const uint8_t* const pattern, unsigned size, unsigned nocase);
     virtual void register_tcp_pattern(AppIdDetector*, const uint8_t* const pattern, unsigned size,
         int position, unsigned nocase);
@@ -103,7 +109,8 @@ public:
         int position, unsigned nocase);
     virtual int add_service_port(AppIdDetector*, const ServiceDetectorPort&);
 
-    static void do_application_discovery(Packet* p, AppIdInspector&);
+    static void do_application_discovery(snort::Packet* p, AppIdInspector&);
+    static void publish_appid_event(AppidChangeBits&, snort::Flow*);
 
     AppIdDetectors* get_tcp_detectors()
     {
@@ -122,11 +129,23 @@ protected:
     AppIdInspector& inspector;
     AppIdDetectors tcp_detectors;
     AppIdDetectors udp_detectors;
-    SearchTool* tcp_patterns = nullptr;
+    snort::SearchTool* tcp_patterns = nullptr;
     int tcp_pattern_count = 0;
-    SearchTool* udp_patterns = nullptr;
+    snort::SearchTool* udp_patterns = nullptr;
     int udp_pattern_count = 0;
     std::vector<AppIdPatternMatchNode*> pattern_data;
+
+private:
+    static bool do_pre_discovery(snort::Packet* p, AppIdSession** p_asd, AppIdInspector& inspector,
+        IpProtocol& protocol, AppidSessionDirection& direction);
+    static bool do_discovery(snort::Packet* p, AppIdSession& asd, IpProtocol protocol,
+        AppidSessionDirection direction, AppId& service_id, AppidChangeBits& change_bits);
+    static void do_post_discovery(snort::Packet* p, AppIdSession& asd,
+        AppidSessionDirection direction, bool is_discovery_done, AppId service_id,
+        AppidChangeBits& change_bits);
+    static bool handle_unmonitored_session(AppIdSession* asd, const snort::Packet* p,
+        IpProtocol protocol, AppidSessionDirection dir, AppIdInspector& inspector,
+        uint64_t& flow_flags);
 };
 #endif
 

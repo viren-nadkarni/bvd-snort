@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -31,6 +31,8 @@
 #include "sfip/sf_ip.h"
 #include "stream/stream.h"      // FIXIT-M bad dependency
 #include "time/packet_time.h"
+
+using namespace snort;
 
 /* Reasonably small, and prime */
 // FIXIT-L size based on max_tcp + max_udp?
@@ -72,10 +74,9 @@ int ExpectFlow::add_flow_data(FlowData* fd)
     return 0;
 }
 
-std::vector<ExpectFlow*>& ExpectFlow::get_expect_flows()
+std::vector<ExpectFlow*>* ExpectFlow::get_expect_flows()
 {
-    assert(packet_expect_flows);
-    return *packet_expect_flows;
+    return packet_expect_flows;
 }
 
 void ExpectFlow::reset_expect_flows()
@@ -100,7 +101,7 @@ struct ExpectNode
     bool reversed_key = false;
     int direction = 0;
     unsigned count = 0;
-    int16_t appId = 0;
+    SnortProtocolId snort_protocol_id = UNKNOWN_PROTOCOL_ID;
 
     ExpectFlow* head = nullptr;
     ExpectFlow* tail = nullptr;
@@ -250,10 +251,10 @@ bool ExpectCache::process_expected(ExpectNode* node, FlowKey& key, Packet* p, Fl
     free_list = head;
 
     /* If this is 0, we're ignoring, otherwise setting id of new session */
-    if (!node->appId)
+    if (!node->snort_protocol_id)
         ignoring = node->direction ? true : false;
-    else if (lws->ssn_state.application_protocol != node->appId)
-        lws->ssn_state.application_protocol = node->appId;
+    else if (lws->ssn_state.snort_protocol_id != node->snort_protocol_id)
+        lws->ssn_state.snort_protocol_id = node->snort_protocol_id;
 
     if (!node->count)
         hash_table->remove(&key);
@@ -309,23 +310,24 @@ ExpectCache::~ExpectCache()
  * Preprocessors may add sessions to be expected altogether or to be associated
  * with some data. For example, FTP preprocessor may add data channel that
  * should be expected. Alternatively, FTP preprocessor may add session with
- * appId FTP-DATA.
+ * snort protocol ID FTP-DATA.
  *
  * It is assumed that only one of cliPort or srvPort should be known (!0). This
  * violation of this assumption will cause hash collision that will cause some
  * session to be not expected and expected. This will occur only rarely and
  * therefore acceptable design optimization.
  *
- * Also, appId is assumed to be consistent between different preprocessors.
- * Each session can be assigned only one AppId. When new appId mismatches
- * existing appId, new appId and associated data is not stored.
+ * Also, snort_protocol_id is assumed to be consistent between different
+ * preprocessors.  Each session can be assigned only one snort protocol ID.
+ * When new snort_protocol_id mismatches existing snort_protocol_id, new
+ * snort_protocol_id and associated data is not stored.
  *
  */
 int ExpectCache::add_flow(const Packet *ctrlPkt,
     PktType type, IpProtocol ip_proto,
     const SfIp* cliIP, uint16_t cliPort,
     const SfIp* srvIP, uint16_t srvPort,
-    char direction, FlowData* fd, int16_t appId)
+    char direction, FlowData* fd, SnortProtocolId snort_protocol_id)
 {
     /* Just pull the VLAN ID, MPLS ID, and Address Space ID from the
         control packet until we have a use case for not doing so. */
@@ -365,12 +367,13 @@ int ExpectCache::add_flow(const Packet *ctrlPkt,
 
     if (!new_node)
     {
-        /* Requests will be rejected if the AppID doesn't match what has already been set. */
-        if (node->appId != appId)
+        // Requests will be rejected if the snort_protocol_id doesn't
+        // match what has already been set.
+        if (node->snort_protocol_id != snort_protocol_id)
         {
-            if (node->appId && appId)
+            if (node->snort_protocol_id && snort_protocol_id)
                 return -1;
-            node->appId = appId;
+            node->snort_protocol_id = snort_protocol_id;
         }
 
         last = node->tail;
@@ -391,7 +394,7 @@ int ExpectCache::add_flow(const Packet *ctrlPkt,
     }
     else
     {
-        node->appId = appId;
+        node->snort_protocol_id = snort_protocol_id;
         node->reversed_key = reversed_key;
         node->direction = direction;
         node->head = node->tail = nullptr;

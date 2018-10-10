@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,8 +24,11 @@
 #include <cstdint>
 
 #include "framework/module.h"
+#include "main/snort_debug.h"
 #include "main/snort_types.h"
 
+namespace snort
+{
 constexpr int GID_DECODE = 116;
 
 //-----------------------------------------------------
@@ -235,7 +238,12 @@ public:
 
     Usage get_usage() const override
     { return CONTEXT; }
+
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
 };
+}
+
+extern Trace TRACE_NAME(decode);
 
 #endif
 

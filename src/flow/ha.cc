@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,13 +27,14 @@
 
 #include "framework/counts.h"
 #include "log/messages.h"
-#include "main/snort_debug.h"
 #include "profiler/profiler_defs.h"
 #include "stream/stream.h"
 #include "time/packet_time.h"
 
 #include "flow.h"
 #include "flow_key.h"
+
+using namespace snort;
 
 static const uint8_t HA_MESSAGE_VERSION = 3;
 
@@ -161,7 +162,6 @@ void FlowHAState::reset()
 
 FlowHAClient::FlowHAClient(uint8_t length, bool session_client)
 {
-    DebugMessage(DEBUG_HA,"FlowHAClient::FlowHAClient()\n");
     if ( !s_client_map )
         return;
 
@@ -300,8 +300,6 @@ static uint16_t calculate_update_msg_content_length(Flow* flow)
         {
             assert((*s_client_map)[i]);
             length += ((*s_client_map)[i]->get_message_size() + sizeof(HAClientHeader));
-            DebugFormat(DEBUG_HA,
-                "HighAvailability::calculate_update_msg_content_length(): length: %d\n", length);
         }
     }
 
@@ -424,7 +422,6 @@ static void consume_receive_message(HAMessage* msg)
 HighAvailability::HighAvailability(PortBitSet* ports, bool)
 {
     using namespace std::placeholders;
-    DebugMessage(DEBUG_HA,"HighAvailability::HighAvailability()\n");
 
     // If we have ports, configure the side channel
     if ( ports != nullptr )
@@ -458,8 +455,6 @@ HighAvailability::HighAvailability(PortBitSet* ports, bool)
 
 HighAvailability::~HighAvailability()
 {
-    DebugMessage(DEBUG_HA,"HighAvailability::~HighAvailability()\n");
-
     if ( sc )
     {
         sc->unregister_receive_handler();
@@ -472,9 +467,6 @@ void HighAvailability::receive_handler(SCMessage* sc_msg)
 {
     assert(sc_msg);
 
-    DebugFormat(DEBUG_HA,"HighAvailability::receive_handler: port: %hu, length: %u\n",
-        sc_msg->hdr->port, sc_msg->content_length);
-
     // SC received messages must have reference back to SideChannel object
     assert(sc_msg->sc);
 
@@ -486,8 +478,6 @@ void HighAvailability::receive_handler(SCMessage* sc_msg)
 
 void HighAvailability::process_update(Flow* flow, const DAQ_PktHdr_t* pkthdr)
 {
-    DebugMessage(DEBUG_HA,"HighAvailability::process_update()\n");
-
     // Only looking for side channel processing - FIXIT-H
     UNUSED(pkthdr); // until we add DAQ communications channel
     if ( !sc || !flow )
@@ -521,8 +511,6 @@ void HighAvailability::process_update(Flow* flow, const DAQ_PktHdr_t* pkthdr)
 
 void HighAvailability::process_deletion(Flow* flow)
 {
-    DebugMessage(DEBUG_HA,"HighAvailability::process_deletion()\n");
-
     // No need to send message if we already have, we are in standby, or
     // we have just been created and haven't yet sent an update
     if ( flow->ha_state->check_any(FlowHAState::NEW |
@@ -556,30 +544,22 @@ void HighAvailability::process_receive()
 bool HighAvailabilityManager::instantiate(PortBitSet* mod_ports, bool mod_use_daq_channel,
         struct timeval* min_session_lifetime, struct timeval* min_sync_interval)
 {
-    DebugMessage(DEBUG_HA,"HighAvailabilityManager::instantiate()\n");
     ports = mod_ports;
     FlowHAState::config_timers(*min_session_lifetime, *min_sync_interval);
-#ifdef HAVE_DAQ_EXT_MODFLOW
     use_daq_channel = mod_use_daq_channel;
-#else
-    if ( mod_use_daq_channel )
-        return false;
-#endif
+
     return true;
 }
 
 // Called prior to the starts of configuration in the main thread.
 void HighAvailabilityManager::pre_config_init()
 {
-    DebugFormat(DEBUG_HA,"HighAvailabilityManager::pre_config_init(): key size: %zu\n",
-        sizeof(FlowKey));
     ports = nullptr;
 }
 
 // Called within the packet thread prior to packet processing
 void HighAvailabilityManager::thread_init()
 {
-    DebugMessage(DEBUG_HA,"HighAvailabilityManager::thread_init()\n");
     // create a a thread local instance iff we are configured to operate.
     if ( (ports != nullptr) || use_daq_channel )
         ha = new HighAvailability(ports,use_daq_channel);
@@ -595,7 +575,6 @@ void HighAvailabilityManager::thread_term_beginning()
 // Called in the packet thread at run-down
 void HighAvailabilityManager::thread_term()
 {
-    DebugMessage(DEBUG_HA,"HighAvailabilityManager::thread_term()\n");
     if ( ha != nullptr )
     {
         delete ha;

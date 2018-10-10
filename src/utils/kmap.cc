@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,12 +29,10 @@
 #include <limits>
 #include <string>
 
-#include "main/snort_types.h"
-
 #include "util.h"
 
-SNORT_FORCED_INCLUSION_DEFINITION(kmap);
-
+namespace snort
+{
 KMAP* KMapNew(KMapUserFreeFunc userfree)
 {
     KMAP* km = (KMAP*)snort_calloc(sizeof(KMAP));
@@ -408,10 +406,13 @@ void* KMapFindNext(KMAP* km)
     return km->keynext->userdata;
 }
 
+} //namespace snort
+
 #ifdef KMAP_MAIN
 /*
 *
 */
+using namespace snort;
 int main(int argc, char** argv)
 {
     int i,n=10;

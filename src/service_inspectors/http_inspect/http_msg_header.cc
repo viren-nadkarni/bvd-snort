@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,6 +32,7 @@
 #include "pub_sub/http_events.h"
 #include "sfip/sf_ip.h"
 
+using namespace snort;
 using namespace HttpEnums;
 
 HttpMsgHeader::HttpMsgHeader(const uint8_t* buffer, const uint16_t buf_size,
@@ -393,13 +394,6 @@ void HttpMsgHeader::setup_encoding_decompression()
         case CONTENTCODE_DEFLATE:
             compression = CMP_DEFLATE;
             break;
-        case CONTENTCODE_COMPRESS:
-        case CONTENTCODE_EXI:
-        case CONTENTCODE_PACK200_GZIP:
-        case CONTENTCODE_X_COMPRESS:
-            add_infraction(INF_UNSUPPORTED_ENCODING);
-            create_event(EVENT_UNSUPPORTED_ENCODING);
-            break;
         case CONTENTCODE_IDENTITY:
             break;
         case CONTENTCODE_CHUNKED:
@@ -407,8 +401,14 @@ void HttpMsgHeader::setup_encoding_decompression()
             create_event(EVENT_CONTENT_ENCODING_CHUNKED);
             break;
         case CONTENTCODE__OTHER:
+            // The ones we never heard of
             add_infraction(INF_UNKNOWN_ENCODING);
             create_event(EVENT_UNKNOWN_ENCODING);
+            break;
+        default:
+            // The ones we know by name but don't support
+            add_infraction(INF_UNSUPPORTED_ENCODING);
+            create_event(EVENT_UNSUPPORTED_ENCODING);
             break;
         }
     }

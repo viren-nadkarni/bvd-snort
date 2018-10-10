@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,9 +25,8 @@
 
 #include "tcp_state_close_wait.h"
 
-#include "main/snort_debug.h"
 
-#include "tcp_normalizer.h"
+#include "tcp_normalizers.h"
 #include "tcp_session.h"
 
 #ifdef UNIT_TEST
@@ -43,7 +42,7 @@ TcpStateCloseWait::TcpStateCloseWait(TcpStateMachine& tsm) :
 
 bool TcpStateCloseWait::syn_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    trk.normalizer->ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
+    trk.normalizer.ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
 
     if ( tsd.get_seg_len() )
         trk.session->handle_data_on_syn(tsd);
@@ -85,20 +84,14 @@ bool TcpStateCloseWait::fin_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& tr
 
 bool TcpStateCloseWait::fin_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    Flow* flow = tsd.get_flow();
-    if( trk.process_inorder_fin() )
-    {
-        trk.update_on_fin_recv(tsd);
-        return true;
-    }
+    snort::Flow* flow = tsd.get_flow();
 
     trk.update_tracker_ack_recv(tsd);
 
     if ( SEQ_GT(tsd.get_seg_seq(), trk.get_fin_final_seq() ) )
     {
-        DebugMessage(DEBUG_STREAM_STATE, "FIN beyond previous, ignoring\n");
         trk.session->tel.set_tcp_event(EVENT_BAD_FIN);
-        trk.normalizer->packet_dropper(tsd, NORM_TCP_BLOCK);
+        trk.normalizer.packet_dropper(tsd, NORM_TCP_BLOCK);
         trk.session->set_pkt_action_flag(ACTION_BAD_PKT);
     }
     else

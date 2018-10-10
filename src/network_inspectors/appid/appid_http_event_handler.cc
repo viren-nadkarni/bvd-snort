@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,94 +30,65 @@
 #include <cassert>
 
 #include "app_info_table.h"
+#include "appid_debug.h"
+#include "appid_discovery.h"
 #include "appid_http_session.h"
 #include "appid_session.h"
 #include "utils/util.h"
 
-static void replace_header_data(char** data, uint16_t& datalen, const uint8_t* header_start,
-    int32_t header_length)
-{
-    if (header_length <= 0)
-        return;
-
-    assert(data);
-    if (*data)
-        snort_free(*data);
-
-    *data = (char*)snort_alloc(header_length + 1);
-    memcpy(*data, header_start, header_length);
-    *(*data + header_length) = '\0';
-    datalen = header_length;
-}
+using namespace snort;
 
 void HttpEventHandler::handle(DataEvent& event, Flow* flow)
 {
-    int direction;
-    uint16_t tmplen;
+    assert(flow);
+    AppIdSession* asd = appid_api.get_appid_session(*flow);
+    if (!asd)
+        return;
+
+    AppidSessionDirection direction;
     const uint8_t* header_start;
     int32_t header_length;
     HttpEvent* http_event = (HttpEvent*)&event;
+    AppidChangeBits change_bits;
 
-    assert(flow);
-    AppIdSession* session = appid_api.get_appid_session(flow);
-    if (!session)
-        return;
+    if (appidDebug->is_active())
+        LogMessage("AppIdDbg %s Processing HTTP metadata from HTTP Inspector\n",
+            appidDebug->get_debug_session());
 
     direction = event_type == REQUEST_EVENT ? APP_ID_FROM_INITIATOR : APP_ID_FROM_RESPONDER;
 
-    if (!session->hsession)
-        session->hsession = new AppIdHttpSession(session);
+    AppIdHttpSession* hsession = asd->get_http_session();
 
     if (direction == APP_ID_FROM_INITIATOR)
     {
         header_start = http_event->get_host(header_length);
         if (header_length > 0)
         {
-            replace_header_data(&session->hsession->host,
-                session->hsession->host_buflen, header_start, header_length);
-            session->scan_flags |= SCAN_HTTP_HOST_URL_FLAG;
+            hsession->set_field(REQ_HOST_FID, header_start, header_length, change_bits);
+            asd->scan_flags |= SCAN_HTTP_HOST_URL_FLAG;
 
             header_start = http_event->get_uri(header_length);
             if (header_length > 0)
             {
-                replace_header_data(&session->hsession->uri,
-                    session->hsession->uri_buflen, header_start,
-                    header_length);
-
-                if (session->hsession->url)
-                    snort_free(session->hsession->url);
-                tmplen = sizeof(HTTP_PREFIX) + session->hsession->host_buflen +
-                    session->hsession->uri_buflen + 1;
-                session->hsession->url = (char*)snort_calloc(tmplen);
-                strncpy(session->hsession->url, HTTP_PREFIX, tmplen);
-                strncat(session->hsession->url, session->hsession->host,
-                    session->hsession->host_buflen);
-                strncat(session->hsession->url, session->hsession->uri,
-                    session->hsession->uri_buflen);
+                hsession->set_field(REQ_URI_FID, header_start, header_length, change_bits);
+                hsession->update_url(change_bits);
             }
         }
 
         header_start = http_event->get_user_agent(header_length);
         if (header_length > 0)
         {
-            replace_header_data(&session->hsession->useragent,
-                session->hsession->useragent_buflen, header_start, header_length);
-            session->scan_flags |= SCAN_HTTP_USER_AGENT_FLAG;
+            hsession->set_field(REQ_AGENT_FID, header_start, header_length, change_bits);
+            asd->scan_flags |= SCAN_HTTP_USER_AGENT_FLAG;
         }
 
         header_start = http_event->get_cookie(header_length);
-        replace_header_data(&session->hsession->cookie,
-            session->hsession->cookie_buflen, header_start, header_length);
-
+        hsession->set_field(REQ_COOKIE_FID, header_start, header_length, change_bits);
         header_start = http_event->get_referer(header_length);
-        replace_header_data(&session->hsession->referer,
-            session->hsession->referer_buflen, header_start, header_length);
-
+        hsession->set_field(REQ_REFERER_FID, header_start, header_length, change_bits);
         header_start = http_event->get_x_working_with(header_length);
-        replace_header_data(&session->hsession->x_working_with, tmplen,
-            header_start, header_length);
-
-        session->hsession->is_webdav = http_event->contains_webdav_method();
+        hsession->set_field(MISC_XWW_FID, header_start, header_length, change_bits);
+        hsession->set_is_webdav(http_event->contains_webdav_method());
 
         // FIXIT-M: Should we get request body (may be expensive to copy)?
         //      It is not currently set in callback in 2.9.x, only via
@@ -126,17 +97,11 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
     else    // Response headers.
     {
         header_start = http_event->get_content_type(header_length);
-        replace_header_data(&session->hsession->content_type,
-            session->hsession->content_type_buflen, header_start,
-            header_length);
-
+        hsession->set_field(RSP_CONTENT_TYPE_FID, header_start, header_length, change_bits);
         header_start = http_event->get_location(header_length);
-        replace_header_data(&session->hsession->location,
-            session->hsession->location_buflen, header_start, header_length);
-
+        hsession->set_field(RSP_LOCATION_FID, header_start, header_length, change_bits);
         header_start = http_event->get_server(header_length);
-        replace_header_data(&session->hsession->server, tmplen, header_start,
-            header_length);
+        hsession->set_field(MISC_SERVER_FID, header_start, header_length, change_bits);
 
         int32_t responseCodeNum = http_event->get_response_code();
         if (responseCodeNum > 0 && responseCodeNum < 700)
@@ -144,12 +109,8 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
             unsigned int ret;
             char tmpstr[32];
             ret = snprintf(tmpstr, sizeof(tmpstr), "%d", responseCodeNum);
-            if (ret < sizeof(tmpstr))
-            {
-                snort_free(session->hsession->response_code);
-                session->hsession->response_code = snort_strdup(tmpstr);
-                session->hsession->response_code_buflen = strlen(tmpstr);
-            }
+            if ( ret < sizeof(tmpstr) )
+                hsession->set_field(MISC_RESP_CODE_FID, (const uint8_t*)tmpstr, ret, change_bits);
         }
 
         // FIXIT-M: Get Location header data.
@@ -162,20 +123,17 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
     header_start = http_event->get_via(header_length);
     if (header_length > 0)
     {
-        replace_header_data(&session->hsession->via, tmplen, header_start,
-            header_length);
-        session->scan_flags |= SCAN_HTTP_VIA_FLAG;
+        hsession->set_field(MISC_VIA_FID, header_start, header_length, change_bits);
+        asd->scan_flags |= SCAN_HTTP_VIA_FLAG;
     }
 
-    session->hsession->process_http_packet(direction);
-    if (session->service.get_id() == APP_ID_HTTP)
+    hsession->process_http_packet(direction, change_bits);
+    if (asd->service.get_id() == APP_ID_HTTP)
     {
-        session->set_session_flags(APPID_SESSION_SERVICE_DETECTED | APPID_SESSION_HTTP_SESSION);
-        session->set_application_ids(session->pick_service_app_id(),
-        session->pick_client_app_id(), session->pick_payload_app_id(),
-        session->pick_misc_app_id());
-        session->service_disco_state = APPID_DISCO_STATE_FINISHED;
+        asd->set_application_ids(asd->pick_service_app_id(), asd->pick_client_app_id(),
+            asd->pick_payload_app_id(), asd->pick_misc_app_id(), change_bits);
     }
 
+    AppIdDiscovery::publish_appid_event(change_bits, flow);
 }
 

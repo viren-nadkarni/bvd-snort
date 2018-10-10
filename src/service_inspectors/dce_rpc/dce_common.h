@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,15 +30,17 @@
 #include "protocols/packet.h"
 
 #include "dce_list.h"
+#include "dce_context_data.h"
 
-extern const InspectApi dce2_smb_api;
-extern const InspectApi dce2_tcp_api;
-extern const InspectApi dce2_udp_api;
-extern const InspectApi dce_http_proxy_api;
-extern const InspectApi dce_http_server_api;
+extern const snort::InspectApi dce2_smb_api;
+extern const snort::InspectApi dce2_tcp_api;
+extern const snort::InspectApi dce2_udp_api;
+extern const snort::InspectApi dce_http_proxy_api;
+extern const snort::InspectApi dce_http_server_api;
 extern THREAD_LOCAL int dce2_detected;
 
 #define GID_DCE2 133
+#define DCE_RPC_SERVICE_NAME "dcerpc"
 
 enum DCE2_Policy
 {
@@ -198,7 +200,6 @@ struct DCE2_SsnData
     DCE2_Policy server_policy;
     DCE2_Policy client_policy;
     int flags;
-    Packet* wire_pkt;
     uint64_t alert_mask;
     DCE2_Roptions ropts;
     void* config;
@@ -209,7 +210,7 @@ struct DCE2_SsnData
     uint32_t srv_nseq;
 };
 
-class DceEndianness : public Endianness
+class DceEndianness : public snort::Endianness
 {
 public:
     int hdr_byte_order;   /* Set to sentinel if not applicable */
@@ -222,11 +223,12 @@ public:
     void reset();
 };
 
-inline void DCE2_ResetRopts(DCE2_Roptions* ropts)
+inline void DCE2_ResetRopts(DCE2_SsnData* sd, snort::Packet* p)
 {
-    ropts->first_frag = DCE2_SENTINEL;
-    ropts->opnum = DCE2_SENTINEL;
-    ropts->stub_data = nullptr;
+    sd->ropts.first_frag = DCE2_SENTINEL;
+    sd->ropts.opnum = DCE2_SENTINEL;
+    sd->ropts.stub_data = nullptr;
+    DceContextData::clear_current_ropts(p, sd->trans);
 }
 
 inline void DCE2_SsnSetNoInspect(DCE2_SsnData* sd)
@@ -258,21 +260,11 @@ inline uint16_t DCE2_GcMaxFragLen(dce2CommonProtoConf* config)
     return UINT16_MAX;
 }
 
-inline int DCE2_SsnFromServer(Packet* p)
-{
-    return p->is_from_server();
-}
-
-inline int DCE2_SsnFromClient(Packet* p)
-{
-    return p->is_from_client();
-}
-
 inline DCE2_Policy DCE2_SsnGetPolicy(DCE2_SsnData* sd)
 {
     assert(sd);
 
-    if (DCE2_SsnFromClient(sd->wire_pkt))
+    if ( snort::DetectionEngine::get_current_packet()->is_from_client() )
         return sd->server_policy;
     else
         return sd->client_policy;
@@ -280,7 +272,7 @@ inline DCE2_Policy DCE2_SsnGetPolicy(DCE2_SsnData* sd)
 
 inline void DCE2_SsnSetPolicy(DCE2_SsnData* sd, DCE2_Policy policy)
 {
-    if (DCE2_SsnFromClient(sd->wire_pkt))
+    if ( snort::DetectionEngine::get_current_packet()->is_from_client() )
         sd->client_policy = policy;
     else
         sd->server_policy = policy;
@@ -391,20 +383,20 @@ inline bool DCE2_SsnIsServerSambaPolicy(DCE2_SsnData* sd)
 
 inline void dce_alert(uint32_t gid, uint32_t sid, dce2CommonStats* stats)
 {
-    DetectionEngine::queue_event(gid,sid);
+    snort::DetectionEngine::queue_event(gid,sid);
     stats->events++;
 }
 
-bool dce2_set_common_config(Value&, dce2CommonProtoConf&);
+bool dce2_set_common_config(snort::Value&, dce2CommonProtoConf&);
 void print_dce2_common_config(dce2CommonProtoConf&);
-bool dce2_set_co_config(Value&, dce2CoProtoConf&);
+bool dce2_set_co_config(snort::Value&, dce2CoProtoConf&);
 void print_dce2_co_config(dce2CoProtoConf&);
-bool dce2_paf_abort(Flow*, DCE2_SsnData*);
+bool dce2_paf_abort(snort::Flow*, DCE2_SsnData*);
 void DCE2_Detect(DCE2_SsnData*);
-Packet* DCE2_GetRpkt(Packet*, DCE2_RpktType, const uint8_t*, uint32_t);
-uint16_t DCE2_GetRpktMaxData(DCE2_SsnData*, DCE2_RpktType);
-DCE2_Ret DCE2_AddDataToRpkt(Packet*, const uint8_t*, uint32_t);
-DCE2_SsnData* get_dce2_session_data(Packet*);
+snort::Packet* DCE2_GetRpkt(snort::Packet*, DCE2_RpktType, const uint8_t*, uint32_t);
+uint16_t DCE2_GetRpktMaxData(DCE2_RpktType);
+DCE2_Ret DCE2_AddDataToRpkt(snort::Packet*, const uint8_t*, uint32_t);
+DCE2_TransType get_dce2_trans_type(const snort::Packet* p);
 
 #endif
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -50,6 +50,8 @@
 #ifdef UNIT_TEST
 #include "catch/snort_catch.h"
 #endif
+
+using namespace snort;
 
 #define s_rule_table_title "rule profile"
 
@@ -119,9 +121,9 @@ struct View
     hr_duration time_per(hr_duration d, uint64_t v) const
     {
         if ( v  == 0 )
-            return 0_ticks;
+            return CLOCK_ZERO;
 
-        return hr_duration(d.count() / v);
+        return hr_duration(d / v);
     }
 
     hr_duration avg_match() const
@@ -158,7 +160,7 @@ static const ProfilerSorter<View> sorters[] =
     {
         "total_time",
         [](const View& lhs, const View& rhs)
-        { return lhs.elapsed().count() >= rhs.elapsed().count(); }
+        { return TO_TICKS(lhs.elapsed()) >= TO_TICKS(rhs.elapsed()); }
     },
     {
         "matches",
@@ -240,10 +242,10 @@ static void print_single_entry(const View& v, unsigned n)
         table << v.matches();
         table << v.alerts();
 
-        table << clock_usecs(duration_cast<microseconds>(v.elapsed()).count());
-        table << clock_usecs(duration_cast<microseconds>(v.avg_check()).count());
-        table << clock_usecs(duration_cast<microseconds>(v.avg_match()).count());
-        table << clock_usecs(duration_cast<microseconds>(v.avg_no_match()).count());
+        table << clock_usecs(TO_USECS(v.elapsed()));
+        table << clock_usecs(TO_USECS(v.avg_check()));
+        table << clock_usecs(TO_USECS(v.avg_match()));
+        table << clock_usecs(TO_USECS(v.avg_no_match()));
 
         table << v.timeouts();
         table << v.suspends();
@@ -319,7 +321,7 @@ void reset_rule_profiler_stats()
 
         auto* rtn = getRtnFromOtn(otn);
 
-        if ( !rtn || !is_network_protocol(rtn->proto) )
+        if ( !rtn || !is_network_protocol(rtn->snort_protocol_id) )
             continue;
 
         for ( unsigned i = 0; i < ThreadConfig::get_instance_max(); ++i )

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -37,7 +37,9 @@ struct PatMatQStat
     PegCount matched_bytes;
 };
 
+namespace snort
+{
 SO_PUBLIC extern THREAD_LOCAL PatMatQStat pmqs;
-
+}
 #endif
 

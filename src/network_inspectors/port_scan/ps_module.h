@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -131,23 +131,23 @@
 //-------------------------------------------------------------------------
 
 extern THREAD_LOCAL SimpleStats spstats;
-extern THREAD_LOCAL ProfileStats psPerfStats;
+extern THREAD_LOCAL snort::ProfileStats psPerfStats;
 
 struct PortscanConfig;
 
-class PortScanModule : public Module
+class PortScanModule : public snort::Module
 {
 public:
     PortScanModule();
     ~PortScanModule() override;
 
-    bool set(const char*, Value&, SnortConfig*) override;
-    bool begin(const char*, int, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
-    ProfileStats* get_profile() const override;
-    const RuleMap* get_rules() const override;
+    snort::ProfileStats* get_profile() const override;
+    const snort::RuleMap* get_rules() const override;
 
     unsigned get_gid() const override
     { return GID_PORT_SCAN; }
@@ -155,7 +155,8 @@ public:
     PortscanConfig* get_data();
 
     Usage get_usage() const override
-    { return CONTEXT; }
+    { return GLOBAL; } // FIXIT-M this should eventually be CONTEXT.
+                       // Set to GLOBAL so this isn't selected away when inspection policy switches
 
 private:
     PS_ALERT_CONF* get_alert_conf(const char* fqn);

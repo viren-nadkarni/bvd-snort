@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -135,6 +135,7 @@ const StrCode HttpMsgHeadShared::header_list[] =
     { HEAD_X_WORKING_WITH,            "x-working-with" },
     { HEAD_CONTENT_TRANSFER_ENCODING, "content-transfer-encoding" },
     { HEAD_MIME_VERSION,              "mime-version" },
+    { HEAD_PROXY_AGENT,               "proxy-agent" },
     { 0,                              nullptr }
 };
 
@@ -149,6 +150,13 @@ const StrCode HttpMsgHeadShared::content_code_list[] =
     { CONTENTCODE_X_COMPRESS,    "x-compress" },
     { CONTENTCODE_IDENTITY,      "identity" },
     { CONTENTCODE_CHUNKED,       "chunked" },
+    { CONTENTCODE_BR,            "br" },
+    { CONTENTCODE_BZIP2,         "bzip2" },
+    { CONTENTCODE_LZMA,          "lzma" },
+    { CONTENTCODE_PEERDIST,      "peerdist" },
+    { CONTENTCODE_SDCH,          "sdch" },
+    { CONTENTCODE_XPRESS,        "xpress" },
+    { CONTENTCODE_XZ,            "xz" },
     { 0,                         nullptr }
 };
 
@@ -171,39 +179,39 @@ const StrCode HttpMsgHeadShared::charset_code_opt_list[] =
 };
 
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_BASIC
-    { EVENT__NONE, INF__NONE, nullptr, nullptr, nullptr };
+    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
 
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_NO_REPEAT
-    { EVENT_REPEATED_HEADER, INF_REPEATED_HEADER, nullptr, nullptr, nullptr };
+    { EVENT_REPEATED_HEADER, INF_REPEATED_HEADER, false, nullptr, nullptr, nullptr };
 
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CASE_INSENSITIVE
-    { EVENT__NONE, INF__NONE, norm_to_lower, nullptr, nullptr };
+    { EVENT__NONE, INF__NONE, false, norm_to_lower, nullptr, nullptr };
 
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_NUMBER
-    { EVENT_REPEATED_HEADER, INF_REPEATED_HEADER, norm_remove_lws, nullptr, nullptr };
+    { EVENT_REPEATED_HEADER, INF_REPEATED_HEADER, false, norm_remove_lws, nullptr, nullptr };
 
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_TOKEN_LIST
-    { EVENT__NONE, INF__NONE, norm_remove_lws, norm_to_lower, nullptr };
+    { EVENT__NONE, INF__NONE, false, norm_remove_lws, norm_to_lower, nullptr };
 
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_METHOD_LIST
-    { EVENT__NONE, INF__NONE, norm_remove_lws, nullptr, nullptr };
+    { EVENT__NONE, INF__NONE, false, norm_remove_lws, nullptr, nullptr };
 
 // FIXIT-L implement a date normalization function that converts the three legal formats into a
 // single standard format. For now we do nothing special for dates. This object is a placeholder
 // to keep track of which headers have date values.
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_DATE
-    { EVENT__NONE, INF__NONE, nullptr, nullptr, nullptr };
+    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
 
 // FIXIT-M implement a URI normalization function, probably by extending existing URI capabilities
 // to cover relative formats
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_URI
-    { EVENT__NONE, INF__NONE, nullptr, nullptr, nullptr };
+    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
 
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CONTENT_LENGTH
-    { EVENT_MULTIPLE_CONTLEN, INF_MULTIPLE_CONTLEN, norm_remove_lws, nullptr, nullptr };
+    { EVENT_MULTIPLE_CONTLEN, INF_MULTIPLE_CONTLEN, true, norm_remove_lws, nullptr, nullptr };
 
 const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CHARSET
-    { EVENT__NONE, INF__NONE, norm_remove_quotes_lws, norm_to_lower, nullptr };
+    { EVENT__NONE, INF__NONE, false, norm_remove_quotes_lws, norm_to_lower, nullptr };
 
 #if defined(__clang__)
 // Designated initializers are not supported in C++11. However we're going to play compilation
@@ -270,6 +278,7 @@ const HeaderNormalizer* const HttpMsgHeadShared::header_norms[HEAD__MAX_VALUE] =
     [HEAD_X_WORKING_WITH] = &NORMALIZER_BASIC,
     [HEAD_CONTENT_TRANSFER_ENCODING] = &NORMALIZER_TOKEN_LIST,
     [HEAD_MIME_VERSION] = &NORMALIZER_BASIC,
+    [HEAD_PROXY_AGENT] = &NORMALIZER_BASIC,
 };
 /* *INDENT-ON* */
 
@@ -277,7 +286,7 @@ const HeaderNormalizer* const HttpMsgHeadShared::header_norms[HEAD__MAX_VALUE] =
 #pragma clang diagnostic pop
 #endif
 
-const RuleMap HttpModule::http_events[] =
+const snort::RuleMap HttpModule::http_events[] =
 {
     { EVENT_ASCII,                      "ascii encoding" },
     { EVENT_DOUBLE_DECODE,              "double decoding attack" },
@@ -313,7 +322,7 @@ const RuleMap HttpModule::http_events[] =
     { EVENT_SIMPLE_REQUEST,             "simple request" },
     { EVENT_UNESCAPED_SPACE_URI,        "unescaped space in HTTP URI" },
     { EVENT_PIPELINE_MAX,               "too many pipelined requests" },
-    { EVENT_ANOM_SERVER,                "anomalous http server on undefined HTTP port" },
+    { EVENT_OBSOLETE_ANOM_SERVER,       "obsolete event--deleted" },
     { EVENT_INVALID_STATCODE,           "invalid status code in HTTP response" },
     { EVENT_UNUSED_1,                   "unused event number--should not appear" },
     { EVENT_UTF_NORM_FAIL,              "HTTP response has UTF charset that failed to normalize" },
@@ -343,7 +352,7 @@ const RuleMap HttpModule::http_events[] =
     { EVENT_URI_BAD_FORMAT,             "URI badly formatted" },
     { EVENT_UNKNOWN_PERCENT,            "unrecognized type of percent encoding in URI" },
     { EVENT_BROKEN_CHUNK,               "HTTP chunk misformatted" },
-    { EVENT_CHUNK_WHITESPACE,           "white space following chunk length" },
+    { EVENT_CHUNK_WHITESPACE,           "white space adjacent to chunk length" },
     { EVENT_HEAD_NAME_WHITESPACE,       "white space within header name" },
     { EVENT_GZIP_OVERRUN,               "excessive gzip compression" },
     { EVENT_GZIP_FAILURE,               "gzip decompression failed" },
@@ -378,6 +387,9 @@ const RuleMap HttpModule::http_events[] =
     { EVENT_CONTENT_ENCODING_CHUNKED,   "invalid value chunked in Content-Encoding header" },
     { EVENT_206_WITHOUT_RANGE,          "206 response sent to a request without a Range header" },
     { EVENT_VERSION_NOT_UPPERCASE,      "'HTTP' in version field not all upper case" },
+    { EVENT_BAD_HEADER_WHITESPACE,      "white space embedded in critical header value" },
+    { EVENT_GZIP_EARLY_END,             "gzip compressed data followed by unexpected non-gzip "
+                                        "data" },
     { 0, nullptr }
 };
 

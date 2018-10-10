@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,6 +28,8 @@
 #include "log/messages.h"
 #include "main/snort_debug.h"
 #include "utils/util.h"
+
+using namespace snort;
 
 #define SIP_SEPERATORS       "()<>@,;:\\/[]?={}\" "
 
@@ -116,7 +118,6 @@ void SIP_ParseMethods(const char* cur_tokenp, uint32_t* methodsConfig, SIPMethod
     /* If the user specified methods, remove default methods for now since
      * it now needs to be set explicitly. */
     *methodsConfig =  SIP_METHOD_NULL;
-    DebugFormat(DEBUG_SIP, "Method token: %s\n",cur_tokenp);
     // Check whether this is a standard method
 
     i_method = SIP_findMethod(cur_tokenp, StandardMethods);

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 // Copyright (C) 2000,2001 Andrew R. Baker <andrewb@uab.edu>
@@ -48,6 +48,7 @@
 #include "packet_io/sfdaq.h"
 #include "protocols/packet.h"
 
+using namespace snort;
 using namespace std;
 
 static THREAD_LOCAL TextLog* full_log = nullptr;
@@ -178,8 +179,6 @@ void FullLogger::alert(Packet* p, const char* msg, const Event& event)
         if ( LogAppID(full_log, p) )
             TextLog_NewLine(full_log);
     }
-
-    DebugMessage(DEBUG_LOG, "Logging Alert data!\n");
 
     LogTimeStamp(full_log, p);
     TextLog_Putc(full_log, ' ');

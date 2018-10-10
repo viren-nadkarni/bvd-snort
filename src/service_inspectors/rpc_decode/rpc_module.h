@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -35,9 +35,9 @@
 struct RpcStats;
 
 extern THREAD_LOCAL RpcStats rdstats;
-extern THREAD_LOCAL ProfileStats rpcdecodePerfStats;
+extern THREAD_LOCAL snort::ProfileStats rpcdecodePerfStats;
 
-class RpcDecodeModule : public Module
+class RpcDecodeModule : public snort::Module
 {
 public:
     RpcDecodeModule();
@@ -45,10 +45,10 @@ public:
     unsigned get_gid() const override
     { return GID_RPC_DECODE; }
 
-    const RuleMap* get_rules() const override;
+    const snort::RuleMap* get_rules() const override;
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
-    ProfileStats* get_profile() const override;
+    snort::ProfileStats* get_profile() const override;
 
     Usage get_usage() const override
     { return INSPECT; }

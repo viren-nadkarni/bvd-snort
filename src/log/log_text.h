@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,13 +26,13 @@
 
 #include "log/text_log.h"
 
-struct Packet;
 struct Event;
 
+namespace snort
+{
+struct Packet;
 namespace ip { struct IP4Hdr; }
 namespace tcp { struct TCPHdr; }
-
-typedef ip::IP4Hdr IP4Hdr;
 
 SO_PUBLIC void LogTimeStamp(TextLog*, Packet*);
 SO_PUBLIC void LogPriorityData(TextLog*, const Event&);
@@ -53,8 +53,9 @@ SO_PUBLIC void LogICMPHeader(TextLog*, Packet*);
 SO_PUBLIC void LogIpAddrs(TextLog*, Packet*);
 SO_PUBLIC void LogIPHeader(TextLog*, Packet*);
 
-SO_PUBLIC void LogIpOptions(TextLog*, const IP4Hdr*, uint16_t valid_ip4_len);
+SO_PUBLIC void LogIpOptions(TextLog*, const ip::IP4Hdr*, uint16_t valid_ip4_len);
 SO_PUBLIC void LogTcpOptions(TextLog*, const tcp::TCPHdr*, uint16_t valid_tcp_len);
+}
 
 #endif
 

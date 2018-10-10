@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,9 +27,9 @@
 #include "ftpp_si.h"
 
 /* list of function prototypes for this preprocessor */
-extern int check_ftp(FTP_SESSION* session, Packet* p, int iMode);
+extern int check_ftp(FTP_SESSION* session, snort::Packet* p, int iMode);
 
-extern int initialize_ftp(FTP_SESSION* session, Packet* p, int iMode);
+extern int initialize_ftp(FTP_SESSION* session, snort::Packet* p, int iMode);
 
 #endif
 

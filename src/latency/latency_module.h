@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,14 +23,14 @@
 
 #include "framework/module.h"
 
-class LatencyModule : public Module
+class LatencyModule : public snort::Module
 {
 public:
     LatencyModule();
 
-    bool set(const char*, Value&, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
 
-    const RuleMap* get_rules() const override;
+    const snort::RuleMap* get_rules() const override;
     unsigned get_gid() const override;
 
     const PegInfo* get_pegs() const override;

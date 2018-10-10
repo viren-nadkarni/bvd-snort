@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,7 +32,6 @@
 #include "hash/xhash.h"
 #include "log/messages.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "main/thread_config.h"
 #include "managers/ips_manager.h"
 #include "managers/module_manager.h"
@@ -53,6 +52,8 @@
 #include "config_file.h"
 #include "parse_conf.h"
 #include "parse_ports.h"
+
+using namespace snort;
 
 #define SRC  0
 #define DST  1
@@ -97,7 +98,7 @@ static bool s_ignore = false;  // for skipping drop rules when not inline, etc.
  */
 static int FinishPortListRule(
     RulePortTables* port_tables, RuleTreeNode* rtn, OptTreeNode* otn,
-    int proto, FastPatternConfig* fp)
+    SnortProtocolId snort_protocol_id, FastPatternConfig* fp)
 {
     int large_port_group = 0;
     PortTable* dstTable;
@@ -106,11 +107,11 @@ static int FinishPortListRule(
     rule_count_t* prc;
     uint32_t orig_flags = rtn->flags;
 
-    assert(otn->proto == proto);
+    assert(otn->snort_protocol_id == snort_protocol_id);
 
     /* Select the Target PortTable for this rule, based on protocol, src/dst
      * dir, and if there is rule content */
-    switch ( proto )
+    switch ( snort_protocol_id )
     {
     case SNORT_PROTO_IP:
         dstTable = port_tables->ip.dst;
@@ -150,11 +151,6 @@ static int FinishPortListRule(
     /* Count rules with both src and dst specific ports */
     if (!(rtn->flags & ANY_DST_PORT) && !(rtn->flags & ANY_SRC_PORT))
     {
-        DebugFormat(DEBUG_PORTLISTS,
-            "***\n***Info:  src & dst ports are both specific"
-            " >> gid=%u sid=%u\n***\n",
-            otn->sigInfo.gid, otn->sigInfo.sid);
-
         prc->both++;
     }
 
@@ -205,17 +201,13 @@ static int FinishPortListRule(
     if (((rtn->flags & (ANY_DST_PORT|ANY_SRC_PORT)) == (ANY_DST_PORT|ANY_SRC_PORT)) ||
         large_port_group || fp->get_single_rule_group())
     {
-        if (proto == SNORT_PROTO_IP)
+        if (snort_protocol_id == SNORT_PROTO_IP)
         {
             /* Add the IP rules to the higher level app protocol groups, if they apply
              * to those protocols.  All IP rules should have any-any port descriptors
              * and fall into this test.  IP rules that are not tcp/udp/icmp go only into the
              * IP table */
-            DebugFormat(DEBUG_PORTLISTS,
-                "Finishing IP any-any rule %u:%u\n",
-                otn->sigInfo.gid, otn->sigInfo.sid);
-
-            switch ( otn->proto )
+            switch ( otn->snort_protocol_id )
             {
             case SNORT_PROTO_IP:    /* Add to all ip proto any port tables */
                 PortObjectAddRule(port_tables->icmp.any, otn->ruleIndex);
@@ -258,7 +250,6 @@ static int FinishPortListRule(
     if (!(rtn->flags & ANY_DST_PORT))
     {
         prc->dst++;
-        DebugMessage(DEBUG_PORTLISTS, "Finishing rule: dst port rule\n");
 
         /* find the proper port object */
         PortObject* pox = PortTableFindInputPortObjectPorts(dstTable, rtn->dst_portobject);
@@ -349,8 +340,7 @@ static int ValidateIPList(sfip_var_t* addrset, const char* token)
     return 0;
 }
 
-static int ProcessIP(
-    SnortConfig*, const char* addr, RuleTreeNode* rtn, int mode, int)
+static int ProcessIP(SnortConfig*, const char* addr, RuleTreeNode* rtn, int mode, int)
 {
     vartable_t* ip_vartable = get_ips_policy()->ip_vartable;
 
@@ -511,14 +501,11 @@ static PortObject* ParsePortListTcpUdpPort(
         /*||isalpha(port_str[0])*/ /*TODO: interferes with protocol names for ports*/
         const char* name = port_str + 1;
 
-        DebugFormat(DEBUG_PORTLISTS,"PortVarTableFind: finding '%s'\n", port_str);
-
         /* look it up  in the port var table */
         portobject = PortVarTableFind(pvt, name);
         if ( !portobject )
             ParseAbort("***PortVar Lookup failed on '%s'.", port_str);
 
-        DebugFormat(DEBUG_PORTLISTS,"PortVarTableFind: '%s' found!\n", port_str);
     }
     /* 3rd -  and finally process a raw port list */
     else
@@ -526,13 +513,7 @@ static PortObject* ParsePortListTcpUdpPort(
         /* port list = [p,p,p:p,p,...] or p or p:p , no embedded spaces due to tokenizer */
         PortObject* pox;
 
-        DebugFormat(DEBUG_PORTLISTS,
-            "parser.c->PortObjectParseString: parsing '%s'\n",port_str);
-
         portobject = PortObjectParseString(pvt, &poparser, nullptr, port_str, 0);
-
-        DebugFormat(DEBUG_PORTLISTS,
-            "parser.c->PortObjectParseString: '%s' done.\n",port_str);
 
         if ( !portobject )
         {
@@ -545,16 +526,11 @@ static PortObject* ParsePortListTcpUdpPort(
         pox = PortTableFindInputPortObjectPorts(noname, portobject);
         if ( pox )
         {
-            DebugFormat(DEBUG_PORTLISTS,
-                "parser.c: already have '%s' as a PortObject - "
-                "calling PortObjectFree(portobject)\n", port_str);
             PortObjectFree(portobject);
             portobject = pox;
         }
         else
         {
-            DebugFormat(DEBUG_PORTLISTS,
-                "parser.c: adding '%s' as a PortObject\n",port_str);
             /* Add to the un-named port var table */
             if (PortTableAddObject(noname, portobject))
             {
@@ -581,7 +557,6 @@ static PortObject* ParsePortListTcpUdpPort(
  *
  *   rtn - proto_node
  *   port_str - port list string or port var name
- *   proto - protocol
  *   dst_flag - dst or src port flag, true = dst, false = src
  *
  */
@@ -605,8 +580,6 @@ static int ParsePortList(
             return -1;
         }
     }
-
-    DebugFormat(DEBUG_PORTLISTS,"Rule-PortVar Parsed: %s \n",port_str);
 
     /* !ports - port lists can be mixed 80:90,!82,
     * so the old NOT flag is deprecated for port lists
@@ -655,7 +628,7 @@ bool same_headers(RuleTreeNode* rule, RuleTreeNode* rtn)
     if (rule->type != rtn->type)
         return false;
 
-    if (rule->proto != rtn->proto)
+    if (rule->snort_protocol_id != rtn->snort_protocol_id)
         return false;
 
     /* For custom rule type declarations */
@@ -703,7 +676,7 @@ static void XferHeader(RuleTreeNode* from, RuleTreeNode* to)
     to->sip = from->sip;
     to->dip = from->dip;
 
-    to->proto = from->proto;
+    to->snort_protocol_id = from->snort_protocol_id;
 
     to->src_portobject = from->src_portobject;
     to->dst_portobject = from->dst_portobject;
@@ -720,7 +693,6 @@ static void AddRuleFuncToList(
     int (* rfunc)(Packet*, RuleTreeNode*, struct RuleFpList*, int),
     RuleTreeNode* rtn)
 {
-    DebugMessage(DEBUG_CONFIGRULES,"Adding new rule to list\n");
     RuleFpList* idx = rtn->rule_func;
 
     if ( !idx )
@@ -758,7 +730,6 @@ static void AddrToFunc(RuleTreeNode* rtn, int mode)
     case SRC:
         if ((rtn->flags & ANY_SRC_IP) == 0)
         {
-            DebugMessage(DEBUG_CONFIGRULES,"CheckSrcIP -> ");
             AddRuleFuncToList(CheckSrcIP, rtn);
         }
         break;
@@ -766,7 +737,6 @@ static void AddrToFunc(RuleTreeNode* rtn, int mode)
     case DST:
         if ((rtn->flags & ANY_DST_IP) == 0)
         {
-            DebugMessage(DEBUG_CONFIGRULES,"CheckDstIP -> ");
             AddRuleFuncToList(CheckDstIP, rtn);
         }
         break;
@@ -797,12 +767,10 @@ static void PortToFunc(RuleTreeNode* rtn, int any_flag, int except_flag, int mod
         switch (mode)
         {
         case SRC:
-            DebugMessage(DEBUG_CONFIGRULES,"CheckSrcPortNotEq -> ");
             AddRuleFuncToList(CheckSrcPortNotEq, rtn);
             break;
 
         case DST:
-            DebugMessage(DEBUG_CONFIGRULES,"CheckDstPortNotEq -> ");
             AddRuleFuncToList(CheckDstPortNotEq, rtn);
             break;
         }
@@ -813,12 +781,10 @@ static void PortToFunc(RuleTreeNode* rtn, int any_flag, int except_flag, int mod
     switch (mode)
     {
     case SRC:
-        DebugMessage(DEBUG_CONFIGRULES,"CheckSrcPortEqual -> ");
         AddRuleFuncToList(CheckSrcPortEqual, rtn);
         break;
 
     case DST:
-        DebugMessage(DEBUG_CONFIGRULES,"CheckDstPortEqual -> ");
         AddRuleFuncToList(CheckDstPortEqual, rtn);
         break;
     }
@@ -828,12 +794,8 @@ static void PortToFunc(RuleTreeNode* rtn, int any_flag, int except_flag, int mod
 // functions (addrs and ports)
 static void SetupRTNFuncList(RuleTreeNode* rtn)
 {
-    DebugMessage(DEBUG_CONFIGRULES,"Initializing RTN function list!\n");
-    DebugMessage(DEBUG_CONFIGRULES,"Functions: ");
-
     if (rtn->flags & BIDIRECTIONAL)
     {
-        DebugMessage(DEBUG_CONFIGRULES,"CheckBidirectional->\n");
         AddRuleFuncToList(CheckBidirectional, rtn);
     }
     else
@@ -858,8 +820,6 @@ static void SetupRTNFuncList(RuleTreeNode* rtn)
         AddrToFunc(rtn, DST);
     }
 
-    DebugMessage(DEBUG_CONFIGRULES,"RuleListEnd\n");
-
     /* tack the end (success) function to the list */
     AddRuleFuncToList(RuleListEnd, rtn);
 }
@@ -875,7 +835,6 @@ static RuleTreeNode* ProcessHeadNode(
      * stick it at the end of the list */
     if ( !rtn )
     {
-        DebugMessage(DEBUG_CONFIGRULES,"Building New Chain head node\n");
         head_count++;
 
         rtn = (RuleTreeNode*)snort_calloc(sizeof(RuleTreeNode));
@@ -890,8 +849,6 @@ static RuleTreeNode* ProcessHeadNode(
         /* add link to parent listhead */
         rtn->listhead = list;
 
-        DebugFormat(DEBUG_CONFIGRULES,
-            "New Chain head flags = 0x%X\n", rtn->flags);
     }
     else
     {
@@ -908,7 +865,7 @@ static int mergeDuplicateOtn(
     SnortConfig* sc, OptTreeNode* otn_cur,
     OptTreeNode* otn_new, RuleTreeNode* rtn_new)
 {
-    if (otn_cur->proto != otn_new->proto)
+    if (otn_cur->snort_protocol_id != otn_new->snort_protocol_id)
     {
         ParseError("GID %u SID %u in rule duplicates previous rule, with different protocol.",
             otn_new->sigInfo.gid, otn_new->sigInfo.sid);
@@ -1054,7 +1011,7 @@ void parse_rule_type(SnortConfig* sc, const char* s, RuleTreeNode& rtn)
     memset(&rtn, 0, sizeof(rtn));
     rtn.type = get_rule_type(s);
 
-    if ( rtn.type == RULE_TYPE__NONE )
+    if ( rtn.type == Actions::NONE )
     {
         s_ignore = true;
         return;
@@ -1089,9 +1046,9 @@ void parse_rule_proto(SnortConfig* sc, const char* s, RuleTreeNode& rtn)
         // this will allow other protocols like http to have ports
         rule_proto = PROTO_BIT__TCP;
 
-    rtn.proto = sc->proto_ref->add(s);
+    rtn.snort_protocol_id = sc->proto_ref->add(s);
 
-    if ( rtn.proto <= 0 )
+    if ( rtn.snort_protocol_id == UNKNOWN_PROTOCOL_ID )
     {
         ParseError("bad protocol: %s", s);
         rule_proto = 0;
@@ -1156,7 +1113,7 @@ void parse_rule_opt_end(SnortConfig* sc, const char* key, OptTreeNode* otn)
         return;
 
     RuleOptType type = OPT_TYPE_MAX;
-    IpsManager::option_end(sc, otn, otn->proto, key, type);
+    IpsManager::option_end(sc, otn, otn->snort_protocol_id, key, type);
 
     if ( type != OPT_TYPE_META )
         otn->num_detection_opts++;
@@ -1180,10 +1137,10 @@ OptTreeNode* parse_rule_open(SnortConfig* sc, RuleTreeNode& rtn, bool stub)
     otn->state = (OtnState*)snort_calloc(ThreadConfig::get_instance_max(), sizeof(OtnState));
 
     if ( !stub )
-        otn->sigInfo.gid = GENERATOR_SNORT_ENGINE;
+        otn->sigInfo.gid = GID_DEFAULT;
 
     otn->chain_node_number = otn_count;
-    otn->proto = rtn.proto;
+    otn->snort_protocol_id = rtn.snort_protocol_id;
     otn->enabled = SnortConfig::get_default_rule_state();
 
     IpsManager::reset_options();
@@ -1216,8 +1173,6 @@ const char* parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* ot
             ParseError("SO rule %s not loaded.", otn->soid);
         else
         {
-            // FIXIT-L gid may be overwritten when set to 3 upon close
-            otn->sigInfo.gid = GENERATOR_SNORT_SHARED;
             entered = true;
             return so_opts;
         }
@@ -1247,18 +1202,9 @@ const char* parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* ot
     otn_count++;
     rule_count++;
 
-    // FIXIT-L need more reliable way of knowing type of rule instead of
-    // hard coding these gids do GIDs actually matter anymore (w/o conflict
-    // with builtins)?
-
-    if ( otn->sigInfo.gid == GENERATOR_SNORT_ENGINE )
+    if ( otn->soid )
     {
-        otn->sigInfo.text_rule = true;
-        detect_rule_count++;
-    }
-    else if ( otn->sigInfo.gid == GENERATOR_SNORT_SHARED )
-    {
-        otn->sigInfo.text_rule = true;
+        otn->sigInfo.builtin = false;
         so_rule_count++;
     }
     else if ( ModuleManager::gid_in_use(otn->sigInfo.gid) )
@@ -1267,8 +1213,17 @@ const char* parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* ot
             ParseError("%u:%u builtin rules do not support detection options",
                 otn->sigInfo.gid, otn->sigInfo.sid);
 
-        otn->sigInfo.text_rule = false;
+        otn->sigInfo.builtin = true;
         builtin_rule_count++;
+    }
+    else
+    {
+        if ( !otn->num_detection_opts )
+            ParseWarning(WARN_RULES, "%u:%u does not have any detection options",
+                otn->sigInfo.gid, otn->sigInfo.sid);
+
+        otn->sigInfo.builtin = false;
+        detect_rule_count++;
     }
 
     if ( !otn_dup )
@@ -1283,8 +1238,8 @@ const char* parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* ot
     validate_fast_pattern(otn);
     OtnLookupAdd(sc->otn_map, otn);
 
-    if ( is_service_protocol(otn->proto) )
-        add_service_to_otn(sc, otn, sc->proto_ref->get_name(otn->proto));
+    if ( is_service_protocol(otn->snort_protocol_id) )
+        add_service_to_otn(sc, otn, sc->proto_ref->get_name(otn->snort_protocol_id));
 
     /*
      * The src/dst port parsing must be done before the Head Nodes are processed, since they must
@@ -1293,7 +1248,7 @@ const char* parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* ot
      * After otn processing we can finalize port object processing for this rule
      */
     if ( FinishPortListRule(
-        sc->port_tables, new_rtn, otn, rtn.proto, sc->fast_pattern_config) )
+        sc->port_tables, new_rtn, otn, rtn.snort_protocol_id, sc->fast_pattern_config) )
         ParseError("Failed to finish a port list rule.");
 
     // Clear ips_option vars

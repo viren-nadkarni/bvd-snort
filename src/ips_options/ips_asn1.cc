@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -62,6 +62,8 @@
 
 #include "asn1_detect.h"
 #include "asn1_util.h"
+
+using namespace snort;
 
 #define BITSTRING_OPT  "bitstring_overflow"
 #define DOUBLE_OPT     "double_overflow"

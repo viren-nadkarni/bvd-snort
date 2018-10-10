@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -138,7 +138,7 @@ struct fd_session_t
    of the underlying decompression engine context. */
 #ifndef SYNC_IN
 #define SYNC_IN(dest) \
-    dest->next_in = (Bytef*)(SessionPtr->Next_In); \
+    dest->next_in = const_cast<Bytef*>(SessionPtr->Next_In); \
     (dest)->avail_in = SessionPtr->Avail_In; \
     (dest)->total_in = SessionPtr->Total_In; \
     (dest)->next_out = SessionPtr->Next_Out; \
@@ -271,7 +271,8 @@ inline bool Move_N(fd_session_t* SessionPtr, uint16_t N)
 }
 
 /* API Functions */
-
+namespace snort
+{
 /* Create a new decompression session object */
 SO_PUBLIC fd_session_t* File_Decomp_New();
 
@@ -295,5 +296,6 @@ SO_PUBLIC void File_Decomp_Free(fd_session_t*);
 
 /* Call the error alerting call-back function */
 SO_PUBLIC void File_Decomp_Alert(fd_session_t*, int Event);
+}
 #endif
 

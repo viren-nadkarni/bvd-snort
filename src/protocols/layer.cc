@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,8 @@
 
 #include "packet.h"
 
+namespace snort
+{
 namespace layer
 {
 static THREAD_LOCAL const Packet* curr_pkt;
@@ -442,4 +444,5 @@ const udp::UDPHdr* get_udp_embed_icmp(const ip::IpApi& api)
 const icmp::ICMPHdr* get_icmp_embed_icmp(const ip::IpApi& api)
 { return reinterpret_cast<const icmp::ICMPHdr*>(api.ip_data()); }
 } // namespace layer
+} // namespace snort
 

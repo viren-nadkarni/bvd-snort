@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -49,6 +49,8 @@ void set_thread_type(SThreadType);
 void set_run_num(uint16_t);
 uint16_t get_run_num();
 
+namespace snort
+{
 SO_PUBLIC unsigned get_instance_id();
 SO_PUBLIC SThreadType get_thread_type();
 SO_PUBLIC inline bool is_packet_thread()
@@ -60,6 +62,7 @@ SO_PUBLIC inline bool is_packet_thread()
 // get a packet thread specific path.  name should be the module name or
 // derived therefrom.
 SO_PUBLIC const char* get_instance_file(std::string&, const char* name);
+}
 
 void take_break();
 bool break_time();

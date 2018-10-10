@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,6 +33,7 @@
 #include "framework/counts.h"
 #include "main/thread.h"
 #include "sfip/sf_ip.h"
+#include "target_based/snort_protocols.h"
 
 //  FIXIT-M For now this emulates the Snort++ attribute table.
 //  Need to add in host_tracker.h data eventually.
@@ -54,16 +55,14 @@ struct HostApplicationEntry
 {
     Port port = 0;
     Protocol ipproto = 0;
-    Protocol protocol = 0;
-
-    static const Protocol UNKNOWN_PROTOCOL = 0;
+    SnortProtocolId snort_protocol_id = UNKNOWN_PROTOCOL_ID;
 
     HostApplicationEntry() = default;
 
-    HostApplicationEntry(Protocol ipproto_param, Port port_param, Protocol protocol_param) :
+    HostApplicationEntry(Protocol ipproto_param, Port port_param, SnortProtocolId protocol_param) :
         port(port_param),
         ipproto(ipproto_param),
-        protocol(protocol_param)
+        snort_protocol_id(protocol_param)
     {
     }
 
@@ -80,7 +79,7 @@ private:
                                       //  shared object are safe.
 
     //  FIXIT-M do we need to use a host_id instead of SfIp as in sfrna?
-    SfIp ip_addr;
+    snort::SfIp ip_addr;
 
     //  Policies to apply to this host.
     Policy stream_policy = 0;
@@ -95,13 +94,13 @@ public:
         memset(&ip_addr, 0, sizeof(ip_addr));
     }
 
-    SfIp get_ip_addr()
+    snort::SfIp get_ip_addr()
     {
         std::lock_guard<std::mutex> lck(host_tracker_lock);
         return ip_addr;
     }
 
-    void set_ip_addr(const SfIp& new_ip_addr)
+    void set_ip_addr(const snort::SfIp& new_ip_addr)
     {
         std::lock_guard<std::mutex> lck(host_tracker_lock);
         std::memcpy(&ip_addr, &new_ip_addr, sizeof(ip_addr));
@@ -166,7 +165,7 @@ public:
     //  Returns false when not found.
     bool find_service(Protocol ipproto, Port port, HostApplicationEntry& app_entry)
     {
-        HostApplicationEntry tmp_entry(ipproto, port, HostApplicationEntry::UNKNOWN_PROTOCOL);
+        HostApplicationEntry tmp_entry(ipproto, port, UNKNOWN_PROTOCOL_ID);
         host_tracker_stats.service_finds++;
 
         std::lock_guard<std::mutex> lck(host_tracker_lock);
@@ -185,7 +184,7 @@ public:
     //  Returns true if entry existed.  False otherwise.
     bool remove_service(Protocol ipproto, Port port)
     {
-        HostApplicationEntry tmp_entry(ipproto, port, HostApplicationEntry::UNKNOWN_PROTOCOL);
+        HostApplicationEntry tmp_entry(ipproto, port, UNKNOWN_PROTOCOL_ID);
         host_tracker_stats.service_removes++;
 
         std::lock_guard<std::mutex> lck(host_tracker_lock);

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,7 +26,10 @@
 
 #include "sip_parser.h"
 
+namespace snort
+{
 struct Packet;
+}
 
 #define TOTAL_RESPONSES 0
 #define RESPONSE1XX     1
@@ -54,7 +57,7 @@ struct SIP_DialogList
     uint32_t num_dialogs;
 };
 
-int SIP_updateDialog(SIPMsg* sipMsg, SIP_DialogList* dList, Packet* p, SIP_PROTO_CONF*);
+int SIP_updateDialog(SIPMsg* sipMsg, SIP_DialogList* dList, snort::Packet* p, SIP_PROTO_CONF*);
 void sip_freeDialogs(SIP_DialogList* list);
 
 #endif

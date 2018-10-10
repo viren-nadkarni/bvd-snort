@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,7 @@
 
 #include <cassert>
 
+using namespace snort;
 using namespace std;
 
 #define SIP_EVENT_EMPTY_REQUEST_URI_STR  "empty request URI"
@@ -90,7 +91,7 @@ static const Parameter s_params[] =
       "maximum via field size" },
 
     { "methods", Parameter::PT_STRING, nullptr, default_methods,
-      "list of methods to check in sip messages" },
+      "list of methods to check in SIP messages" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -133,8 +134,8 @@ static const PegInfo sip_pegs[] =
 {
     { CountType::SUM, "packets", "total packets" },
     { CountType::SUM, "sessions", "total sessions" },
-    { CountType::NOW, "concurrent_sessions", "total concurrent sip sessions" },
-    { CountType::MAX, "max_concurrent_sessions", "maximum concurrent sip sessions" },
+    { CountType::NOW, "concurrent_sessions", "total concurrent SIP sessions" },
+    { CountType::MAX, "max_concurrent_sessions", "maximum concurrent SIP sessions" },
     { CountType::SUM, "events", "events generated" },
     { CountType::SUM, "dialogs", "total dialogs" },
     { CountType::SUM, "ignored_channels", "total channels ignored" },

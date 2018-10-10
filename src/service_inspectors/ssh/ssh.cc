@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -37,6 +37,8 @@
 #include "stream/stream.h"
 
 #include "ssh_module.h"
+
+using namespace snort;
 
 THREAD_LOCAL ProfileStats sshPerfStats;
 THREAD_LOCAL SshStats sshstats;
@@ -164,8 +166,8 @@ static void snort_ssh(SSH_PROTO_CONF* config, Packet* p)
     // If we picked up mid-stream or missed any packets (midstream pick up
     // means we've already missed packets) set missed packets flag and make
     // sure we don't do any more reassembly on this session
-    if ((p->flow->get_session_flags() & SSNFLAG_MIDSTREAM)
-        || Stream::missed_packets(p->flow, SSN_DIR_BOTH))
+    if ( p->test_session_flags(SSNFLAG_MIDSTREAM)
+        || Stream::missed_packets(p->flow, SSN_DIR_BOTH) )
     {
         // Order only matters if the packets are not encrypted
         if ( !(sessp->state_flags & SSH_FLG_SESS_ENCRYPTED ))
@@ -316,7 +318,6 @@ static unsigned int ProcessSSHProtocolVersionExchange(SSH_PROTO_CONF* config, SS
     Packet* p, uint8_t direction)
 {
     const char* version_stringp = (const char*)p->data;
-    uint8_t version;
     const char* version_end;
 
     /* Get the version. */
@@ -327,11 +328,11 @@ static unsigned int ProcessSSHProtocolVersionExchange(SSH_PROTO_CONF* config, SS
             && (version_stringp[7] == '9'))
         {
             /* SSH 1.99 which is the same as SSH2.0 */
-            version = SSH_VERSION_2;
+            sessionp->version = SSH_VERSION_2;
         }
         else
         {
-            version = SSH_VERSION_1;
+            sessionp->version = SSH_VERSION_1;
         }
 
         /* CAN-2002-0159 */
@@ -352,10 +353,15 @@ static unsigned int ProcessSSHProtocolVersionExchange(SSH_PROTO_CONF* config, SS
     else if ( p->dsize >= 6 &&
         !strncasecmp(version_stringp, "SSH-2.", 6))
     {
-        version = SSH_VERSION_2;
+        sessionp->version = SSH_VERSION_2;
     }
     else
     {
+        /* unknown version */ 
+        sessionp->version =  SSH_VERSION_UNKNOWN;
+
+        DetectionEngine::queue_event(GID_SSH, SSH_EVENT_VERSION);
+        
         return 0;
     }
 
@@ -372,7 +378,6 @@ static unsigned int ProcessSSHProtocolVersionExchange(SSH_PROTO_CONF* config, SS
         break;
     }
 
-    sessionp->version = version;
     version_end = (char*)memchr(version_stringp, '\n', p->dsize);
     if (version_end)
         return ((version_end - version_stringp) + 1);
@@ -543,11 +548,6 @@ static unsigned int ProcessSSHKeyInitExchange(SSHData* sessionp, Packet* p,
     }
     else
     {
-        {
-            /* Unrecognized version. */
-            DetectionEngine::queue_event(GID_SSH, SSH_EVENT_VERSION);
-        }
-
         return 0;
     }
 
@@ -812,7 +812,7 @@ const InspectApi ssh_api =
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU,
+    PROTO_BIT__PDU,
     nullptr, // buffers
     "ssh",
     ssh_init,

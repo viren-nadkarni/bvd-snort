@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -570,4 +570,20 @@ static const ConvertMap protected_content_api =
 };
 
 const ConvertMap* protected_content_map = &protected_content_api;
+
+/*************************************************
+ *************  sidechannel ****************
+ *************************************************/
+
+// FIXIT-H: This is temporary and needs to be translated to an appropriate `side_channel = {}`
+
+static const std::string sidechannel = "sidechannel";
+static const ConvertMap sidechannel_api =
+{
+    sidechannel,
+    deleted_ctor<& sidechannel>,
+};
+
+const ConvertMap* sidechannel_map = &sidechannel_api;
+
 } // namespace config

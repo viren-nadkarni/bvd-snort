@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,13 +24,16 @@
 
 #include <string>
 
+namespace snort
+{
 struct BaseApi;
+}
 
 class LuaApi
 {
 public:
     virtual ~LuaApi() = default;
-    virtual const BaseApi* get_base() const = 0;
+    virtual const snort::BaseApi* get_base() const = 0;
 
     std::string name;
     std::string chunk;

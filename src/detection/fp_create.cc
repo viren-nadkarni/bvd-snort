@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -55,6 +55,7 @@
 #include "service_map.h"
 #include "treenodes.h"
 
+using namespace snort;
 using namespace std;
 
 static unsigned mpse_count = 0;
@@ -505,7 +506,7 @@ static int fpAddPortGroupRule(
     PatternMatchVector pmv;
 
     // skip builtin rules, continue for text and so rules
-    if ( !otn->sigInfo.text_rule )
+    if ( otn->sigInfo.builtin )
         return -1;
 
     /* Rule not enabled */
@@ -514,7 +515,9 @@ static int fpAddPortGroupRule(
 
     OptFpList* next = nullptr;
     bool only_literal = !MpseManager::is_regex_capable(fp->get_search_api());
-    pmv = get_fp_content(otn, next, srvc, only_literal);
+    bool exclude;
+
+    pmv = get_fp_content(otn, next, srvc, only_literal, exclude);
 
     if ( !pmv.empty() )
     {
@@ -539,6 +542,9 @@ static int fpAddPortGroupRule(
             return 0;
         }
     }
+
+    if ( exclude )
+        return 0;
 
     // no fast pattern added
     if (fpFinishPortGroupRule(sc, pg, otn, nullptr, fp) != 0)
@@ -644,7 +650,7 @@ static int fpCreateInitRuleMap(
     /* Process src PORT groups */
     if ( src )
     {
-        for ( GHashNode* node=ghash_findfirst(src->pt_mpxo_hash);
+        for ( GHashNode* node = ghash_findfirst(src->pt_mpxo_hash);
             node;
             node=ghash_findnext(src->pt_mpxo_hash) )
         {
@@ -924,7 +930,7 @@ static int fpCreatePortObject2PortGroup(
             otn = OtnLookup(sc->otn_map, gid, sid);
             assert(otn);
 
-            if ( is_network_protocol(otn->proto) )
+            if ( is_network_protocol(otn->snort_protocol_id) )
                 fpAddPortGroupRule(sc, pg, otn, fp, false);
         }
 
@@ -1183,7 +1189,7 @@ static void fpBuildServicePortGroupByServiceOtnList(
     s_group = srvc;
 
     /*
-     * add each rule to the port group pattern matchers,
+     * add each rule to the service group pattern matchers,
      * or to the no-content rule list
      */
     SF_LNODE* cursor;
@@ -1192,8 +1198,7 @@ static void fpBuildServicePortGroupByServiceOtnList(
         otn;
         otn = (OptTreeNode*)sflist_next(&cursor) )
     {
-        if (fpAddPortGroupRule(sc, pg, otn, fp, true) != 0)
-            continue;
+        fpAddPortGroupRule(sc, pg, otn, fp, true);
     }
 
     if (fpFinishPortGroup(sc, pg, fp) != 0)
@@ -1237,11 +1242,14 @@ static void fpBuildServicePortGroups(
             ParseError("*** failed to create and find a port group for '%s'",srvc);
             continue;
         }
-        int16_t id = sc->proto_ref->find(srvc);
-        assert(id != SFTARGET_UNKNOWN_PROTOCOL);
+        SnortProtocolId snort_protocol_id = sc->proto_ref->find(srvc);
+        assert(snort_protocol_id != UNKNOWN_PROTOCOL_ID);
+        assert((unsigned)snort_protocol_id < sopg.size());
 
-        assert((unsigned)id < sopg.size());
-        sopg[ id ] = pg;
+        if(snort_protocol_id == UNKNOWN_PROTOCOL_ID)
+            continue;
+
+        sopg[ snort_protocol_id ] = pg;
     }
 }
 
@@ -1263,11 +1271,7 @@ static void fpCreateServiceMapPortGroups(SnortConfig* sc)
         fpBuildServicePortGroups(sc, sc->spgmmTable->to_cli[i],
             sc->sopgTable->to_cli[i], sc->srmmTable->to_cli[i], fp);
     }
-    if ( !sc->sopgTable->set_user_mode() )
-    {
-        fp->set_stream_insert(true);
-        ParseWarning(WARN_RULES, "legacy mode fast pattern searching enabled");
-    }
+    sc->sopgTable->set_user_mode();
 }
 
 /*
@@ -1318,13 +1322,13 @@ static void fpPrintServiceRuleMapTable(GHash* p, const char* proto, const char* 
     }
 }
 
-static void fpPrintServiceRuleMaps(SnortConfig* sc, srmm_table_t* service_map)
+static void fpPrintServiceRuleMaps(SnortConfig* sc)
 {
     for ( int i = SNORT_PROTO_IP; i < SNORT_PROTO_MAX; ++i )
     {
         const char* s = sc->proto_ref->get_name(i);
-        fpPrintServiceRuleMapTable(service_map->to_srv[i], s, "to server");
-        fpPrintServiceRuleMapTable(service_map->to_cli[i], s, "to client");
+        fpPrintServiceRuleMapTable(sc->srmmTable->to_srv[i], s, "to server");
+        fpPrintServiceRuleMapTable(sc->srmmTable->to_cli[i], s, "to client");
     }
 }
 
@@ -1361,10 +1365,10 @@ static void fp_print_service_rules(SnortConfig* sc, GHash* cli, GHash* srv, cons
         LogMessage("%25.25s: %8u%8u\n", "total", ctot, stot);
 }
 
-static void fp_print_service_rules_by_proto(SnortConfig* sc, srmm_table_t* srmm)
+static void fp_print_service_rules_by_proto(SnortConfig* sc)
 {
     for ( int i = SNORT_PROTO_IP; i < SNORT_PROTO_MAX; ++i )
-        fp_print_service_rules(sc, srmm->to_srv[i], srmm->to_cli[i], sc->proto_ref->get_name(i));
+        fp_print_service_rules(sc, sc->srmmTable->to_srv[i], sc->srmmTable->to_cli[i], sc->proto_ref->get_name(i));
 }
 
 static void fp_sum_port_groups(PortGroup* pg, unsigned c[PM_TYPE_MAX])
@@ -1489,15 +1493,15 @@ static int fpCreateServicePortGroups(SnortConfig* sc)
     if (fpCreateServiceMaps(sc))
         return -1;
 
-    fp_print_service_rules_by_proto(sc, sc->srmmTable);
+    fp_print_service_rules_by_proto(sc);
 
     if ( fp->get_debug_print_rule_group_build_details() )
-        fpPrintServiceRuleMaps(sc, sc->srmmTable);
+        fpPrintServiceRuleMaps(sc);
 
     fpCreateServiceMapPortGroups(sc);
 
     if (fp->get_debug_print_rule_group_build_details())
-        fpPrintServicePortGroupSummary(sc, sc->spgmmTable);
+        fpPrintServicePortGroupSummary(sc);
 
     ServiceMapFree(sc->srmmTable);
     sc->srmmTable = nullptr;

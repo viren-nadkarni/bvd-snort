@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,11 +22,13 @@
 #include "config.h"
 #endif
 
+#include "framework/data_bus.h"
 #include "framework/logger.h"
 #include "framework/module.h"
 #include "log/text_log.h"
 #include "protocols/packet.h"
 
+using namespace snort;
 using namespace std;
 
 #define S_NAME "log_hext"
@@ -36,6 +38,66 @@ static const char* s_help = "output payload suitable for daq hext";
 
 static THREAD_LOCAL TextLog* hext_log = nullptr;
 static THREAD_LOCAL unsigned s_pkt_num = 0;
+
+
+class DaqMetaEventHandler : public DataHandler
+{
+public:
+    DaqMetaEventHandler() = default;
+    void handle(DataEvent&, Flow*) override;
+};
+
+void DaqMetaEventHandler::handle(DataEvent& event, Flow*)
+{
+    if (!hext_log) return;
+
+    DaqMetaEvent* ev = (DaqMetaEvent*)&event;
+
+    const char* cmd;
+    switch (ev->get_type()) {
+        case DAQ_METAHDR_TYPE_SOF: cmd = "sof"; break;
+        case DAQ_METAHDR_TYPE_EOF: cmd = "eof"; break;
+        default: return;
+    }
+
+    const Flow_Stats_t* fs = (const Flow_Stats_t*)ev->get_data();
+
+    SfIp src, dst;
+    char shost[INET6_ADDRSTRLEN];
+    char dhost[INET6_ADDRSTRLEN];
+
+    src.set(fs->initiatorIp);
+    dst.set(fs->responderIp);
+
+    src.ntop(shost, sizeof(shost));
+    dst.ntop(dhost, sizeof(dhost));
+
+    int vlan_tag = fs->vlan_tag == 0xfff ?  0 : fs->vlan_tag;
+
+    TextLog_Print(hext_log,
+        "\n$%s %d %d %d %d %s %d %s %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+        cmd,
+        fs->ingressZone,
+        fs->egressZone,
+        fs->ingressIntf,
+        fs->egressIntf,
+        shost, ntohs(fs->initiatorPort),
+        dhost, ntohs(fs->responderPort),
+        fs->opaque,
+        fs->initiatorPkts,
+        fs->responderPkts,
+        fs->initiatorPktsDropped,
+        fs->responderPktsDropped,
+        fs->initiatorBytesDropped,
+        fs->responderBytesDropped,
+        fs->isQoSAppliedOnSrcIntf,
+        fs->sof_timestamp.tv_sec,
+        fs->eof_timestamp.tv_sec,
+        vlan_tag,
+        fs->address_space_id,
+        fs->protocol);
+}
+
 
 //-------------------------------------------------------------------------
 // impl stuff
@@ -189,6 +251,7 @@ HextLogger::HextLogger(HextModule* m)
     limit = m->limit;
     width = m->width;
     raw = m->raw;
+    DataBus::subscribe(DAQ_META_EVENT, new DaqMetaEventHandler());
 }
 
 void HextLogger::open()

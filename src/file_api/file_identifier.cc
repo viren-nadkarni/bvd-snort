@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -39,6 +39,8 @@
 #include "catch/snort_catch.h"
 #endif
 
+using namespace snort;
+
 struct MergeNode
 {
     IdentifierNode* shared_node;  /*the node that is shared*/
@@ -66,7 +68,7 @@ void FileMagicRule::clear()
 
 void FileIdentifier::init_merge_hash()
 {
-    identifier_merge_hash = ghash_new(1000, sizeof(MergeNode), 0, nullptr);
+    identifier_merge_hash = snort::ghash_new(1000, sizeof(MergeNode), 0, nullptr);
     assert(identifier_merge_hash);
 }
 
@@ -290,9 +292,9 @@ void FileIdentifier::insert_file_rule(FileMagicRule& rule)
         init_merge_hash();
     }
 
-    if (rule.id > FILE_ID_MAX)
+    if (rule.id >= FILE_ID_MAX)
     {
-        ParseError("file type: rule id %u larger than %d", rule.id, FILE_ID_MAX);
+        ParseError("file type: rule id %u exceeds max id of %d", rule.id, FILE_ID_MAX-1);
         return;
     }
 
@@ -369,6 +371,23 @@ FileMagicRule* FileIdentifier::get_rule_from_id(uint32_t id)
     }
     else
         return nullptr;
+}
+
+void FileIdentifier::get_magic_rule_ids_from_type(const std::string& type,
+    const std::string& version, snort::FileTypeBitSet& ids_set)
+{
+    ids_set.reset();
+
+    for (uint32_t i = 0; i < FILE_ID_MAX; i++)
+    {
+        if (type == file_magic_rules[i].type)
+        {
+            if (version.empty() or version == file_magic_rules[i].version)
+            {
+                ids_set.set(file_magic_rules[i].id);
+            }
+        }
+    }
 }
 
 //--------------------------------------------------------------------------

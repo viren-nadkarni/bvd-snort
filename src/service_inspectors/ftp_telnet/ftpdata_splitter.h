@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,30 +23,33 @@
 #include "stream/flush_bucket.h"
 #include "stream/stream_splitter.h"
 
+namespace snort
+{
 class Flow;
+}
 
 //---------------------------------------------------------------------------------
 // FtpDataSplitter - flush when current seg size is different from previous segment
 //---------------------------------------------------------------------------------
-class FtpDataSplitter : public StreamSplitter
+class FtpDataSplitter : public snort::StreamSplitter
 {
 public:
-    FtpDataSplitter(bool b, uint16_t sz = 0) : StreamSplitter(b)
+    FtpDataSplitter(bool b, uint16_t sz = 0) : snort::StreamSplitter(b)
     {
         min = sz + get_flush_bucket_size();
         restart_scan();
-        last_seg_size = 1448;  // FIXIT-H base this off mss or snaplen
+        expected_seg_size = 0;
     }
 
 
-    Status scan(Flow*, const uint8_t*, uint32_t len, uint32_t flags, uint32_t* fp ) override;
-    bool finish(Flow*) override;
+    Status scan(snort::Flow*, const uint8_t*, uint32_t len, uint32_t flags, uint32_t* fp ) override;
+    bool finish(snort::Flow*) override;
 
 private:
     uint16_t min;
     uint16_t segs;
     uint16_t bytes;
-    uint16_t last_seg_size;
+    uint16_t expected_seg_size;
 
     void restart_scan();
 };

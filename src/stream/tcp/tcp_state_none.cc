@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,8 +25,10 @@
 
 #include "tcp_state_none.h"
 
-#include "tcp_normalizer.h"
+#include "tcp_normalizers.h"
 #include "tcp_session.h"
+
+using namespace snort;
 
 TcpStateNone::TcpStateNone(TcpStateMachine& tsm) :
     TcpStateHandler(TcpStreamTracker::TCP_STATE_NONE, tsm)
@@ -60,7 +62,7 @@ bool TcpStateNone::syn_ack_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk
         flow->session_state |= ( STREAM_STATE_SYN | STREAM_STATE_SYN_ACK );
         trk.init_on_synack_sent(tsd);
         trk.session->init_new_tcp_session(tsd);
-        trk.normalizer->ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
+        trk.normalizer.ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs());
     }
     else if ( trk.session->config->require_3whs() )
     {
@@ -75,7 +77,7 @@ bool TcpStateNone::syn_ack_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk
     if ( trk.session->config->midstream_allowed(tsd.get_pkt() ) )
     {
         trk.init_on_synack_recv(tsd);
-        trk.normalizer->ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
+        trk.normalizer.ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs());
         if ( tsd.get_seg_len() > 0 )
             trk.session->handle_data_segment(tsd);
     }
@@ -120,7 +122,8 @@ bool TcpStateNone::ack_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
         if ( !tsd.get_tcph()->is_rst() && ( flow->session_state & STREAM_STATE_SYN_ACK ) )
         {
             trk.init_on_3whs_ack_recv(tsd);
-            trk.normalizer->ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
+            trk.normalizer.ecn_tracker(
+                tsd.get_tcph(), trk.session->config->require_3whs());
         }
     }
     else if ( trk.session->config->require_3whs() )
@@ -164,7 +167,7 @@ bool TcpStateNone::data_seg_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& tr
         flow->set_session_flags(SSNFLAG_MIDSTREAM);
 
         trk.init_on_data_seg_recv(tsd);
-        trk.normalizer->ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
+        trk.normalizer.ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs());
         trk.session->handle_data_segment(tsd);
     }
     else if ( trk.session->config->require_3whs() )
@@ -241,8 +244,9 @@ TEST_CASE("TCP State None", "[tcp_none_state][stream_tcp]")
     TcpSession* session = new TcpSession(flow);
     TcpStateMachine* tsm =  new TcpStateMachine;
     TcpStateHandler* tsh = new TcpStateNone(*tsm, *session);
-    ctrk->normalizer = TcpNormalizerFactory::create(session, StreamPolicy::OS_LINUX, ctrk, strk);
-    strk->normalizer = TcpNormalizerFactory::create(session, StreamPolicy::OS_LINUX, strk, ctrk);
+
+    ctrk->normalizer = TcpNormalizerFactory::create(StreamPolicy::OS_LINUX, session, ctrk, strk);
+    strk->normalizer = TcpNormalizerFactory::create(StreamPolicy::OS_LINUX, session, strk, ctrk);
     ctrk->reassembler = TcpReassemblerFactory::create(session, ctrk, StreamPolicy::OS_LINUX,
         false);
     strk->reassembler = TcpReassemblerFactory::create(session, strk, StreamPolicy::OS_LINUX, true);

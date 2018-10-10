@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,8 @@
 
 #include "pp_flow_iface.h"
 #include "pp_raw_buffer_iface.h"
+
+using namespace snort;
 
 template<typename From, typename To>
 static inline void stack_push(lua_State* L, const From v)

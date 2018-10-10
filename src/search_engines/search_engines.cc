@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,29 +24,28 @@
 
 #include "managers/plugin_manager.h"
 
-struct BaseApi;
-extern const BaseApi* se_ac_bnfa[];
+using namespace snort;
 
-#ifdef HAVE_HYPERSCAN
-extern const BaseApi* se_hyperscan[];
-#endif
+extern const BaseApi* se_ac_bnfa[];
 
 #ifdef STATIC_SEARCH_ENGINES
 extern const BaseApi* se_ac_std[];
 extern const BaseApi* se_acsmx2[];
+#ifdef HAVE_HYPERSCAN
+extern const BaseApi* se_hyperscan[];
+#endif
 #endif
 
 void load_search_engines()
 {
     PluginManager::load_plugins(se_ac_bnfa);
 
-#ifdef HAVE_HYPERSCAN
-    PluginManager::load_plugins(se_hyperscan);
-#endif
-
 #ifdef STATIC_SEARCH_ENGINES
     PluginManager::load_plugins(se_ac_std);
     PluginManager::load_plugins(se_acsmx2);
+#ifdef HAVE_HYPERSCAN
+    PluginManager::load_plugins(se_hyperscan);
+#endif
 #endif
 }
 

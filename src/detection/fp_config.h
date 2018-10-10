@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,6 +24,11 @@
 
 #ifndef FP_CONFIG_H
 #define FP_CONFIG_H
+
+namespace snort
+{
+    struct MpseApi;
+}
 
 // this is a basically a factory for creating MPSE
 
@@ -122,7 +127,7 @@ public:
 
     void set_max_pattern_len(unsigned);
 
-    const struct MpseApi* get_search_api()
+    const snort::MpseApi* get_search_api()
     { return search_api; }
 
     bool get_trim()
@@ -143,9 +148,9 @@ public:
     { return max_pattern_len; }
 
 private:
-    const struct MpseApi* search_api;
+    const snort::MpseApi* search_api;
 
-    bool inspect_stream_insert = false;
+    bool inspect_stream_insert = true;
     bool trim;
     bool split_any_any = false;
     bool debug_print_fast_pattern = false;

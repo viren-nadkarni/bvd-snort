@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,6 +29,8 @@
 #include "main/snort_types.h"
 #include "protocols/protocol_ids.h"
 
+namespace snort
+{
 struct Packet;
 struct SnortConfig;
 struct SfIp;
@@ -65,7 +67,7 @@ public:
 
     SO_PUBLIC int query_flow(const DAQ_PktHdr_t*, DAQ_QueryFlow_t*);
     SO_PUBLIC int modify_flow_opaque(const DAQ_PktHdr_t*, uint32_t opaque);
-    int modify_flow_pkt_trace(const DAQ_PktHdr_t*, DAQ_Verdict,
+    int modify_flow_pkt_trace(const DAQ_PktHdr_t*, uint8_t verdict_reason,
         uint8_t* buff, uint32_t buff_len);
     int add_expected(const Packet* ctrlPkt, const SfIp* cliIP, uint16_t cliPort,
             const SfIp* srvIP, uint16_t srvPort, IpProtocol, unsigned timeout_ms,
@@ -76,7 +78,6 @@ private:
     void get_tunnel_capabilities();
     bool set_filter(const char*);
     std::string interface_spec;
-    DAQ_Meta_Func_t daq_meta_callback;
     void* daq_hand;
     int daq_dlt;
     int s_error;
@@ -119,6 +120,6 @@ public:
     static bool forwarding_packet(const DAQ_PktHdr_t*);
     static bool break_loop(int error);
 };
-
+}
 #endif
 

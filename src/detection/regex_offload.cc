@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,12 +34,14 @@
 #include <thread>
 
 #include "main/snort_config.h"
+#include "latency/packet_latency.h"
+#include "latency/rule_latency.h"
 #include "fp_detect.h"
 #include "ips_context.h"
 
 struct RegexRequest
 {
-    Packet* packet = nullptr;
+    snort::Packet* packet = nullptr;
 
     std::thread* thread;
     std::mutex mutex;
@@ -107,14 +109,22 @@ void RegexOffload::worker(RegexRequest* req)
         assert(req->packet);
         assert(req->packet->flow->is_offloaded());
 
-        SnortConfig::set_conf(req->packet->context->conf);  // FIXIT-H reload issue
+        snort::SnortConfig::set_conf(req->packet->context->conf);  // FIXIT-H reload issue
         fp_offload(req->packet);
 
         req->offload = false;
     }
+    tterm();
 }
 
-void RegexOffload::put(unsigned id, Packet* p)
+void RegexOffload::tterm()
+{
+    // FIXIT-M break this over-coupling. In reality we shouldn't be evaluating latency in offload.
+    PacketLatency::tterm();
+    RuleLatency::tterm();
+}
+
+void RegexOffload::put(unsigned id, snort::Packet* p)
 {
     assert(p);
     assert(!idle.empty());
@@ -136,7 +146,9 @@ void RegexOffload::put(unsigned id, Packet* p)
 bool RegexOffload::get(unsigned& id)
 {
     assert(!busy.empty());
-    RegexRequest* req = busy.front();  // FIXIT-H onload any order
+
+    // FIXIT-H onload flows in any order
+    RegexRequest* req = busy.front();
 
     if ( req->offload )
         return false;
@@ -150,7 +162,7 @@ bool RegexOffload::get(unsigned& id)
     return true;
 }
 
-bool RegexOffload::on_hold(Flow* f)
+bool RegexOffload::on_hold(snort::Flow* f)
 {
     for ( auto* req : busy )
     {

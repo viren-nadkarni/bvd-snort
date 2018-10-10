@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,6 +28,8 @@
 
 #include "log/messages.h"
 #include "file_api/file_service.h"
+
+using namespace snort;
 
 void DecodeConfig::set_ignore_data(bool ignored)
 {
@@ -92,7 +94,7 @@ bool DecodeConfig::is_decoding_enabled()
 // update file depth and max_depth etc
 void DecodeConfig::sync_all_depths()
 {
-    file_depth = FileService::get_max_file_depth();
+    file_depth = snort::FileService::get_max_file_depth();
     if ((file_depth >= 0)or (b64_depth >= 0) or (qp_depth >= 0)
         or (bitenc_depth >= 0) or (uu_depth >= 0))
         decode_enabled = true;

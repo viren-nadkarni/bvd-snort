@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,8 @@
 #include "profiler/profiler.h"
 
 #include "dce_common.h"
+
+using namespace snort;
 
 #define s_name "dce_stub_data"
 #define s_help \
@@ -76,14 +78,15 @@ IpsOption::EvalStatus Dce2StubDataOption::eval(Cursor& c, Packet* p)
         return NO_MATCH;
     }
 
-    DCE2_SsnData* sd = get_dce2_session_data(p);
-
-    if ((sd == nullptr) || DCE2_SsnNoInspect(sd))
+    if (DceContextData::is_noinspect(p))
     {
         return NO_MATCH;
     }
 
-    DCE2_Roptions* ropts = &sd->ropts;
+    DCE2_Roptions* ropts = DceContextData::get_current_ropts(p);
+
+    if ( !ropts )
+        return NO_MATCH;
 
     if (ropts->stub_data != nullptr)
     {

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,8 @@
 #include "decode_bit.h"
 #include "decode_qp.h"
 #include "decode_uu.h"
+
+using namespace snort;
 
 void MimeDecode::reset_decoded_bytes()
 {
@@ -131,7 +133,7 @@ DecodeType MimeDecode::get_decode_type()
     return decode_type;
 }
 
-MimeDecode::MimeDecode(DecodeConfig* conf)
+MimeDecode::MimeDecode(snort::DecodeConfig* conf)
 {
     config = conf;
 }

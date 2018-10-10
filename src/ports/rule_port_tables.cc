@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -39,7 +39,7 @@ PortProto::PortProto()
     nfp = PortObjectNew();
 
     if ( !src or !dst or !any or !nfp )
-        ParseAbort("can't allocate port structs");
+        snort::ParseAbort("can't allocate port structs");
 
    // someday these could be read from snort.conf, something like...
    // 'config portlist: large-rule-count <val>'
@@ -70,7 +70,7 @@ RulePortTables* PortTablesNew()
     RulePortTables* rpt = new RulePortTables;
 
     if ( !(rpt->svc_any = PortObjectNew()) )
-        ParseAbort("ParseRulesFile udp any-any PortObjectNew() failed");
+        snort::ParseAbort("ParseRulesFile udp any-any PortObjectNew() failed");
 
     PortObjectAddPortAny(rpt->svc_any);
 

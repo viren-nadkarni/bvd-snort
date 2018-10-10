@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,10 @@
 
 #include <cstdint>
 
+namespace snort
+{
+namespace tcp
+{
 // these are bits in th_flags:
 #define TH_FIN  0x01
 #define TH_SYN  0x02
@@ -61,8 +65,6 @@
 
 #define GET_PKT_SEQ(p) (ntohl((p)->ptrs.tcph->th_seq))
 
-namespace tcp
-{
 constexpr uint8_t TCP_MIN_HEADER_LEN = 20; // this is actually the minimal TCP header length
 constexpr int OPT_TRUNC = -1;
 constexpr int OPT_BADLEN = -2;
@@ -119,7 +121,6 @@ struct TCPHdr
     inline bool is_syn() const
     { return (th_flags & TH_SYN); }
 
-    // FIXIT-L should other flags (e.g. RST, FIN) be included in check for syn only?
     inline bool is_syn_only() const
     { return (th_flags & (TH_SYN | TH_ACK)) == TH_SYN; }
 
@@ -174,6 +175,7 @@ struct TCPHdr
     { th_urp = new_urp; }
 };
 }  // namespace tcp
+}  // namespace snort
 
 #endif
 

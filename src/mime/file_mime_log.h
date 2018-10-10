@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -41,7 +41,10 @@ struct MailLogConfig
     uint32_t email_hdrs_log_depth = 0;
 };
 
+namespace snort
+{
 class Flow;
+}
 
 class MailLogState
 {
@@ -51,7 +54,7 @@ public:
 
     /* accumulate MIME attachment filenames. The filenames are appended by commas */
     int log_file_name(const uint8_t* start, int length, bool* disp_cont);
-    void set_file_name_from_log(Flow*);
+    void set_file_name_from_log(snort::Flow*);
 
     int log_email_hdrs(const uint8_t* start, int length);
     int log_email_id (const uint8_t* start, int length, EmailUserType);

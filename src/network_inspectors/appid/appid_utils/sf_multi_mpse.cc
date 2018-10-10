@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -41,7 +41,7 @@ struct tPatternList
 /*Root node */
 struct tPatternRootNode
 {
-    SearchTool* patternTree;
+    snort::SearchTool* patternTree;
     tPatternList* patternList;
     tPatternList* lastPattern;
     unsigned int level;        /*some searches may be specific to levels. Increments from 1 at top
@@ -180,11 +180,11 @@ static int compareAppUrlPatterns(const void* p1, const void* p2)
 static int createTreesRecusively(void* root)
 {
     tPatternRootNode* rootNode = (tPatternRootNode*)root;
-    SearchTool* patternMatcher;
+    snort::SearchTool* patternMatcher;
     tPatternList* patternNode;
 
     /* set up the MPSE for url patterns */
-    if (!(patternMatcher = rootNode->patternTree = new SearchTool("ac_full", true)))
+    if (!(patternMatcher = rootNode->patternTree = new snort::SearchTool("ac_full", true)))
         return -1;
 
     for (patternNode = rootNode->patternList;

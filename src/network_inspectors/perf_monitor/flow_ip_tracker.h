@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,6 +22,7 @@
 #define FLOW_IP_TRACKER_H
 
 #include "perf_tracker.h"
+
 #include "hash/xhash.h"
 
 enum FlowState
@@ -51,9 +52,9 @@ struct TrafficStats
 struct FlowStateValue
 {
     TrafficStats traffic_stats[SFS_TYPE_MAX];
-    uint64_t total_packets;
-    uint64_t total_bytes;
-    uint32_t state_changes[SFS_STATE_MAX];
+    PegCount total_packets;
+    PegCount total_bytes;
+    PegCount state_changes[SFS_STATE_MAX];
 };
 
 class FlowIPTracker : public PerfTracker
@@ -63,21 +64,19 @@ public:
     ~FlowIPTracker() override;
 
     void reset() override;
-    void update(Packet*) override;
+    void update(snort::Packet*) override;
     void process(bool) override;
 
-    int update_state(const SfIp* src_addr, const SfIp* dst_addr, FlowState);
+    int update_state(const snort::SfIp* src_addr, const snort::SfIp* dst_addr, FlowState);
 
 private:
     FlowStateValue stats;
-    XHash* ip_map;
+    snort::XHash* ip_map;
     char ip_a[41], ip_b[41];
 
-    FlowStateValue* find_stats(const SfIp* src_addr, const SfIp* dst_addr, int* swapped);
+    FlowStateValue* find_stats(const snort::SfIp* src_addr, const snort::SfIp* dst_addr, int* swapped);
     void write_stats();
     void display_stats();
 };
-
-extern THREAD_LOCAL FlowIPTracker* perf_flow_ip;
 #endif
 

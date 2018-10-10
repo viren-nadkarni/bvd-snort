@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -58,13 +58,12 @@ extern "C" {
 #include "log/messages.h"
 #include "main/build.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "packet_io/sfdaq.h"
 #include "protocols/packet.h"   // For NUM_IP_PROTOS
 
 #include "util_cstring.h"
 
-char** protocol_names = nullptr;
+using namespace snort;
 
 /****************************************************************************
  * Store interesting data in memory that would not otherwise be visible
@@ -111,7 +110,7 @@ int DisplayBanner()
         VERSION, BUILD, info);
     LogMessage("   ''''    By Martin Roesch & The Snort Team\n");
     LogMessage("           http://snort.org/contact#team\n");
-    LogMessage("           Copyright (C) 2014-2017 Cisco and/or its affiliates."
+    LogMessage("           Copyright (C) 2014-2018 Cisco and/or its affiliates."
                            " All rights reserved.\n");
     LogMessage("           Copyright (C) 1998-2013 Sourcefire, Inc., et al.\n");
     LogMessage("           Using DAQ version %s\n", daq_version_string());
@@ -495,28 +494,6 @@ std::string read_infile(const char* key, const char* fname)
     return line;
 }
 
-char* snort_strndup(const char* src, size_t dst_size)
-{
-    char* dup = (char*)snort_calloc(dst_size + 1);
-
-    if ( SnortStrncpy(dup, src, dst_size + 1) == SNORT_STRNCPY_ERROR )
-    {
-        snort_free(dup);
-        return nullptr;
-    }
-
-    return dup;
-}
-
-char* snort_strdup(const char* str)
-{
-    assert(str);
-    size_t n = strlen(str) + 1;
-    char* p = (char*)snort_alloc(n);
-    memcpy(p, str, n);
-    return p;
-}
-
 typedef char PathBuf[PATH_MAX+1];
 
 static const char* CurrentWorkingDir(PathBuf& buf)
@@ -553,7 +530,6 @@ bool EnterChroot(std::string& root_dir, std::string& log_dir)
         return false;
     }
     PathBuf pwd;
-    DebugFormat(DEBUG_INIT, "EnterChroot: %s\n", CurrentWorkingDir(pwd));
     PathBuf abs_log_dir;
 
     if ( !GetAbsolutePath(log_dir.c_str(), abs_log_dir) )
@@ -575,7 +551,6 @@ bool EnterChroot(std::string& root_dir, std::string& log_dir)
         return false;
     }
     size_t abs_root_dir_len = strlen(abs_root_dir);
-    DebugFormat(DEBUG_INIT, "ABS: %s %zu\n", abs_root_dir, abs_root_dir_len);
 
     if (strncmp(abs_root_dir, abs_log_dir, abs_root_dir_len))
     {
@@ -590,8 +565,6 @@ bool EnterChroot(std::string& root_dir, std::string& log_dir)
         return false;
     }
 
-    DebugFormat(DEBUG_INIT,"chroot success (%s ->", abs_root_dir);
-    DebugFormat(DEBUG_INIT,"%s)\n ", CurrentWorkingDir(pwd));
 
     /* Immediately change to the root directory of the jail. */
     if (chdir("/") < 0)
@@ -601,14 +574,12 @@ bool EnterChroot(std::string& root_dir, std::string& log_dir)
         return false;
     }
 
-    DebugFormat(DEBUG_INIT,"chdir success (%s)\n", CurrentWorkingDir(pwd));
 
     if (abs_root_dir_len >= strlen(abs_log_dir))
         log_dir = "/";
     else
         log_dir = abs_log_dir + abs_root_dir_len;
 
-    DebugFormat(DEBUG_INIT,"new logdir from %s to %s\n", abs_log_dir, log_dir.c_str());
 
     LogMessage("Chroot directory = %s\n", root_dir.c_str());
 
@@ -626,16 +597,44 @@ void SetNoCores()
 }
 #endif
 
+namespace snort
+{
+char** protocol_names = nullptr;
+
 const char* get_error(int errnum)
 {
     static THREAD_LOCAL char buf[128];
 
-#if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE < 200112L && \
-        defined(_XOPEN_SOURCE) && _XOPEN_SOURCE < 600) || _GNU_SOURCE
+#if defined(HAVE_GNU_STRERROR_R)
     return strerror_r(errnum, buf, sizeof(buf));
 #else
     (void)strerror_r(errnum, buf, sizeof(buf));
     return buf;
 #endif
 }
+
+char* snort_strndup(const char* src, size_t dst_size)
+{
+    char* dup = (char*)snort_calloc(dst_size + 1);
+
+    if ( SnortStrncpy(dup, src, dst_size + 1) == SNORT_STRNCPY_ERROR )
+    {
+        snort_free(dup);
+        return nullptr;
+    }
+
+    return dup;
+}
+
+char* snort_strdup(const char* str)
+{
+    assert(str);
+    size_t n = strlen(str) + 1;
+    char* p = (char*)snort_alloc(n);
+    memcpy(p, str, n);
+    return p;
+}
+
+}
+
 

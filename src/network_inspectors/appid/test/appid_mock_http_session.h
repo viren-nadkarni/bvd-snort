@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,32 +21,29 @@
 #ifndef APPID_MOCK_HTTP_SESSION_H
 #define APPID_MOCK_HTTP_SESSION_H
 
-AppIdHttpSession::AppIdHttpSession(AppIdSession* session) : asd(session) { }
-AppIdHttpSession::~AppIdHttpSession()
-{
-    snort_free(body);
-    snort_free(content_type);
-    snort_free(cookie);
-    snort_free(host);
-    snort_free(location);
-    snort_free(referer);
-    snort_free(req_body);
-    snort_free(response_code);
-    snort_free(server);
-    snort_free(uri);
-    snort_free(url);
-    snort_free(useragent);
-    snort_free(via);
-    snort_free(x_working_with);
-    delete xffAddr;
+#include <string>
 
-    if (new_field_contents)
-        for ( unsigned i = 0; i < NUMBER_OF_PTYPES; i++)
-            if (nullptr != new_field[i])
-                snort_free(new_field[i]);
+typedef AppIdHttpSession::pair_t pair_t;
+
+AppIdHttpSession::AppIdHttpSession(AppIdSession& session)
+    : asd(session)
+{
+    for ( int i = 0; i < NUM_METADATA_FIELDS; i++)
+        meta_data[i] = nullptr;
 }
 
-int AppIdHttpSession::process_http_packet(int) { return 0; }
+AppIdHttpSession::~AppIdHttpSession()
+{
+    delete xff_addr;
+
+    for ( int i = 0; i < NUM_METADATA_FIELDS; i++)
+    {
+        if ( meta_data[i] )
+            delete meta_data[i];
+    }
+}
+
+int AppIdHttpSession::process_http_packet(AppidSessionDirection, AppidChangeBits&) { return 0; }
 
 char const* APPID_UT_XFF_IP_ADDR = "192.168.0.1";
 char const* CONTENT_TYPE = "html/text";
@@ -68,47 +65,65 @@ char const* RSP_BODY = "this is the body of the http response";
 #define URI_OFFSET 22
 #define COOKIE_OFFSET 44
 
-void init_hsession_new_fields(AppIdHttpSession* hsession)
+void AppIdHttpSession::update_url(AppidChangeBits&)
 {
-    hsession->new_field_contents = true;
-    hsession->new_field[REQ_AGENT_FID] = snort_strdup(USERAGENT);
-    hsession->new_field[REQ_HOST_FID] = snort_strdup(HOST);
-    hsession->new_field[REQ_REFERER_FID] = snort_strdup(REFERER);
-    hsession->new_field[REQ_URI_FID] = snort_strdup(URI);
-    hsession->new_field[REQ_COOKIE_FID] = snort_strdup(NEW_COOKIE);
-    hsession->new_field[REQ_BODY_FID] = snort_strdup(REQ_BODY);
-    hsession->new_field[RSP_CONTENT_TYPE_FID] = snort_strdup(CONTENT_TYPE);
-    hsession->new_field[RSP_LOCATION_FID] = snort_strdup(LOCATION);
-    hsession->new_field[RSP_BODY_FID] = snort_strdup(RSP_BODY);
+    const std::string* host = meta_data[REQ_HOST_FID];
+    const std::string* uri = meta_data[REQ_URI_FID];
+    if (host and uri)
+    {
+        if (meta_data[MISC_URL_FID])
+            delete meta_data[MISC_URL_FID];
+        meta_data[MISC_URL_FID] = new std::string(std::string("http://") + *host + *uri);
+    }
 }
 
-AppIdHttpSession* init_http_session(AppIdSession* asd)
+class MockAppIdHttpSession : public AppIdHttpSession
 {
-    AppIdHttpSession* hsession = new AppIdHttpSession(asd);
-    SfIp* ip = new SfIp;
-    ip->pton(AF_INET, APPID_UT_XFF_IP_ADDR);
-    hsession->xffAddr = ip;
-    hsession->content_type = snort_strdup(CONTENT_TYPE);
-    hsession->cookie = snort_strdup(COOKIE);
-    hsession->host = snort_strdup(HOST);
-    hsession->location = snort_strdup(LOCATION);
-    hsession->referer = snort_strdup(REFERER);
-    hsession->response_code = snort_strdup(RESPONSE_CODE);
-    hsession->server = snort_strdup(SERVER);
-    hsession->url = snort_strdup(URL);
-    hsession->uri = snort_strdup(URI);
-    hsession->useragent = snort_strdup(USERAGENT);
-    hsession->via = snort_strdup(VIA);
-    hsession->x_working_with = snort_strdup(X_WORKING_WITH);
-    hsession->body = snort_strdup(RSP_BODY);
-    hsession->req_body = snort_strdup(REQ_BODY);
-    hsession->fieldOffset[REQ_URI_FID] = URI_OFFSET;
-    hsession->fieldEndOffset[REQ_URI_FID] = URI_OFFSET + strlen(URI);
-    hsession->fieldOffset[REQ_COOKIE_FID] = COOKIE_OFFSET;
-    hsession->fieldEndOffset[REQ_COOKIE_FID] = COOKIE_OFFSET + strlen(NEW_COOKIE);
+public:
+    MockAppIdHttpSession(AppIdSession& asd)
+        : AppIdHttpSession(asd)
+    {
+        SfIp* ip = new SfIp;
+        ip->pton(AF_INET, APPID_UT_XFF_IP_ADDR);
+        xff_addr = ip;
 
-    return hsession;
-}
+        meta_data[REQ_AGENT_FID] = new std::string(USERAGENT);
+        meta_data[REQ_HOST_FID] = new std::string(HOST);
+        meta_data[REQ_REFERER_FID] = new std::string(REFERER);
+        meta_data[REQ_URI_FID] = new std::string(URI);
+        meta_data[REQ_COOKIE_FID] = new std::string(COOKIE);
+        meta_data[REQ_BODY_FID] = new std::string(REQ_BODY);
+        meta_data[RSP_CONTENT_TYPE_FID] = new std::string(CONTENT_TYPE);
+        meta_data[RSP_LOCATION_FID] = new std::string(LOCATION);
+        meta_data[RSP_BODY_FID] = new std::string(RSP_BODY);
+        meta_data[MISC_VIA_FID] = new std::string(VIA);
+        meta_data[MISC_RESP_CODE_FID] = new std::string(RESPONSE_CODE);
+        meta_data[MISC_SERVER_FID] = new std::string(SERVER);
+        meta_data[MISC_XWW_FID] = new std::string(X_WORKING_WITH);
+        meta_data[MISC_URL_FID] = new std::string(URL);
+
+        meta_offset[REQ_URI_FID].first = URI_OFFSET;
+        meta_offset[REQ_URI_FID].second = URI_OFFSET + strlen(URI);
+        meta_offset[REQ_COOKIE_FID].first = COOKIE_OFFSET;
+        meta_offset[REQ_COOKIE_FID].second = COOKIE_OFFSET + strlen(NEW_COOKIE);
+    }
+
+    void reset()
+    {
+        for ( int i = 0; i < NUM_METADATA_FIELDS; i++)
+        {
+            delete meta_data[i];
+            meta_data[i] = nullptr;
+        }
+    }
+
+    static AppIdHttpSession* init_http_session(AppIdSession& asd)
+    {
+        AppIdHttpSession* hsession = new MockAppIdHttpSession(asd);
+
+        return hsession;
+    }
+};
 
 #endif
 

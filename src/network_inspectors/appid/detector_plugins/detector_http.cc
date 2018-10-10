@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -37,7 +37,7 @@ static const char HTTP2_PREFACE[] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 #define HTTP2_PREFACE_LEN (sizeof(HTTP2_PREFACE) - 1)
 #define HTTP2_PREFACE_MAXPOS (sizeof(HTTP2_PREFACE)-2)
 
-static THREAD_LOCAL HttpServiceDetector* http_service_detector;
+static HttpServiceDetector* http_service_detector;
 
 HttpClientDetector::HttpClientDetector(ClientDiscovery* cdm)
 {
@@ -62,13 +62,14 @@ HttpClientDetector::HttpClientDetector(ClientDiscovery* cdm)
 
 int HttpClientDetector::validate(AppIdDiscoveryArgs& args)
 {
-    add_app(args.asd, APP_ID_HTTP, APP_ID_HTTP + GENERIC_APP_OFFSET, nullptr);
-    args.asd->client_disco_state = APPID_DISCO_STATE_FINISHED;
-    http_service_detector->add_service(args.asd, args.pkt, args.dir, APP_ID_HTTP);
-    args.asd->service_disco_state = APPID_DISCO_STATE_FINISHED;
-    args.asd->set_session_flags(APPID_SESSION_CLIENT_DETECTED | APPID_SESSION_SERVICE_DETECTED);
-    args.asd->clear_session_flags(APPID_SESSION_CONTINUE);
-    args.asd->is_http2 = true;
+    add_app(args.asd, APP_ID_HTTP, APP_ID_HTTP + GENERIC_APP_OFFSET, nullptr, args.change_bits);
+    args.asd.client_disco_state = APPID_DISCO_STATE_FINISHED;
+    http_service_detector->add_service(args.change_bits, args.asd, args.pkt,
+        args.dir, APP_ID_HTTP);
+    args.asd.service_disco_state = APPID_DISCO_STATE_FINISHED;
+    args.asd.set_session_flags(APPID_SESSION_CLIENT_DETECTED | APPID_SESSION_SERVICE_DETECTED);
+    args.asd.clear_session_flags(APPID_SESSION_CONTINUE);
+    args.asd.is_http2 = true;
 
     return APPID_SUCCESS;
 }

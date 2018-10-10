@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,7 +29,10 @@
 // and thereby controls event generation.  event_filter is evaluated after
 // the event is queued, and thereby controls which events get logged.
 
+namespace snort
+{
 struct SfIp;
+}
 
 struct DetectionFilterConfig
 {
@@ -46,7 +49,7 @@ void detection_filter_term();
 
 void detection_filter_print_config(DetectionFilterConfig*);
 
-int detection_filter_test(void*, const SfIp* sip, const SfIp* dip, long curtime);
+int detection_filter_test(void*, const snort::SfIp* sip, const snort::SfIp* dip, long curtime);
 struct THD_NODE* detection_filter_create(DetectionFilterConfig*, struct THDX_STRUCT*);
 
 #endif

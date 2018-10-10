@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,10 +26,10 @@
 #include "managers/plugin_manager.h"
 
 #ifdef STATIC_IPS_ACTIONS
-extern const BaseApi* act_react[];
-extern const BaseApi* act_reject[];
+extern const snort::BaseApi* act_react[];
+extern const snort::BaseApi* act_reject[];
 #endif
-extern const BaseApi* act_replace[];
+extern const snort::BaseApi* act_replace[];
 
 void load_actions()
 {

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -45,10 +45,9 @@ static inline uint64_t get_microseconds(struct timeval t)
     return (uint64_t)t.tv_sec * 1000000 + t.tv_usec;
 }
 
-CPUTracker::CPUTracker(PerfConfig *perf) :
-    PerfTracker(perf, perf->output == PERF_FILE, TRACKER_NAME)
+CPUTracker::CPUTracker(PerfConfig *perf) : PerfTracker(perf, TRACKER_NAME)
 {
-    formatter->register_section("thread_" + to_string(get_instance_id()));
+    formatter->register_section("thread_" + to_string(snort::get_instance_id()));
     formatter->register_field("cpu_user", &user_stat);
     formatter->register_field("cpu_system", &system_stat);
     formatter->register_field("cpu_wall", &wall_stat);
@@ -177,7 +176,7 @@ TEST_CASE("process and output", "[cpu_tracker]")
         {2100000, 3200000, 8500000}};
 
     PerfConfig config;
-    config.format = PERF_MOCK;
+    config.format = PerfFormat::MOCK;
     TestCPUTracker tracker(&config);
     MockFormatter *formatter = (MockFormatter*)tracker.output;
 

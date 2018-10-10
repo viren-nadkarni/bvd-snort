@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -55,6 +55,8 @@
 #include "parse_stream.h"
 #include "vars.h"
 
+using namespace snort;
+
 bool parsing_follows_files = false;
 
 static struct rule_index_map_t* ruleIndexMap = nullptr;
@@ -91,12 +93,12 @@ void parser_term(SnortConfig* sc)
 
 static void CreateDefaultRules(SnortConfig* sc)
 {
-    CreateRuleType(sc, ACTION_LOG, RULE_TYPE__LOG);
-    CreateRuleType(sc, ACTION_PASS, RULE_TYPE__PASS);
-    CreateRuleType(sc, ACTION_ALERT, RULE_TYPE__ALERT);
-    CreateRuleType(sc, ACTION_DROP, RULE_TYPE__DROP);
-    CreateRuleType(sc, ACTION_BLOCK, RULE_TYPE__BLOCK);
-    CreateRuleType(sc, ACTION_RESET, RULE_TYPE__RESET);
+    CreateRuleType(sc, Actions::get_string(Actions::LOG), Actions::LOG);
+    CreateRuleType(sc, Actions::get_string(Actions::PASS), Actions::PASS);
+    CreateRuleType(sc, Actions::get_string(Actions::ALERT), Actions::ALERT);
+    CreateRuleType(sc, Actions::get_string(Actions::DROP), Actions::DROP);
+    CreateRuleType(sc, Actions::get_string(Actions::BLOCK), Actions::BLOCK);
+    CreateRuleType(sc, Actions::get_string(Actions::RESET), Actions::RESET);
 }
 
 static void FreeRuleTreeNodes(SnortConfig* sc)
@@ -410,9 +412,11 @@ static void parse_file(SnortConfig* sc, Shell* sh)
  ***************************************************************************/
 SnortConfig* ParseSnortConf(const SnortConfig* boot_conf, const char* fname)
 {
-    SnortConfig* sc = new SnortConfig;
+    SnortConfig* sc = new SnortConfig(SnortConfig::get_conf()->proto_ref);
 
     sc->logging_flags = boot_conf->logging_flags;
+    sc->tweaks = boot_conf->tweaks;
+
     VarNode* tmp = boot_conf->var_list;
 
     if ( !fname )
@@ -540,10 +544,10 @@ void SetRuleStates(SnortConfig* sc)
 
 void ParseRules(SnortConfig* sc)
 {
-    for ( unsigned idx = 0; idx < sc->policy_map->ips_policy.size(); ++idx )
+    for ( unsigned idx = 0; idx < sc->policy_map->ips_policy_count(); ++idx )
     {
         set_ips_policy(sc, idx);
-        IpsPolicy* p = sc->policy_map->ips_policy[idx];
+        IpsPolicy* p = sc->policy_map->get_ips_policy(idx);
 
         if ( p->enable_builtin_rules )
             ModuleManager::load_rules(sc);
@@ -594,7 +598,7 @@ void ParseRules(SnortConfig* sc)
  * Returns: the ListHead for the rule type
  *
  ***************************************************************************/
-ListHead* CreateRuleType(SnortConfig* sc, const char* name, RuleType mode)
+ListHead* CreateRuleType(SnortConfig* sc, const char* name, Actions::Type mode)
 {
     RuleListNode* node;
     int evalIndex = 0;

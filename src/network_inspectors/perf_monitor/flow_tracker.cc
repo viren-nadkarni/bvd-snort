@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,12 +33,13 @@
 #include "catch/snort_catch.h"
 #endif
 
+using namespace snort;
+
 #define TRACKER_NAME PERF_NAME "_flow"
 
 #define MAX_PKT_LEN  9000
 
-FlowTracker::FlowTracker(PerfConfig* perf) : PerfTracker(perf,
-        perf->output == PERF_FILE, TRACKER_NAME)
+FlowTracker::FlowTracker(PerfConfig* perf) : PerfTracker(perf, TRACKER_NAME)
 {
     pkt_len_cnt.resize( MAX_PKT_LEN + 1 );
     tcp.src.resize( config->flow_max_port_to_track + 1, 0 );
@@ -164,7 +165,7 @@ TEST_CASE("no protocol", "[FlowTracker]")
     uint32_t* len_ptr = &const_cast<DAQ_PktHdr_t*>(p.pkth)->caplen;
 
     PerfConfig config;
-    config.format = PERF_MOCK;
+    config.format = PerfFormat::MOCK;
     config.flow_max_port_to_track = 1024;
 
     MockFlowTracker tracker(&config);
@@ -210,7 +211,7 @@ TEST_CASE("icmp", "[FlowTracker]")
     uint8_t* type_ptr = (uint8_t*) &icmp.type;
 
     PerfConfig config;
-    config.format = PERF_MOCK;
+    config.format = PerfFormat::MOCK;
     config.flow_max_port_to_track = 1024;
 
     MockFlowTracker tracker(&config);
@@ -254,7 +255,7 @@ TEST_CASE("tcp", "[FlowTracker]")
     uint32_t* len_ptr = &const_cast<DAQ_PktHdr_t*>(p.pkth)->caplen;
 
     PerfConfig config;
-    config.format = PERF_MOCK;
+    config.format = PerfFormat::MOCK;
     config.flow_max_port_to_track = 1024;
 
     MockFlowTracker tracker(&config);
@@ -308,7 +309,7 @@ TEST_CASE("udp", "[FlowTracker]")
     uint32_t* len_ptr = &const_cast<DAQ_PktHdr_t*>(p.pkth)->caplen;
 
     PerfConfig config;
-    config.format = PERF_MOCK;
+    config.format = PerfFormat::MOCK;
     config.flow_max_port_to_track = 1024;
 
     MockFlowTracker tracker(&config);

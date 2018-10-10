@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2006-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,6 +23,7 @@
 #define SFTARGET_DATA_H
 
 #include "sfip/sf_cidr.h"
+#include "target_based/snort_protocols.h"
 
 #define SFAT_OK 0
 #define SFAT_ERROR (-1)
@@ -46,7 +47,7 @@ struct ApplicationEntry
 
     uint16_t port;
     uint16_t ipproto;
-    uint16_t protocol;
+    SnortProtocolId snort_protocol_id;
 
     uint8_t fields;
 };
@@ -68,7 +69,7 @@ struct HostInfo
 
 struct HostAttributeEntry
 {
-    SfCidr ipAddr;
+    snort::SfCidr ipAddr;
     HostInfo hostInfo;
     ApplicationEntry* services;
     ApplicationEntry* clients;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,24 +30,24 @@
 class TcpSegmentDescriptor
 {
 public:
-    TcpSegmentDescriptor(Flow*, Packet*, TcpEventLogger&);
+    TcpSegmentDescriptor(snort::Flow*, snort::Packet*, TcpEventLogger&);
     virtual ~TcpSegmentDescriptor() = default;
 
     uint32_t init_mss(uint16_t* value);
     uint32_t init_wscale(uint16_t* value);
     bool has_wscale();
 
-    Flow* get_flow() const
+    snort::Flow* get_flow() const
     {
         return flow;
     }
 
-    Packet* get_pkt() const
+    snort::Packet* get_pkt() const
     {
         return pkt;
     }
 
-    const tcp::TCPHdr* get_tcph() const
+    const snort::tcp::TCPHdr* get_tcph() const
     {
         return tcph;
     }
@@ -145,10 +145,10 @@ public:
     }
 
 private:
-    Flow* flow;
-    Packet* pkt;
+    snort::Flow* flow;
+    snort::Packet* pkt;
 
-    const tcp::TCPHdr* tcph;
+    const snort::tcp::TCPHdr* tcph;
     uint16_t src_port;
     uint16_t dst_port;
     uint32_t seg_seq;

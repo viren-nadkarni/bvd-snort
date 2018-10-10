@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,11 +31,13 @@
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
+using namespace snort;
+
 // Stubs whose sole purpose is to make the test code link
 static SnortConfig my_config;
 THREAD_LOCAL SnortConfig *snort_conf = &my_config;
 
-SnortConfig::SnortConfig(SnortConfig*) 
+SnortConfig::SnortConfig(const SnortConfig* const)
 { snort_conf->run_flags = 0;} // run_flags is used indirectly from HashFnc class by calling SnortConfig::static_hash()
 
 SnortConfig::~SnortConfig() = default;

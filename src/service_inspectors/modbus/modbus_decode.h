@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,10 +22,15 @@
 #ifndef MODBUS_DECODE_H
 #define MODBUS_DECODE_H
 
+namespace snort
+{
+struct Packet;
+}
+
 /* Need 8 bytes for MBAP Header + Function Code */
 #define MODBUS_MIN_LEN 8
 
-bool ModbusDecode(struct Packet*);
+bool ModbusDecode(snort::Packet*);
 
 #endif
 

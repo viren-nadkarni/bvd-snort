@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -317,7 +317,7 @@ size_t HttpUri::get_file_proc_hash()
 
     if (abs_path.length() > 0 )
     {
-        abs_path_hash = str_to_hash(abs_path.start(), abs_path.length());
+        abs_path_hash = snort::str_to_hash(abs_path.start(), abs_path.length());
     }
 
     return abs_path_hash;

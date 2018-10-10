@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -41,6 +41,7 @@
 #include "markup.h"
 #include "ring.h"
 
+using namespace snort;
 using namespace std;
 
 #ifndef SIGNAL_SNORT_RELOAD
@@ -121,7 +122,7 @@ static void exit_handler(int signal)
 
 static void dirty_handler(int signal)
 {
-    SnortConfig::get_conf()->dirty_pig = true;
+    snort::SnortConfig::get_conf()->dirty_pig = true;
     exit_handler(signal);
 }
 
@@ -158,7 +159,7 @@ static void oops_handler(int signal)
 {
     // FIXIT-L what should we capture if this is the main thread?
     if ( !is_main_thread )
-        Snort::capture_packet();
+        snort::Snort::capture_packet();
 
     add_signal(signal, SIG_DFL, false);
     raise(signal);
@@ -355,7 +356,7 @@ void daemonize()
     if ( errno )
         FatalError("failed to setsid - %s", get_error(errno));
 
-    if ( SnortConfig::log_quiet() or SnortConfig::log_syslog() )
+    if ( snort::SnortConfig::log_quiet() or snort::SnortConfig::log_syslog() )
         snuff_stdio();
 
     pid_t ppid = getppid();

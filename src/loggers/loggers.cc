@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,6 +25,8 @@
 
 #include "managers/plugin_manager.h"
 
+using namespace snort;
+
 // to ensure PacketManager::log_protocols() is built into Snort++
 extern const BaseApi* log_codecs[];
 
@@ -34,7 +36,9 @@ extern const BaseApi* alert_sf_socket[];
 extern const BaseApi* alert_csv[];
 extern const BaseApi* alert_fast[];
 extern const BaseApi* alert_full[];
+extern const BaseApi* alert_json[];
 extern const BaseApi* alert_syslog[];
+extern const BaseApi* alert_unixsock[];
 extern const BaseApi* log_hext[];
 extern const BaseApi* log_pcap[];
 extern const BaseApi* eh_unified2[];
@@ -51,7 +55,9 @@ void load_loggers()
     PluginManager::load_plugins(alert_csv);
     PluginManager::load_plugins(alert_fast);
     PluginManager::load_plugins(alert_full);
+    PluginManager::load_plugins(alert_json);
     PluginManager::load_plugins(alert_syslog);
+    PluginManager::load_plugins(alert_unixsock);
 
     // loggers
     PluginManager::load_plugins(log_hext);

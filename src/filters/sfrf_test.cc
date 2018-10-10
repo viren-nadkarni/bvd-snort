@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2009-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,6 @@
 #endif
 
 #include "catch/snort_catch.h"
-#include "main/snort_types.h"
 #include "parser/parse_ip.h"
 #include "sfip/sf_ip.h"
 
@@ -31,8 +30,6 @@
 #include "sfrf.h"
 
 //---------------------------------------------------------------
-
-SNORT_FORCED_INCLUSION_DEFINITION(sfrf_test);
 
 #define IP_ANY   nullptr          // used to get "unset"
 
@@ -909,9 +906,9 @@ static void Init(unsigned cap)
         cfg.tracking = p->track;
         cfg.count = p->count;
         cfg.seconds = p->seconds;
-        cfg.newAction = (RuleType)RULE_NEW;
+        cfg.newAction = (snort::Actions::Type)RULE_NEW;
         cfg.timeout = p->timeout;
-        cfg.applyTo = p->ip ? sfip_var_from_string(p->ip) : nullptr;
+        cfg.applyTo = p->ip ? sfip_var_from_string(p->ip, "sfrf_test") : nullptr;
 
         p->create = SFRF_ConfigAdd(nullptr, rfc, &cfg);
     }
@@ -943,15 +940,15 @@ static int EventTest(EventData* p)
     // this is the only acceptable public value for op
     SFRF_COUNT_OPERATION op = SFRF_COUNT_INCREMENT;
 
-    SfIp sip, dip;
+    snort::SfIp sip, dip;
     sip.set(p->sip);
     dip.set(p->dip);
 
     status = SFRF_TestThreshold(
         rfc, p->gid, p->sid, &sip, &dip, curtime, op);
 
-    if ( status >= RULE_TYPE__MAX )
-        status -= RULE_TYPE__MAX;
+    if ( status >= snort::Actions::MAX )
+        status -= snort::Actions::MAX;
 
     return status;
 }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -49,12 +49,12 @@ struct DCE2_PafTcpData
     uint16_t frag_len;
 };
 
-class Dce2TcpSplitter : public StreamSplitter
+class Dce2TcpSplitter : public snort::StreamSplitter
 {
 public:
     Dce2TcpSplitter(bool c2s);
 
-    Status scan(Flow*, const uint8_t* data, uint32_t len,
+    Status scan(snort::Flow*, const uint8_t* data, uint32_t len,
         uint32_t flags, uint32_t* fp) override;
 
     bool is_paf() override

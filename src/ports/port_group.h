@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,6 +24,11 @@
 
 #ifndef PORT_GROUP_H
 #define PORT_GROUP_H
+
+namespace snort
+{
+    class Mpse;
+}
 
 // PortGroup contains a set of fast patterns in the form of an MPSE and a
 // set of non-fast-pattern (nfp) rules.  when a PortGroup is selected, the
@@ -60,7 +65,7 @@ struct PortGroup
     RULE_NODE* nfp_head, * nfp_tail;
 
     // pattern matchers
-    class Mpse* mpse[PM_TYPE_MAX];
+    snort::Mpse* mpse[PM_TYPE_MAX];
 
     // detection option tree
     void* nfp_tree;

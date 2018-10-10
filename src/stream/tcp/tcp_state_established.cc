@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,7 +25,7 @@
 
 #include "tcp_state_established.h"
 
-#include "tcp_normalizer.h"
+#include "tcp_normalizers.h"
 #include "tcp_session.h"
 
 TcpStateEstablished::TcpStateEstablished(TcpStateMachine& tsm) :
@@ -42,7 +42,7 @@ bool TcpStateEstablished::syn_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& 
 bool TcpStateEstablished::syn_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
     trk.session->check_for_repeated_syn(tsd);
-    trk.normalizer->ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
+    trk.normalizer.ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs());
     return true;
 }
 
@@ -59,7 +59,7 @@ bool TcpStateEstablished::syn_ack_sent(TcpSegmentDescriptor& tsd, TcpStreamTrack
     }
 
     if ( trk.is_server_tracker() )
-        trk.normalizer->ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
+        trk.normalizer.ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
 
     return true;
 }
@@ -91,20 +91,10 @@ bool TcpStateEstablished::data_seg_recv(TcpSegmentDescriptor& tsd, TcpStreamTrac
 
 bool TcpStateEstablished::fin_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    TcpStreamTracker* listener = nullptr;
-
-    if ( tsd.get_pkt()->is_from_client() )
-        listener = trk.session->server;
-    else
-        listener = trk.session->client;
     trk.update_on_fin_sent(tsd);
+    trk.session->eof_handle(tsd.get_pkt());
+    trk.set_tcp_state(TcpStreamTracker::TCP_FIN_WAIT1);
 
-    if ( SEQ_EQ(tsd.get_end_seq(), (listener->r_nxt_ack +  tsd.get_seg_len())) ||
-        listener->process_inorder_fin() || !listener->is_segment_seq_valid(tsd) )
-    {
-        trk.session->eof_handle(tsd.get_pkt());
-        trk.set_tcp_state(TcpStreamTracker::TCP_FIN_WAIT1);
-    }
     return true;
 }
 
@@ -116,20 +106,13 @@ bool TcpStateEstablished::fin_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& 
          trk.session->handle_data_segment(tsd);
          trk.flush_data_on_fin_recv(tsd);
     }
-    if( (tsd.get_end_seq() == trk.r_nxt_ack) || !trk.is_segment_seq_valid(tsd) )
+
+    if ( trk.update_on_fin_recv(tsd) )
     {
-        if ( trk.update_on_fin_recv(tsd) )
-        {
-            trk.session->update_perf_base_state(TcpStreamTracker::TCP_CLOSING);
-            trk.set_tcp_state(TcpStreamTracker::TCP_CLOSE_WAIT);
-        }
+        trk.session->update_perf_base_state(TcpStreamTracker::TCP_CLOSING);
+        trk.set_tcp_state(TcpStreamTracker::TCP_CLOSE_WAIT);
     }
-    else
-    {
-        //Out of Order FIN received
-        if ( !trk.is_fin_seq_set() )
-            trk.set_fin_final_seq( tsd.get_seg_seq() );
-    }
+
     return true;
 }
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -35,14 +35,14 @@ public:
     SmtpClientDetector(ClientDiscovery*);
 
     int validate(AppIdDiscoveryArgs&) override;
-    SMTPDetectorData* get_common_data(AppIdSession*);
+    SMTPDetectorData* get_common_data(AppIdSession&);
 
 private:
     int extract_version_and_add_client_app(AppId, const int prefix_len,
         const uint8_t* product, const uint8_t* product_end, ClientSMTPData* const,
-        AppIdSession*, AppId);
+        AppIdSession&, AppId, AppidChangeBits&);
     int identify_client_version(ClientSMTPData* const, const uint8_t* product,
-        const uint8_t* data_end, AppIdSession*, Packet*);
+        const uint8_t* data_end, AppIdSession&, snort::Packet*, AppidChangeBits&);
 };
 
 class SmtpServiceDetector : public ServiceDetector

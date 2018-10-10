@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,7 +26,6 @@
 
 #include "detection/detection_engine.h"
 #include "log/messages.h"
-#include "main/snort_debug.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "protocols/ssl.h"
@@ -36,6 +35,8 @@
 
 #include "pop_module.h"
 #include "pop_paf.h"
+
+using namespace snort;
 
 THREAD_LOCAL ProfileStats popPerfStats;
 THREAD_LOCAL PopStats popstats;
@@ -136,8 +137,6 @@ static POPData* SetNewPOPData(POP_PROTO_CONF* config, Packet* p)
 
     if (p->packet_flags & SSNFLAG_MIDSTREAM)
     {
-        DebugMessage(DEBUG_POP, "Got midstream packet - "
-            "setting state to unknown\n");
         pop_ssn->state = STATE_UNKNOWN;
     }
 
@@ -261,16 +260,12 @@ static int POP_Setup(Packet* p, POPData* ssn)
 
         if (ssn->session_flags & POP_FLAG_NEXT_STATE_UNKNOWN)
         {
-            DebugMessage(DEBUG_POP, "Found gap in previous reassembly buffer - "
-                "set state to unknown\n");
             ssn->state = STATE_UNKNOWN;
             ssn->session_flags &= ~POP_FLAG_NEXT_STATE_UNKNOWN;
         }
 
         if (missing_in_rebuilt == SSN_MISSING_BEFORE)
         {
-            DebugMessage(DEBUG_POP, "Found missing packets before "
-                "in reassembly buffer - set state to unknown\n");
             ssn->state = STATE_UNKNOWN;
         }
     }
@@ -350,16 +345,10 @@ static const uint8_t* POP_HandleCommand(Packet* p, POPData* pop_ssn, const uint8
     {
         if (pop_ssn->state == STATE_UNKNOWN)
         {
-            DebugMessage(DEBUG_POP, "Command not found, but state is "
-                "unknown - checking for SSL\n");
-
             /* check for encrypted */
-
             if ((pop_ssn->session_flags & POP_FLAG_CHECK_SSL) &&
                 (IsSSL(ptr, end - ptr, p->packet_flags)))
             {
-                DebugMessage(DEBUG_POP, "Packet is SSL encrypted\n");
-
                 pop_ssn->state = STATE_TLS_DATA;
 
                 /* Ignore data */
@@ -367,7 +356,6 @@ static const uint8_t* POP_HandleCommand(Packet* p, POPData* pop_ssn, const uint8
             }
             else
             {
-                DebugMessage(DEBUG_POP, "Not SSL - try data state\n");
                 /* don't check for ssl again in this packet */
                 if (pop_ssn->session_flags & POP_FLAG_CHECK_SSL)
                     pop_ssn->session_flags &= ~POP_FLAG_CHECK_SSL;
@@ -381,7 +369,6 @@ static const uint8_t* POP_HandleCommand(Packet* p, POPData* pop_ssn, const uint8
         else
         {
             DetectionEngine::queue_event(GID_POP, POP_UNKNOWN_CMD);
-            DebugMessage(DEBUG_POP, "No known command found\n");
             return eol;
         }
     }
@@ -442,7 +429,6 @@ static void POP_ProcessServerPacket(Packet* p, POPData* pop_ssn)
     {
         if (pop_ssn->state == STATE_DATA)
         {
-            DebugMessage(DEBUG_POP, "DATA STATE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
             //ptr = POP_HandleData(p, ptr, end);
             FilePosition position = get_file_position(p);
             int len = end - ptr;
@@ -480,16 +466,10 @@ static void POP_ProcessServerPacket(Packet* p, POPData* pop_ssn)
         }
         else
         {
-            DebugMessage(DEBUG_POP,
-                "Server response not found - see if it's SSL data\n");
-
             if ((pop_ssn->session_flags & POP_FLAG_CHECK_SSL) &&
                 (IsSSL(ptr, end - ptr, p->packet_flags)))
             {
-                DebugMessage(DEBUG_POP, "Server response is an SSL packet\n");
-
                 pop_ssn->state = STATE_TLS_DATA;
-
                 return;
             }
             else if (pop_ssn->session_flags & POP_FLAG_CHECK_SSL)
@@ -507,7 +487,6 @@ static void POP_ProcessServerPacket(Packet* p, POPData* pop_ssn)
             else if (*ptr == '+')
             {
                 DetectionEngine::queue_event(GID_POP, POP_UNKNOWN_RESP);
-                DebugMessage(DEBUG_POP, "Server response not found\n");
             }
         }
 
@@ -553,9 +532,6 @@ static void snort_pop(POP_PROTO_CONF* config, Packet* p)
         {
             if (IsTlsClientHello(p->data, p->data + p->dsize))
             {
-                DebugMessage(DEBUG_POP,
-                    "TLS DATA STATE ~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-
                 pop_ssn->state = STATE_TLS_SERVER_PEND;
                 return;
             }
@@ -571,7 +547,6 @@ static void snort_pop(POP_PROTO_CONF* config, Packet* p)
             return;
         }
         POP_ProcessClientPacket(p, pop_ssn);
-        DebugMessage(DEBUG_POP, "POP client packet\n");
     }
     else
     {
@@ -581,7 +556,7 @@ static void snort_pop(POP_PROTO_CONF* config, Packet* p)
             {
                 pop_ssn->state = STATE_TLS_DATA;
             }
-            else if (!(p->flow->get_session_flags() & SSNFLAG_MIDSTREAM)
+            else if ( !p->test_session_flags(SSNFLAG_MIDSTREAM)
                 && !Stream::missed_packets(p->flow, SSN_DIR_BOTH))
             {
                 /* revert back to command state - assume server didn't accept STARTTLS */
@@ -598,7 +573,6 @@ static void snort_pop(POP_PROTO_CONF* config, Packet* p)
         if ( !InspectPacket(p))
         {
             /* Packet will be rebuilt, so wait for it */
-            DebugMessage(DEBUG_POP, "Client packet will be reassembled\n");
             return;
         }
         else if (!(p->packet_flags & PKT_REBUILT_STREAM))
@@ -618,9 +592,6 @@ static void snort_pop(POP_PROTO_CONF* config, Packet* p)
              * that were not rebuilt, state is going to be messed up
              * so set state to unknown. It's likely this was the
              * beginning of the conversation so reset state */
-            DebugMessage(DEBUG_POP, "Got non-rebuilt packets before "
-                "this rebuilt packet\n");
-
             pop_ssn->state = STATE_UNKNOWN;
             pop_ssn->session_flags &= ~POP_FLAG_GOT_NON_REBUILT;
         }
@@ -766,7 +737,7 @@ const InspectApi pop_api =
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU,
+    PROTO_BIT__PDU,
     nullptr, // buffers
     "pop3",
     pop_init,

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -28,12 +28,15 @@
 #include <cstdint>
 #include <cstring>
 
+namespace snort
+{
 struct Packet;
+}
 
 class Cursor
 {
 public:
-    Cursor(Packet*);
+    Cursor(snort::Packet*);
     Cursor(const Cursor&);
 
     Cursor& operator=(const Cursor&) = default;
@@ -44,7 +47,7 @@ public:
     bool is(const char* s) const
     { return !strcmp(name, s); }
 
-    void reset(Packet*);
+    void reset(snort::Packet*);
 
     void set(const char* s, const uint8_t* b, unsigned n)
     { name = s; data = b; sz = n; pos = delta = 0; }

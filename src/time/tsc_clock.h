@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -37,20 +37,24 @@
 
 struct TscClock
 {
-    // this has to be const so we use a nice round number and scale it later
-    typedef std::ratio<1, 1000000> period;
-
-    typedef uint64_t rep;
-    typedef std::chrono::duration<rep, period> duration;
-    typedef std::chrono::time_point<TscClock> time_point;
+    typedef uint64_t duration;
+    typedef uint64_t time_point;
 
     static const bool is_steady = true;
 
     static uint64_t counter()
     {
+#if defined(__aarch64__)
+        uint64_t ticks;
+
+        asm volatile("mrs %0, CNTVCT_EL0" : "=r" (ticks));
+        return ticks;
+#else
+        // Default to x86, other archs will compile error anyway
         uint32_t lo, hi;
         asm volatile("rdtsc" : "=a" (lo), "=d" (hi));
         return ((uint64_t)hi << 32) | lo;
+#endif
     }
 
     static time_point now() noexcept

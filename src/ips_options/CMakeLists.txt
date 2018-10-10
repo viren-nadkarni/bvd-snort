@@ -27,6 +27,7 @@ SET( PLUGIN_LIST
     ips_isdataat.cc
     ips_itype.cc
     ips_msg.cc
+    ips_pcre.cc
     ips_priority.cc
     ips_raw_data.cc
     ips_rem.cc
@@ -61,8 +62,6 @@ set (IPS_SOURCES
     ips_metadata.cc
     ips_options.cc
     ips_options.h
-    ips_pcre.cc
-    ips_pcre.h
     ips_pkt_data.cc
     ips_reference.cc
     ips_replace.cc
@@ -71,14 +70,16 @@ set (IPS_SOURCES
 )
 
 if ( HAVE_HYPERSCAN )
-    set(OPTION_LIST ips_regex.cc ips_regex.h
-        ips_sd_pattern.cc ips_sd_pattern.h
+    set(PLUGIN_LIST
+        ${PLUGIN_LIST}
+        ips_regex.cc
+        ips_sd_pattern.cc
         sd_credit_card.cc sd_credit_card.h)
 endif ()
 
 if (STATIC_IPS_OPTIONS)
 
-    add_library ( ips_options STATIC
+    add_library ( ips_options OBJECT
         ${IPS_SOURCES}
         ${OPTION_LIST}
         ${PLUGIN_LIST}
@@ -86,7 +87,7 @@ if (STATIC_IPS_OPTIONS)
 
 else (STATIC_IPS_OPTIONS)
 
-    add_library ( ips_options STATIC
+    add_library ( ips_options OBJECT
         ${IPS_SOURCES}
         ${OPTION_LIST}
     )
@@ -114,6 +115,7 @@ else (STATIC_IPS_OPTIONS)
     add_dynamic_module(ips_isdataat ips_options ips_isdataat.cc)
     add_dynamic_module(ips_itype ips_options ips_itype.cc)
     add_dynamic_module(ips_msg ips_options ips_msg.cc)
+    add_dynamic_module(ips_pcre ips_options ips_pcre.cc)
     add_dynamic_module(ips_priority ips_options ips_priority.cc)
     add_dynamic_module(ips_raw_data ips_options ips_raw_data.cc)
     add_dynamic_module(ips_rem ips_options ips_rem.cc)
@@ -128,11 +130,11 @@ else (STATIC_IPS_OPTIONS)
     add_dynamic_module(ips_tos ips_options ips_tos.cc)
     add_dynamic_module(ips_ttl ips_options ips_ttl.cc)
     add_dynamic_module(ips_window ips_options ips_window.cc)
+if ( HAVE_HYPERSCAN )
+    add_dynamic_module(ips_regex ips_options ips_regex.cc)
+    add_dynamic_module(ips_sd_pattern ips_options ips_sd_pattern.cc sd_credit_card.cc sd_credit_card.h)
+endif ( HAVE_HYPERSCAN )
 
 endif (STATIC_IPS_OPTIONS)
 
-target_link_libraries(ips_options
-    framework
-    helpers
-    hash
-)
+add_subdirectory(test)

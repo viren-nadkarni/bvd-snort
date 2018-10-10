@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -34,12 +34,13 @@ public:
     KerberosClientDetector(ClientDiscovery*);
 
     int validate(AppIdDiscoveryArgs&) override;
-    KerberosDetectorData* get_common_data(AppIdSession*);
+    KerberosDetectorData* get_common_data(AppIdSession&);
 
     bool failed_login = false;
 
 private:
-    int krb_walk_client_packet(KRBState*, const uint8_t*, const uint8_t*, AppIdSession*);
+    int krb_walk_client_packet(KRBState*, const uint8_t*, const uint8_t*,
+        AppIdSession&, AppidChangeBits&);
 };
 
 class KerberosServiceDetector : public ServiceDetector

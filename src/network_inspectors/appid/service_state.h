@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,11 +22,10 @@
 #ifndef SERVICE_STATE_H
 #define SERVICE_STATE_H
 
-#include <mutex>
-
-#include "sfip/sf_ip.h"
-#include "service_plugins/service_discovery.h"
 #include "protocols/protocol_ids.h"
+#include "sfip/sf_ip.h"
+
+#include "service_plugins/service_discovery.h"
 #include "utils/util.h"
 
 class ServiceDetector;
@@ -77,9 +76,9 @@ public:
     ~ServiceDiscoveryState();
     ServiceDetector* select_detector_by_brute_force(IpProtocol proto);
     void set_service_id_valid(ServiceDetector* sd);
-    void set_service_id_failed(AppIdSession* asd, const SfIp* client_ip, unsigned invalid_delta =
-        0);
-    void update_service_incompatiable(const SfIp* ip);
+    void set_service_id_failed(AppIdSession& asd, const snort::SfIp* client_ip,
+        unsigned invalid_delta = 0);
+    void update_service_incompatiable(const snort::SfIp* ip);
 
     SERVICE_ID_STATE get_state() const
     {
@@ -114,10 +113,11 @@ public:
 private:
     SERVICE_ID_STATE state;
     ServiceDetector* service = nullptr;
-    AppIdDetectorList* brute_force_mgr = nullptr;
+    AppIdDetectorList* tcp_brute_force_mgr = nullptr;
+    AppIdDetectorList* udp_brute_force_mgr = nullptr;
     unsigned valid_count = 0;
     unsigned detract_count = 0;
-    SfIp last_detract;
+    snort::SfIp last_detract;
 
     // consecutive incompatible flows - incompatible means client packet did not match.
     unsigned invalid_client_count = 0;
@@ -126,7 +126,7 @@ private:
      * different every time, then consecutive incompatible status indicate that flow is not using
      * specific service.
      */
-    SfIp last_invalid_client;
+    snort::SfIp last_invalid_client;
     time_t reset_time;
 };
 
@@ -135,10 +135,10 @@ class AppIdServiceState
 public:
     static void initialize();
     static void clean();
-    static ServiceDiscoveryState* add(const SfIp*, IpProtocol, uint16_t port, bool decrypted);
-    static ServiceDiscoveryState* get(const SfIp*, IpProtocol, uint16_t port, bool decrypted);
-    static void remove(const SfIp*, IpProtocol, uint16_t port, bool decrypted);
-    static void check_reset(AppIdSession* asd, const SfIp* ip, uint16_t port);
+    static ServiceDiscoveryState* add(const snort::SfIp*, IpProtocol, uint16_t port, bool decrypted);
+    static ServiceDiscoveryState* get(const snort::SfIp*, IpProtocol, uint16_t port, bool decrypted);
+    static void remove(const snort::SfIp*, IpProtocol, uint16_t port, bool decrypted);
+    static void check_reset(AppIdSession& asd, const snort::SfIp* ip, uint16_t port);
 
     static void dump_stats();
 };

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2007-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -44,6 +44,8 @@
 #include "hash/hashfcn.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
+
+using namespace snort;
 
 static THREAD_LOCAL ProfileStats cvsPerfStats;
 
@@ -183,13 +185,6 @@ static int CvsDecode(const uint8_t* data, uint16_t data_len,
         /* shouldn't happen as long as line < end, but ... */
         if (command.cmd_str == nullptr)
             return CVS_NO_ALERT;
-
-        DebugFormat(DEBUG_IPS_OPTION, "CVS command\n"
-            " command: %.*s\n"
-            "argument: %.*s\n",
-            command.cmd_str_len, (const char*)command.cmd_str,
-            command.cmd_arg == nullptr ? 4 : command.cmd_arg_len,
-            command.cmd_arg == nullptr ? "none" : (const char*)command.cmd_arg);
 
         switch (cvs_rule_option->type)
         {

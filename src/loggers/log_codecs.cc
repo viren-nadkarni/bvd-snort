@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,6 +22,7 @@
 #include "config.h"
 #endif
 
+#include "detection/ips_context.h"
 #include "detection/signature.h"
 #include "events/event.h"
 #include "framework/logger.h"
@@ -30,6 +31,8 @@
 #include "log/text_log.h"
 #include "main/snort_config.h"
 #include "protocols/packet_manager.h"
+
+using namespace snort;
 
 static THREAD_LOCAL TextLog* test_file = nullptr;
 
@@ -135,7 +138,7 @@ void CodecLogger::close()
 
 void CodecLogger::log(Packet* p, const char* msg, Event* e)
 {
-    TextLog_Print(test_file, "pkt:" STDu64 "\t", pc.total_from_daq);
+    TextLog_Print(test_file, "pkt:" STDu64 "\t", p->context->packet_number);
 
     if (e != nullptr)
     {

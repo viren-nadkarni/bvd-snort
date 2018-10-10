@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -196,7 +196,7 @@ struct FTP_SERVER_PROTO_CONF
 
 typedef struct s_FTP_BOUNCE_TO
 {
-    SfIp ip;
+    snort::SfIp ip;
     int relevant_bits;
     unsigned short portlo;
     unsigned short porthi;

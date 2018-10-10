@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -51,10 +51,10 @@
 /*
 **  Macros
 */
-#define SF_ASN1_CLASS(c)   (((u_char)(c)) & SF_ASN1_CLASS_MASK)
-#define SF_ASN1_FLAG(c)    (((u_char)(c)) & SF_ASN1_FLAG_MASK)
-#define SF_ASN1_TAG(c)     (((u_char)(c)) & SF_ASN1_TAG_MASK)
-#define SF_ASN1_LEN_EXT(c) (((u_char)(c)) & SF_BER_LEN_MASK)
+#define SF_ASN1_CLASS(c)   (((uint8_t)(c)) & SF_ASN1_CLASS_MASK)
+#define SF_ASN1_FLAG(c)    (((uint8_t)(c)) & SF_ASN1_FLAG_MASK)
+#define SF_ASN1_TAG(c)     (((uint8_t)(c)) & SF_ASN1_TAG_MASK)
+#define SF_ASN1_LEN_EXT(c) (((uint8_t)(c)) & SF_BER_LEN_MASK)
 
 #define ASN1_OOB(s,e,d)      (!(((s) <= (d)) && ((d) < (e))))
 #define ASN1_FATAL_ERR(e)    ((e) < 0)
@@ -115,7 +115,7 @@ static ASN1_TYPE* asn1_node_alloc()
 **  @retval ASN1_ERR_MEM_ALLOC memory allocation failed
 **  @retval ASN1_ERR_INVALID_ARG invalid argument
 */
-void asn1_init_mem(SnortConfig* sc)
+void asn1_init_mem(snort::SnortConfig* sc)
 {
     int num_nodes;
 
@@ -143,7 +143,7 @@ void asn1_init_mem(SnortConfig* sc)
 **  @return none
 **
 */
-void asn1_free_mem(SnortConfig*)
+void asn1_free_mem(snort::SnortConfig*)
 {
     if (asn1_config.mem != nullptr)
     {
@@ -276,7 +276,7 @@ static int asn1_decode_ident(ASN1_TYPE* asn1_type, ASN1_DATA* asn1_data)
 **  @retval SF_BER_LEN_DEF_SHORT one byte length < 127
 **  @retval SF_BER_LEN_INDEF indeterminate length
 */
-static int asn1_decode_len_type(const u_char* data)
+static int asn1_decode_len_type(const uint8_t* data)
 {
     int iExt;
 
@@ -496,7 +496,7 @@ static int asn1_is_eoc(ASN1_TYPE* asn1)
 **  @retval ASN1_ERR_INVALID_ARG invalid argument
 **  @retval ASN1_ERR_OOB out of bounds
 */
-static int asn1_decode_type(const u_char** data, u_int* len, ASN1_TYPE** asn1_type)
+static int asn1_decode_type(const uint8_t** data, u_int* len, ASN1_TYPE** asn1_type)
 {
     ASN1_DATA asn1data;
     u_int uiRawLen;
@@ -647,14 +647,14 @@ valid:
 **  @retval  ASN1_OK function successful
 **  @retval !ASN1_OK lots of error conditions, figure it out
 */
-int asn1_decode(const u_char* data, u_int len, ASN1_TYPE** asn1_type)
+int asn1_decode(const uint8_t* data, u_int len, ASN1_TYPE** asn1_type)
 {
     ASN1_TYPE* cur;
     ASN1_TYPE* child = nullptr;
     ASN1_TYPE* indef;
     ASN1_TYPE* asnstack[ASN1_MAX_STACK];
 
-    const u_char* end;
+    const uint8_t* end;
     u_int con_len;
     int index = 0;
     int iRet;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -44,7 +44,7 @@ bool TcpStateClosed::syn_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 
 bool TcpStateClosed::syn_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    Flow* flow = tsd.get_flow();
+    snort::Flow* flow = tsd.get_flow();
     flow->set_expire(tsd.get_pkt(), trk.session->config->session_timeout);
     return true;
 }
@@ -63,7 +63,7 @@ bool TcpStateClosed::ack_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 
 bool TcpStateClosed::data_seg_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    Flow* flow = tsd.get_flow();
+    snort::Flow* flow = tsd.get_flow();
 
     trk.update_tracker_ack_sent(tsd);
     // data on a segment when we're not accepting data any more alert!
@@ -135,7 +135,7 @@ bool TcpStateClosed::do_post_sm_packet_actions(TcpSegmentDescriptor& tsd, TcpStr
     if ( trk.get_tcp_event() != TcpStreamTracker::TCP_FIN_RECV_EVENT )
     {
         TcpStreamTracker::TcpState talker_state = trk.session->get_talker_state();
-        Flow* flow = tsd.get_flow();
+        snort::Flow* flow = tsd.get_flow();
 
         if ( ( talker_state == TcpStreamTracker::TCP_TIME_WAIT ) || !flow->two_way_traffic() )
         {
@@ -157,15 +157,15 @@ bool TcpStateClosed::do_post_sm_packet_actions(TcpSegmentDescriptor& tsd, TcpStr
 TEST_CASE("TCP State Closed", "[tcp_closed_state][stream_tcp]")
 {
     // initialization code here
-    Flow* flow = new Flow;
+    snort::Flow* flow = new snort::Flow;
     TcpStreamTracker* ctrk = new TcpStreamTracker(true);
     TcpStreamTracker* strk = new TcpStreamTracker(false);
     TcpEventLogger* tel = new TcpEventLogger;
     TcpSession* session = new TcpSession(flow);
     TcpStateMachine* tsm =  new TcpStateMachine;
     TcpStateHandler* tsh = new TcpStateClosed(*tsm, *session);
-    ctrk->normalizer = TcpNormalizerFactory::create(session, StreamPolicy::OS_LINUX, ctrk, strk);
-    strk->normalizer = TcpNormalizerFactory::create(session, StreamPolicy::OS_LINUX, strk, ctrk);
+    ctrk->normalizer = TcpNormalizerFactory::create(StreamPolicy::OS_LINUX, session, ctrk, strk);
+    strk->normalizer = TcpNormalizerFactory::create(StreamPolicy::OS_LINUX, session, strk, ctrk);
     ctrk->reassembler = TcpReassemblerFactory::create(session, ctrk, StreamPolicy::OS_LINUX,
         false);
     strk->reassembler = TcpReassemblerFactory::create(session, strk, StreamPolicy::OS_LINUX, true);

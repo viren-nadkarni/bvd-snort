@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -37,8 +37,11 @@
 
 #include "sfip/sf_returns.h"
 
+namespace snort
+{
 struct SfIp;
 struct SfCidr;
+}
 
 /* Selects which mode a given variable is using to
  * store and lookup IP addresses */
@@ -51,7 +54,7 @@ typedef enum _modes
 /* Used by the "list" mode.  A doubly linked list of SfIp objects. */
 typedef struct _ip_node
 {
-    SfCidr* ip;
+    snort::SfCidr* ip;
 #define ip_addr ip;   /* To ease porting Snort */
     struct _ip_node* next;
     int flags;
@@ -117,6 +120,6 @@ SfIpRet sfvar_compare(const sfip_var_t* one, const sfip_var_t* two);
 void sfvar_free(sfip_var_t* var);
 
 // returns true if both args are valid and ip is contained by var
-bool sfvar_ip_in(sfip_var_t* var, const SfIp* ip);
+bool sfvar_ip_in(sfip_var_t* var, const snort::SfIp* ip);
 
 #endif

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2009-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,15 +24,14 @@
 
 #include "catch/snort_catch.h"
 #include "hash/xhash.h"
-#include "main/snort_types.h"
 #include "parser/parse_ip.h"
 #include "sfip/sf_ip.h"
 
 #include "sfthd.h"
 
-//---------------------------------------------------------------
+using namespace snort;
 
-SNORT_FORCED_INCLUSION_DEFINITION(sfthd_test);
+//---------------------------------------------------------------
 
 #define IP_ANY   nullptr          // used to get "unset"
 
@@ -757,7 +756,7 @@ static void Init(ThreshData* base, int max)
 
         if ( p->type != THD_TYPE_DETECT )
         {
-            sfip_var_t* set = p->ip ? sfip_var_from_string(p->ip) : nullptr;
+            sfip_var_t* set = p->ip ? sfip_var_from_string(p->ip, "sfthd_test") : nullptr;
 
             p->create = sfthd_create_threshold(nullptr,
                 pThdObjs, p->gid, p->sid, p->tracking, p->type, PRIORITY,
@@ -837,7 +836,7 @@ static int EventTest(EventData* p, THD_NODE* rule)
     long curtime = (long)p->now;
     int status;
 
-    SfIp sip, dip;
+    snort::SfIp sip, dip;
     sip.set(p->sip);
     dip.set(p->dip);
 

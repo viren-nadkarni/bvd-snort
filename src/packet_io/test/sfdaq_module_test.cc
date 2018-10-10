@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,11 +28,10 @@
 
 #include "catch/snort_catch.h"
 #include "main/snort_config.h"
-#include "main/snort_types.h"
 #include "packet_io/sfdaq_config.h"
 #include "packet_io/sfdaq_module.h"
 
-SNORT_FORCED_INCLUSION_DEFINITION(sfdaq_module_test);
+using namespace snort;
 
 TEST_CASE("Kitchen Sink", "[SFDAQModule]")
 {

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -22,6 +22,8 @@
 #include "config.h"
 #endif
 
+#include <cassert>
+
 #include "framework/ips_option.h"
 #include "framework/module.h"
 #include "hash/hashfcn.h"
@@ -29,6 +31,8 @@
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
+
+using namespace snort;
 
 #define M_NORMAL  0
 #define M_ALL     1
@@ -50,9 +54,9 @@ static THREAD_LOCAL ProfileStats tcpFlagsPerfStats;
 
 struct TcpFlagCheckData
 {
-    u_char mode;
-    u_char tcp_flags;
-    u_char tcp_mask; /* Mask to take away from the flags check */
+    uint8_t mode;
+    uint8_t tcp_flags;
+    uint8_t tcp_mask; /* Mask to take away from the flags check */
 };
 
 class TcpFlagOption : public IpsOption
@@ -122,21 +126,14 @@ IpsOption::EvalStatus TcpFlagOption::eval(Cursor&, Packet* p)
      */
 
     TcpFlagCheckData* flagptr = &config;
-    u_char tcp_flags = p->ptrs.tcph->th_flags & (0xFF ^ flagptr->tcp_mask);
-
-    DebugMessage(DEBUG_IPS_OPTION, "           <!!> CheckTcpFlags: ");
+    uint8_t tcp_flags = p->ptrs.tcph->th_flags & (0xFF ^ flagptr->tcp_mask);
 
     switch ((flagptr->mode))
     {
     case M_NORMAL:
         if (flagptr->tcp_flags == tcp_flags)    /* only these set */
         {
-            DebugMessage(DEBUG_IPS_OPTION,"Got TCP [default] flag match!\n");
             return MATCH;
-        }
-        else
-        {
-            DebugMessage(DEBUG_IPS_OPTION,"No match\n");
         }
         break;
 
@@ -144,42 +141,25 @@ IpsOption::EvalStatus TcpFlagOption::eval(Cursor&, Packet* p)
         /* all set */
         if ((flagptr->tcp_flags & tcp_flags) == flagptr->tcp_flags)
         {
-            DebugMessage(DEBUG_IPS_OPTION, "Got TCP [ALL] flag match!\n");
             return MATCH;
-        }
-        else
-        {
-            DebugMessage(DEBUG_IPS_OPTION,"No match\n");
         }
         break;
 
     case M_NOT:
         if ((flagptr->tcp_flags & tcp_flags) == 0)     /* none set */
         {
-            DebugMessage(DEBUG_IPS_OPTION,"Got TCP [NOT] flag match!\n");
             return MATCH;
-        }
-        else
-        {
-            DebugMessage(DEBUG_IPS_OPTION, "No match\n");
         }
         break;
 
     case M_ANY:
         if ((flagptr->tcp_flags & tcp_flags) != 0)     /* something set */
         {
-            DebugMessage(DEBUG_IPS_OPTION,"Got TCP [ANY] flag match!\n");
             return MATCH;
-        }
-        else
-        {
-            DebugMessage(DEBUG_IPS_OPTION,"No match\n");
         }
         break;
 
     default:      /* Should never see this */
-        DebugMessage(DEBUG_IPS_OPTION, "TCP flag check went to default case"
-            " for some silly reason\n");
         break;
     }
 
@@ -196,22 +176,7 @@ static void flags_parse_test(const char* rule, TcpFlagCheckData* idx)
     const char* fend;
 
     fptr = rule;
-
-    /* make sure there is at least a split pointer */
-    if (fptr == nullptr)
-    {
-        ParseError("flags missing in TCP flag rule");
-        return;
-    }
-
-    while (isspace((u_char) *fptr))
-        fptr++;
-
-    if (strlen(fptr) == 0)
-    {
-        ParseError("flags missing in TCP flag rule");
-        return;
-    }
+    assert(fptr and *fptr);
 
     /* find the end of the alert string */
     fend = fptr + strlen(fptr);
@@ -299,22 +264,7 @@ static void flags_parse_mask(const char* rule, TcpFlagCheckData* idx)
     const char* fend;
 
     fptr = rule;
-
-    /* make sure there is at least a split pointer */
-    if (fptr == nullptr)
-    {
-        ParseError("flags missing in TCP flag rule");
-        return;
-    }
-
-    while (isspace((u_char) *fptr))
-        fptr++;
-
-    if (strlen(fptr) == 0)
-    {
-        ParseError("flags missing in TCP flag rule");
-        return;
-    }
+    assert(fptr and *fptr);
 
     /* find the end of the alert string */
     fend = fptr + strlen(fptr);

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -32,6 +32,7 @@
 #include "packet_io/sfdaq.h"
 #include "utils/util.h"
 
+using namespace snort;
 using namespace std;
 
 /*
@@ -131,7 +132,7 @@ static void LogTcpdumpSingle(
     if ( data->limit && (context.size + dumpSize > data->limit) )
         TcpdumpRollLogFile(data);
 
-    pcap_dump((u_char*)context.dumpd, reinterpret_cast<const struct pcap_pkthdr*>(p->pkth), p->pkt);
+    pcap_dump((uint8_t*)context.dumpd, reinterpret_cast<const struct pcap_pkthdr*>(p->pkth), p->pkt);
     context.size += dumpSize;
 
     if (!SnortConfig::line_buffered_logging())  // FIXIT-L misnomer

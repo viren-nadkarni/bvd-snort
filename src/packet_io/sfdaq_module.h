@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,21 +23,28 @@
 
 #include "framework/module.h"
 
+namespace snort
+{
 struct SnortConfig;
+}
 struct SFDAQConfig;
 struct SFDAQInstanceConfig;
 
-class SFDAQModule : public Module
+class SFDAQModule : public snort::Module
 {
 public:
     SFDAQModule();
 
-    bool set(const char*, Value&, SnortConfig*) override;
-    bool begin(const char*, int, SnortConfig*) override;
-    bool end(const char*, int, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool end(const char*, int, snort::SnortConfig*) override;
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
+    void prep_counts() override;
+
+    bool counts_need_prep() const override
+    { return true; }
 
     Usage get_usage() const override
     { return GLOBAL; }

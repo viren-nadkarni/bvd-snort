@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,6 @@
 #include "config.h"
 #endif
 
-#include "main/snort_debug.h"
 
 #include "client_app_msn.h"
 
@@ -148,7 +147,7 @@ int MsnClientDetector::validate(AppIdDiscoveryArgs& args)
     return APPID_INPROCESS;
 
 done:
-    add_app(args.asd, APP_ID_MSN_MESSENGER, product_id, (char*)version);
+    add_app(args.asd, APP_ID_MSN_MESSENGER, product_id, (char*)version, args.change_bits);
     return APPID_SUCCESS;
 }
 

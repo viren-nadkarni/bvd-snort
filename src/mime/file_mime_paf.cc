@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,6 +29,8 @@
 #include <cctype>
 
 #include "main/snort_debug.h"
+
+using namespace snort;
 
 static const char* boundary_str = "boundary=";
 
@@ -138,6 +140,8 @@ static inline bool check_boundary(MimeDataPafInfo* data_info,  uint8_t data)
     return false;
 }
 
+namespace snort
+{
 void reset_mime_paf_state(MimeDataPafInfo* data_info)
 {
     data_info->boundary_search = nullptr;
@@ -157,7 +161,6 @@ bool process_mime_paf_data(MimeDataPafInfo* data_info,  uint8_t data)
         if (store_boundary(data_info, data))
         {
             /* End of boundary, move to MIME_PAF_FOUND_BOUNDARY_STATE*/
-            DebugFormat(DEBUG_FILE, "Create boundary string: %s\n", data_info->boundary);
             data_info->data_state = MIME_PAF_FOUND_BOUNDARY_STATE;
         }
         break;
@@ -166,7 +169,6 @@ bool process_mime_paf_data(MimeDataPafInfo* data_info,  uint8_t data)
         if (check_boundary(data_info,  data))
         {
             /* End of boundary, move to MIME_PAF_FOUND_BOUNDARY_STATE*/
-            DebugFormat(DEBUG_FILE, "Found boundary string: %s\n", data_info->boundary);
             return true;
         }
         break;
@@ -221,4 +223,4 @@ bool check_data_end(void* data_end_state,  uint8_t val)
     *((DataEndState*)data_end_state) = state;
     return false;
 }
-
+} // namespace snort

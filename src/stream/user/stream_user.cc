@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,6 +27,8 @@
 
 #include "user_module.h"
 #include "user_session.h"
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // helpers
@@ -129,7 +131,7 @@ static const InspectApi user_api =
         mod_dtor
     },
     IT_STREAM,
-    (unsigned)PktType::PDU,
+    PROTO_BIT__PDU,
     nullptr, // buffers
     nullptr, // service
     nullptr, // pinit

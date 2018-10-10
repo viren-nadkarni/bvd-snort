@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,27 +32,35 @@
 #ifndef FT_MAIN_H
 #define FT_MAIN_H
 
+#include "target_based/snort_protocols.h"
+
 #include "ftpp_ui_config.h"
 
 #define BUF_SIZE 1024
 
+namespace snort
+{
 struct Packet;
-struct ProfileStats;
 struct SnortConfig;
+}
 
-extern int16_t ftp_data_app_id;
+#define FTP_CLIENT_NAME "ftp_client"
+#define FTP_DATA_NAME "ftp_data"
+#define FTP_SERVER_NAME "ftp_server"
 
-void do_detection(Packet*);
+extern SnortProtocolId ftp_data_snort_protocol_id;
+
+void do_detection(snort::Packet*);
 
 void CleanupFTPServerConf(void* serverConf);
 void CleanupFTPCMDConf(void* ftpCmd);
 void CleanupFTPBounceTo(void* ftpBounce);
 
-int CheckFTPServerConfigs(SnortConfig*, FTP_SERVER_PROTO_CONF*);
-int FTPCheckConfigs(SnortConfig*, void*);
+int CheckFTPServerConfigs(snort::SnortConfig*, FTP_SERVER_PROTO_CONF*);
+int FTPCheckConfigs(snort::SnortConfig*, void*);
 
-FTP_CLIENT_PROTO_CONF* get_ftp_client(Packet*);
-FTP_SERVER_PROTO_CONF* get_ftp_server(Packet*);
+FTP_CLIENT_PROTO_CONF* get_ftp_client(snort::Packet*);
+FTP_SERVER_PROTO_CONF* get_ftp_server(snort::Packet*);
 
 #endif
 

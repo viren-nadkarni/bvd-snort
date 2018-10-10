@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,24 +30,24 @@
 
 extern const PegInfo wiz_pegs[];
 extern THREAD_LOCAL struct WizStats tstats;
-extern THREAD_LOCAL ProfileStats wizPerfStats;
+extern THREAD_LOCAL snort::ProfileStats wizPerfStats;
 
 class MagicBook;
 class CurseBook;
 
-class WizardModule : public Module
+class WizardModule : public snort::Module
 {
 public:
     WizardModule();
     ~WizardModule() override;
 
-    bool set(const char*, Value&, SnortConfig*) override;
-    bool begin(const char*, int, SnortConfig*) override;
-    bool end(const char*, int, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool end(const char*, int, snort::SnortConfig*) override;
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
-    ProfileStats* get_profile() const override;
+    snort::ProfileStats* get_profile() const override;
 
     MagicBook* get_book(bool c2s, bool hex);
     CurseBook* get_curse_book();

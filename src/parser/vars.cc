@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,7 +25,6 @@
 
 #include "log/messages.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "sfip/sf_ipvar.h"
 #include "utils/util.h"
 #include "utils/util_cstring.h"
@@ -35,6 +34,8 @@
 #ifdef UNIT_TEST
 #include "catch/snort_catch.h"
 #endif
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // var node stuff
@@ -126,7 +127,7 @@ int PortVarDefine(SnortConfig* sc, const char* name, const char* s)
     PortObject* po;
     POParser pop;
     int rstat;
-    PortVarTable* portVarTable = get_ips_policy()->portVarTable;
+    PortVarTable* portVarTable = snort::get_ips_policy()->portVarTable;
 
     DisallowCrossTableDuplicateVars(sc, name, VAR_TYPE__PORTVAR);
 
@@ -365,7 +366,7 @@ int VarIsIpList(vartable_t* ip_vartable, const char* value)
 void DisallowCrossTableDuplicateVars(
     SnortConfig*, const char* name, VarType var_type)
 {
-    IpsPolicy* dp = get_ips_policy();
+    IpsPolicy* dp = snort::get_ips_policy();
     VarEntry* var_table = dp->var_table;
     PortVarTable* portVarTable = dp->portVarTable;
     vartable_t* ip_vartable = dp->ip_vartable;
@@ -456,7 +457,7 @@ void DisallowCrossTableDuplicateVars(
 VarEntry* VarDefine(
     SnortConfig* sc, const char* name, const char* value)
 {
-    IpsPolicy* dp = get_ips_policy();
+    IpsPolicy* dp = snort::get_ips_policy();
     VarEntry* var_table = dp->var_table;
     vartable_t* ip_vartable = dp->ip_vartable;
     VarEntry* p;
@@ -518,9 +519,6 @@ VarEntry* VarDefine(
         }
     }
 
-    DebugFormat(DEBUG_PORTLISTS,
-        "VarDefine: name=%s value=%s\n",name,value);
-
     /* Check to see if this variable is just being aliased */
     if (var_table != nullptr)
     {
@@ -545,9 +543,6 @@ VarEntry* VarDefine(
     {
         ParseAbort("could not expand var('%s').", name);
     }
-
-    DebugFormat(DEBUG_PORTLISTS,
-        "VarDefine: name=%s value=%s (expanded)\n",name,value);
 
     DisallowCrossTableDuplicateVars(sc, name, VAR_TYPE__DEFAULT);
 
@@ -650,7 +645,7 @@ void DeleteVars(VarEntry* var_table)
 
 const char* VarSearch(SnortConfig* sc, const char* name)
 {
-    IpsPolicy* dp = get_ips_policy();
+    IpsPolicy* dp = snort::get_ips_policy();
     VarEntry* var_table = dp->var_table;
     PortVarTable* portVarTable = dp->portVarTable;
     vartable_t* ip_vartable = dp->ip_vartable;
@@ -710,7 +705,6 @@ const char* ExpandVars(SnortConfig* sc, const char* string)
 
     int i = 0, j = 0;
     int l_string = strlen(string);
-    DebugFormat(DEBUG_CONFIGRULES, "ExpandVars, Before: %s\n", string);
 
     while (i < l_string && j < (int)sizeof(estring) - 1)
     {
@@ -825,7 +819,6 @@ const char* ExpandVars(SnortConfig* sc, const char* string)
         }
     }
 
-    DebugFormat(DEBUG_CONFIGRULES, "ExpandVars, After: %s\n", estring);
 
     return estring;
 }
@@ -835,7 +828,6 @@ void AddVarToTable(SnortConfig* sc, const char* name, const char* value)
     //TODO: snort.cfg and rules should use PortVar instead ...this allows compatibility for now.
     if (strstr(name, "_PORT") || strstr(name, "PORT_"))
     {
-        DebugMessage(DEBUG_CONFIGRULES,"PortVar\n");
         PortVarDefine(sc, name, value);
     }
     else

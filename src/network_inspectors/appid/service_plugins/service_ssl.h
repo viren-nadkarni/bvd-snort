@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -43,7 +43,7 @@ int ssl_scan_cname(const uint8_t*, size_t, AppId*, AppId*);
 int ssl_add_cert_pattern(uint8_t*, size_t, uint8_t, AppId);
 int ssl_add_cname_pattern(uint8_t*, size_t, uint8_t, AppId);
 void ssl_detector_free_patterns();
-bool setSSLSquelch(Packet*, int type, AppId, AppIdInspector& inspector);
+bool setSSLSquelch(snort::Packet*, int type, AppId, AppIdInspector& inspector);
 
 #endif
 

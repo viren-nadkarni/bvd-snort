@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,17 +32,14 @@ class HttpMsgBodyOld : public HttpMsgBody
 {
 public:
     HttpMsgBodyOld(const uint8_t* buffer, const uint16_t buf_size, HttpFlowData* session_data_,
-        HttpEnums::SourceId source_id_, bool buf_owner, Flow* flow_, const HttpParaList* params_)
-        : HttpMsgBody(buffer, buf_size, session_data_, source_id_, buf_owner, flow_, params_),
-        data_length(session_data->data_length[source_id]) {}
+        HttpEnums::SourceId source_id_, bool buf_owner, snort::Flow* flow_,
+        const HttpParaList* params_)
+        : HttpMsgBody(buffer, buf_size, session_data_, source_id_, buf_owner, flow_, params_) {}
     void update_flow() override;
 
 #ifdef REG_TEST
     void print_section(FILE* output) override;
 #endif
-
-protected:
-    int64_t data_length;
 };
 
 #endif

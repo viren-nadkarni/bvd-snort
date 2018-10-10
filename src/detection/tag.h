@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -29,7 +29,14 @@
 
 #include <cstdint>
 
+#include "main/snort_debug.h"
+extern Trace TRACE_NAME(detection);
+
+namespace snort
+{
 struct Packet;
+}
+
 struct OptTreeNode;
 struct Event;
 
@@ -56,8 +63,8 @@ struct TagData
 
 void InitTag();
 void CleanupTag();
-int CheckTagList(Packet*, Event&, void**);
-void SetTags(Packet*, const OptTreeNode*, uint16_t);
+int CheckTagList(snort::Packet*, Event&, void**);
+void SetTags(snort::Packet*, const OptTreeNode*, uint16_t);
 
 #endif
 

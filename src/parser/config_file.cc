@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -67,7 +67,7 @@ static int GetChecksumFlags(const char* args)
     if (args == nullptr)
         return CHECKSUM_FLAG__ALL;
 
-    toks = mSplit(args, " \t", 10, &num_toks, 0);
+    toks = snort::mSplit(args, " \t", 10, &num_toks, 0);
     for (i = 0; i < num_toks; i++)
     {
         if (strcasecmp(toks[i], CHECKSUM_MODE_OPT__ALL) == 0)
@@ -132,7 +132,7 @@ static int GetChecksumFlags(const char* args)
         }
         else
         {
-            ParseError("unknown command line checksum option: %s.", toks[i]);
+            snort::ParseError("unknown command line checksum option: %s.", toks[i]);
             return ret_flags;
         }
     }
@@ -160,19 +160,19 @@ static int GetChecksumFlags(const char* args)
         ret_flags = negative_flags;
     }
 
-    mSplitFree(&toks, num_toks);
+    snort::mSplitFree(&toks, num_toks);
     return ret_flags;
 }
 
 void ConfigChecksumDrop(const char* args)
 {
-    NetworkPolicy* policy = get_network_policy();
+    NetworkPolicy* policy = snort::get_network_policy();
     policy->checksum_drop = GetChecksumFlags(args);
 }
 
 void ConfigChecksumMode(const char* args)
 {
-    NetworkPolicy* policy = get_network_policy();
+    NetworkPolicy* policy = snort::get_network_policy();
     policy->checksum_eval = GetChecksumFlags(args);
 }
 
@@ -180,7 +180,7 @@ void config_conf(const char* val)
 {
     lua_conf = val;
     SetSnortConfDir(lua_conf.c_str());
-    Snort::set_main_hook(DetectionEngine::inspect);
+    snort::Snort::set_main_hook(snort::DetectionEngine::inspect);
 }
 
 void SetSnortConfDir(const char* file)

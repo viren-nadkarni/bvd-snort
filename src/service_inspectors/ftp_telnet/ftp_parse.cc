@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -413,7 +413,7 @@ static int DoNextFormat(FTP_PARAM_FMT* ThisFmt, int allocated,
             {
                 /* explicit check that we have enough room for copy */
                 if (numChoices <= ThisFmt->numChoices)
-                    ParseError("Can't do memcpy - index out of range ");
+                    snort::ParseError("Can't do memcpy - index out of range ");
 
                 memcpy(tmpChoices, ThisFmt->choices,
                     sizeof(FTP_PARAM_FMT*) * ThisFmt->numChoices);
@@ -646,7 +646,7 @@ int ProcessFTPAllowBounce(
 
     if (iRet)
     {
-        ParseError("Failed to add configuration for Bounce object '%s'.", ALLOW_BOUNCE);
+        snort::ParseError("Failed to add configuration for Bounce object '%s'.", ALLOW_BOUNCE);
         snort_free(newBounce);
         return FTPP_FATAL_ERR;
     }

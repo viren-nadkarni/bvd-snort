@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,8 @@
 #include "ps_module.h"
 
 #include <cassert>
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // port_scan params
@@ -81,55 +83,55 @@ static const Parameter ps_params[] =
       "list of CIDRs with optional ports" },
 
     { "tcp_ports", Parameter::PT_TABLE, scan_params, nullptr,
-      "tcp port scan configuration (one-to-one)" },
+      "TCP port scan configuration (one-to-one)" },
 
     { "tcp_decoy", Parameter::PT_TABLE, scan_params, nullptr,
-      "tcp decoy scan configuration (one-to-one decoy)" },
+      "TCP decoy scan configuration (one-to-one decoy)" },
 
     { "tcp_sweep", Parameter::PT_TABLE, scan_params, nullptr,
-      "tcp sweep scan configuration (one-to-many)" },
+      "TCP sweep scan configuration (one-to-many)" },
 
     { "tcp_dist", Parameter::PT_TABLE, scan_params, nullptr,
-      "tcp distributed scan configuration (many-to-one)" },
+      "TCP distributed scan configuration (many-to-one)" },
 
     { "udp_ports", Parameter::PT_TABLE, scan_params, nullptr,
-      "udp port scan configuration (one-to-one)" },
+      "UDP port scan configuration (one-to-one)" },
 
     { "udp_decoy", Parameter::PT_TABLE, scan_params, nullptr,
-      "udp decoy scan configuration (one-to-one)" },
+      "UDP decoy scan configuration (one-to-one)" },
 
     { "udp_sweep", Parameter::PT_TABLE, scan_params, nullptr,
-      "udp sweep scan configuration (one-to-many)" },
+      "UDP sweep scan configuration (one-to-many)" },
 
     { "udp_dist", Parameter::PT_TABLE, scan_params, nullptr,
-      "udp distributed scan configuration (many-to-one)" },
+      "UDP distributed scan configuration (many-to-one)" },
 
     { "ip_proto", Parameter::PT_TABLE, scan_params, nullptr,
-      "ip protocol scan configuration (one-to-one)" },
+      "IP protocol scan configuration (one-to-one)" },
 
     { "ip_decoy", Parameter::PT_TABLE, scan_params, nullptr,
-      "ip decoy scan configuration (one-to-one decoy)" },
+      "IP decoy scan configuration (one-to-one decoy)" },
 
     { "ip_sweep", Parameter::PT_TABLE, scan_params, nullptr,
       "ip sweep scan configuration (one-to-many)" },
 
     { "ip_dist", Parameter::PT_TABLE, scan_params, nullptr,
-      "ip distributed scan configuration (many-to-one)" },
+      "IP distributed scan configuration (many-to-one)" },
 
     { "icmp_sweep", Parameter::PT_TABLE, scan_params, nullptr,
-      "icmp sweep scan configuration (one-to-many)" },
+      "ICMP sweep scan configuration (one-to-many)" },
 
     { "tcp_window", Parameter::PT_INT, "0:", "0",
-      "detection interval for all tcp scans" },
+      "detection interval for all TCP scans" },
 
     { "udp_window", Parameter::PT_INT, "0:", "0",
-      "detection interval for all udp scans" },
+      "detection interval for all UDP scans" },
 
     { "ip_window", Parameter::PT_INT, "0:", "0",
-      "detection interval for all ip scans" },
+      "detection interval for all IP scans" },
 
     { "icmp_window", Parameter::PT_INT, "0:", "0",
-      "detection interval for all icmp scans" },
+      "detection interval for all ICMP scans" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -196,7 +198,7 @@ ProfileStats* PortScanModule::get_profile() const
 { return &psPerfStats; }
 
 const PegInfo* PortScanModule::get_pegs() const
-{ return simple_pegs; }
+{ return snort::simple_pegs; }
 
 PegCount* PortScanModule::get_counts() const
 { return (PegCount*)&spstats; }

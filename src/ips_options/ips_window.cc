@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,8 @@
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
+
+using namespace snort;
 
 #define s_name "window"
 
@@ -98,7 +100,7 @@ IpsOption::EvalStatus TcpWinOption::eval(Cursor&, Packet* p)
 static const Parameter s_params[] =
 {
     { "~range", Parameter::PT_INTERVAL, RANGE, nullptr,
-      "check if tcp window size is in given range" },
+      "check if TCP window size is in given range" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };

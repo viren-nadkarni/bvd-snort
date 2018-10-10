@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -130,7 +130,7 @@ struct SMTP_PROTO_CONF
     int max_response_line_len = 0;
     int xlink2state;
     MailLogConfig log_config;
-    DecodeConfig decode_conf;
+    snort::DecodeConfig decode_conf;
 
     uint32_t xtra_filename_id;
     uint32_t xtra_mfrom_id;
@@ -141,7 +141,7 @@ struct SMTP_PROTO_CONF
     SMTPToken* cmds;
     SMTPCmdConfig* cmd_config;
     SMTPSearch* cmd_search;
-    SearchTool* cmd_search_mpse;
+    snort::SearchTool* cmd_search_mpse;
 };
 
 struct SmtpStats

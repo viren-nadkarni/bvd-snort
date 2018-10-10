@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,6 +21,7 @@
 #include "config.h"
 #endif
 
+#include "detection/ips_context.h"
 #include "detection/signature.h"
 #include "events/event.h"
 #include "framework/logger.h"
@@ -34,6 +35,8 @@
 #include "managers/script_manager.h"
 #include "profiler/profiler_defs.h"
 #include "protocols/packet.h"
+
+using namespace snort;
 
 static THREAD_LOCAL ProfileStats luaLogPerfStats;
 
@@ -77,7 +80,7 @@ SO_PUBLIC const SnortPacket* get_packet()
     default: lua_packet.type = "OTHER";
     }
 
-    lua_packet.num = pc.total_from_daq;
+    lua_packet.num = packet->context->packet_number;
     lua_packet.sp = packet->ptrs.sp;
     lua_packet.dp = packet->ptrs.dp;
 

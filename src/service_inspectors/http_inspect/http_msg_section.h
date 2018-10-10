@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -70,22 +70,20 @@ public:
 
 protected:
     HttpMsgSection(const uint8_t* buffer, const uint16_t buf_size, HttpFlowData* session_data_,
-        HttpEnums::SourceId source_id_, bool buf_owner, Flow* flow_, const HttpParaList*
+        HttpEnums::SourceId source_id_, bool buf_owner, snort::Flow* flow_, const HttpParaList*
         params_);
 
     const Field msg_text;
-
     HttpFlowData* const session_data;
-    const HttpEnums::SourceId source_id;
-    Flow* const flow;
-    uint64_t trans_num;
+    snort::Flow* const flow;
     const HttpParaList* const params;
     HttpTransaction* const transaction;
-    const bool tcp_close;
-
+    uint64_t trans_num;
+    int32_t status_code_num;
+    const HttpEnums::SourceId source_id;
     HttpEnums::VersionId version_id;
     HttpEnums::MethodId method_id;
-    int32_t status_code_num;
+    const bool tcp_close;
 
     // Convenience methods shared by multiple subclasses
     void add_infraction(int infraction);

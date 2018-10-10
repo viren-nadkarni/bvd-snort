@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,8 +24,12 @@
 
 #include "main/snort_types.h"
 
-void packet_time_update(const struct timeval* cur_tv);
+namespace snort
+{
 SO_PUBLIC time_t packet_time();
+}
+
+void packet_time_update(const struct timeval* cur_tv);
 uint32_t packet_first_time();
 void packet_gettimeofday(struct timeval* tv);
 

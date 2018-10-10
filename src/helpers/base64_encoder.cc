@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,7 +34,7 @@
 #include "catch/snort_catch.h"
 #endif
 
-SNORT_FORCED_INCLUSION_DEFINITION(base64_encoder);
+using namespace snort;
 
 static inline char b64(uint8_t idx)
 {

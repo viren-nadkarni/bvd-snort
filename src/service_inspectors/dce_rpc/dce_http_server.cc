@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,12 +23,14 @@
 #include "config.h"
 #endif
 
-#include "dce_http_common.h"
 #include "dce_http_server_module.h"
-#include "dce_http_server_splitter.h"
 
 #include "managers/inspector_manager.h"
 #include "stream/libtcp/tcp_stream_session.h"
+
+#include "dce_http_server_splitter.h"
+
+using namespace snort;
 
 THREAD_LOCAL DceHttpServerStats dce_http_server_stats;
 
@@ -51,19 +53,18 @@ void DceHttpServer::clear(Packet* p)
 {
     Flow* flow = p->flow;
 
-    if ( flow->session != nullptr)
+    if (flow->session and flow->pkt_type == PktType::TCP)
     {
-        if ( (flow->get_session_flags() & SSNFLAG_ABORT_SERVER) == 0 )
+        if ( !p->test_session_flags(SSNFLAG_ABORT_SERVER) )
         {
-            TcpStreamSession* session = (TcpStreamSession*)flow->session;
-
+            TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
             DceHttpServerSplitter* splitter =
-                (DceHttpServerSplitter*)(session->get_splitter(false));
+                (DceHttpServerSplitter*)(tcp_session->get_splitter(false));
 
             if ( splitter->cutover_inspector())
             {
                 dce_http_server_stats.http_server_sessions++;
-                dce_http_bind(flow, "dcerpc");
+                flow->set_service(p, DCE_RPC_SERVICE_NAME);
             }
             else
                 dce_http_server_stats.http_server_session_failures++;
@@ -112,7 +113,7 @@ const InspectApi dce_http_server_api =
         mod_server_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU,
+    PROTO_BIT__PDU,
     nullptr,  // buffers
     "dce_http_server",
     nullptr, // pinit

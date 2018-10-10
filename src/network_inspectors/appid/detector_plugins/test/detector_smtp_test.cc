@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,10 +31,6 @@
 #include <CppUTestExt/MockSupport.h>
 
 #include <string>
-
-#ifdef DEBUG_MSGS
-void Debug::print(const char*, int, uint64_t, const char*, ...) { }
-#endif
 
 struct AddAppData
 {

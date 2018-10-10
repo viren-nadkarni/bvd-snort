@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -56,6 +56,8 @@
 #include "protocols/packet.h"
 #include "utils/util.h"
 #include "utils/util_cstring.h"
+
+using namespace snort;
 
 #define s_name "session"
 
@@ -172,23 +174,23 @@ static FILE* OpenSessionFile(Packet* p)
     dst = p->ptrs.ip_api.get_dst();
     src = p->ptrs.ip_api.get_src();
 
-    const char* addr;
+    SfIpString addr;
 
     if (SnortConfig::get_conf()->homenet.contains(dst) == SFIP_CONTAINS)
     {
         if (SnortConfig::get_conf()->homenet.contains(src) == SFIP_NOT_CONTAINS)
         {
-            addr = p->ptrs.ip_api.get_src()->ntoa();
+            p->ptrs.ip_api.get_src()->ntop(addr);
         }
         else
         {
             if (p->ptrs.sp >= p->ptrs.dp)
             {
-                addr = p->ptrs.ip_api.get_src()->ntoa();
+                p->ptrs.ip_api.get_src()->ntop(addr);
             }
             else
             {
-                addr = p->ptrs.ip_api.get_dst()->ntoa();
+                p->ptrs.ip_api.get_dst()->ntop(addr);
             }
         }
     }
@@ -196,17 +198,17 @@ static FILE* OpenSessionFile(Packet* p)
     {
         if (SnortConfig::get_conf()->homenet.contains(src) == SFIP_CONTAINS)
         {
-            addr = p->ptrs.ip_api.get_dst()->ntoa();
+            p->ptrs.ip_api.get_dst()->ntop(addr);
         }
         else
         {
             if (p->ptrs.sp >= p->ptrs.dp)
             {
-                addr = p->ptrs.ip_api.get_src()->ntoa();
+                p->ptrs.ip_api.get_src()->ntop(addr);
             }
             else
             {
-                addr = p->ptrs.ip_api.get_dst()->ntoa();
+                p->ptrs.ip_api.get_dst()->ntop(addr);
             }
         }
     }
@@ -247,8 +249,8 @@ static FILE* OpenSessionFile(Packet* p)
 
 static void DumpSessionData(FILE* fp, Packet* p, SessionData* sessionData)
 {
-    const u_char* idx;
-    const u_char* end;
+    const uint8_t* idx;
+    const uint8_t* end;
     char conv[] = "0123456789ABCDEF"; /* xlation lookup table */
 
     if (p->dsize == 0 || p->data == nullptr || (p->ptrs.decode_flags & DECODE_FRAG))

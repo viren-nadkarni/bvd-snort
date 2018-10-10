@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -40,6 +40,8 @@
 #include "catch/snort_catch.h"
 #endif
 
+using namespace snort;
+
 static THREAD_LOCAL uint64_t elapsed = 0;
 
 namespace packet_latency
@@ -70,17 +72,14 @@ using EventHandler = EventingWrapper<Event>;
 
 static inline std::ostream& operator<<(std::ostream& os, const Event& e)
 {
-    using std::chrono::duration_cast;
-    using std::chrono::microseconds;
-
-    os << "latency: " << pc.total_from_daq << " packet";
+    os << "latency: " << e.packet->context->packet_number << " packet";
 
     if ( e.fastpathed )
         os << " fastpathed: ";
     else
         os << " timed out: ";
 
-    os << clock_usecs(duration_cast<microseconds>(e.elapsed).count()) << " usec, ";
+    os << clock_usecs(TO_USECS(e.elapsed)) << " usec, ";
 
     if ( e.packet->is_cooked() )
         os << e.packet->get_pseudo_type();
@@ -126,9 +125,7 @@ inline Impl<Clock>::Impl(const ConfigWrapper& cfg, EventHandler& eh, EventHandle
 template<typename Clock>
 inline void Impl<Clock>::push()
 {
-    using std::chrono::duration_cast;
-    auto max_time = duration_cast<typename Clock::duration>(config->max_time);
-    timers.emplace_back(max_time);
+    timers.emplace_back(config->max_time);
 }
 
 template<typename Clock>
@@ -153,10 +150,7 @@ inline bool Impl<Clock>::pop(const Packet* p)
             event_handler.handle(e);
     }
 
-    // FIXIT-H this is fugly and inefficient
-    using std::chrono::duration_cast;
-    using std::chrono::microseconds;
-    elapsed = clock_usecs(duration_cast<microseconds>(timer.elapsed()).count());
+    elapsed = clock_usecs(TO_USECS(timer.elapsed()));
 
     timers.pop_back();
     return timed_out;
@@ -210,6 +204,7 @@ static struct SnortLogHandler : public EventHandler
 
 static THREAD_LOCAL Impl<>* impl = nullptr;
 
+// FIXIT-L this should probably be put in a tinit
 static inline Impl<>& get_impl()
 {
     if ( !impl )

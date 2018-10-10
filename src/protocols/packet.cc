@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,6 +23,7 @@
 
 #include "packet.h"
 
+#include "detection/ips_context.h"
 #include "flow/expect_cache.h"
 #include "framework/endianness.h"
 #include "log/obfuscator.h"
@@ -30,6 +31,8 @@
 
 #include "packet_manager.h"
 
+namespace snort
+{
 Packet::Packet(bool packet_data)
 {
     layers = new Layer[CodecManager::get_max_layers()];
@@ -148,9 +151,6 @@ const char* Packet::get_type() const
     case PktType::UDP:
         return "UDP";
 
-    case PktType::ARP:
-        return "ARP";
-
     case PktType::PDU:
     case PktType::FILE:
         if ( proto_bits & PROTO_BIT__TCP )
@@ -163,6 +163,9 @@ const char* Packet::get_type() const
         return "Error";
 
     case PktType::NONE:
+        if ( proto_bits & PROTO_BIT__ARP )
+            return "ARP";
+
         if ( num_layers > 0 )
             return PacketManager::get_proto_name(layers[num_layers-1].prot_id);
 
@@ -207,4 +210,36 @@ const char* Packet::get_pseudo_type() const
     }
     return "other";
 }
+
+// Things that are set prior to PDU creation and used after PDU creation
+static inline uint32_t get_session_flags(Packet& p)
+{
+    if ( p.ptrs.get_pkt_type() == PktType::PDU )
+        return p.context->get_session_flags();
+
+    return p.flow ? p.flow->get_session_flags() : 0;
+}
+
+bool Packet::is_detection_enabled(bool to_server)
+{
+    uint32_t session_flags = get_session_flags(*this);
+
+    if ( to_server )
+        return !(session_flags & SSNFLAG_NO_DETECT_TO_SERVER);
+
+    return !(session_flags & SSNFLAG_NO_DETECT_TO_CLIENT);
+}
+
+bool Packet::test_session_flags(uint32_t flags)
+{ return (get_session_flags(*this) & flags) != 0; }
+
+SnortProtocolId Packet::get_snort_protocol_id()
+{
+    if ( ptrs.get_pkt_type() == PktType::PDU )
+        return context->get_snort_protocol_id();
+
+    return flow ? flow->ssn_state.snort_protocol_id : UNKNOWN_PROTOCOL_ID;
+}
+
+} // namespace snort
 

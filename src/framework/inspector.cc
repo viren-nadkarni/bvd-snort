@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,8 @@
 #include "main/thread_config.h"
 #include "protocols/packet.h"
 #include "stream/stream_splitter.h"
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // packet handler stuff
@@ -99,7 +101,7 @@ StreamSplitter* Inspector::get_splitter(bool to_server)
 
 bool Inspector::likes(Packet* p)
 {
-    if ( !((uint16_t)p->type() & api->proto_bits) )
+    if ( !(BIT((uint16_t)p->type()) & api->proto_bits) )
         return false;
 
     if ( p->is_tcp() && api->type == IT_SERVICE )

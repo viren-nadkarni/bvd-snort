@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,6 +32,7 @@
 #include "magic.h"
 #include "wiz_module.h"
 
+using namespace snort;
 using namespace std;
 
 THREAD_LOCAL ProfileStats wizPerfStats;
@@ -88,6 +89,23 @@ public:
         uint32_t flags, uint32_t* fp) override;
 
     bool is_paf() override { return true; }
+
+private:
+    void count_scan(const Flow* f)
+    {
+        if ( f->pkt_type == PktType::TCP )
+            ++tstats.tcp_scans;
+        else
+            ++tstats.user_scans;
+    }
+
+    void count_hit(const Flow* f)
+    {
+        if ( f->pkt_type == PktType::TCP )
+            ++tstats.tcp_hits;
+        else
+            ++tstats.user_hits;
+    }
 
 private:
     Wizard* wizard;
@@ -152,10 +170,10 @@ StreamSplitter::Status MagicSplitter::scan(
     uint32_t, uint32_t*)
 {
     Profile profile(wizPerfStats);
-    ++tstats.tcp_scans;
+    count_scan(f);
 
     if ( wizard->cast_spell(wand, f, data, len) )
-        ++tstats.tcp_hits;
+        count_hit(f);
 
     else if ( wizard->finished(wand) )
         return ABORT;
@@ -294,7 +312,7 @@ bool Wizard::finished(Wand& w)
     if ( w.hex or w.spell )
         return false;
 
-    // FIXTHIS-L how to know curses are done?
+    // FIXIT-L how to know curses are done?
     if ( !w.curse_tracker.empty() )
         return false;
 
@@ -338,7 +356,7 @@ static const InspectApi wiz_api =
         mod_dtor
     },
     IT_WIZARD,
-    (uint16_t)PktType::TCP | (uint16_t)PktType::UDP | (uint16_t)PktType::PDU,
+    PROTO_BIT__ANY_PDU,
     nullptr, // buffers
     nullptr, // service
     nullptr, // init

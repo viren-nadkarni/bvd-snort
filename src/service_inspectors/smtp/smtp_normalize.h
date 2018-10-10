@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,8 +24,11 @@
 
 #include <cstdint>
 
+namespace snort
+{
 struct Packet;
+}
 
-int SMTP_NormalizeCmd(Packet*, const uint8_t*, const uint8_t*, const uint8_t*);
+int SMTP_NormalizeCmd(snort::Packet*, const uint8_t*, const uint8_t*, const uint8_t*);
 
 #endif

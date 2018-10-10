@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,16 +28,16 @@
 #define host_cache_help \
     "configure hosts"
 
-class HostCacheModule : public Module
+class HostCacheModule : public snort::Module
 {
 public:
-    HostCacheModule() : Module("host_cache", host_cache_help, host_cache_params, true)
+    HostCacheModule() : snort::Module("host_cache", host_cache_help, host_cache_params, true)
     {
     }
 
-    bool begin(const char*, int, SnortConfig*) override;
-    bool end(const char*, int, SnortConfig*) override;
-    bool set(const char*, Value&, SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool end(const char*, int, snort::SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
@@ -48,8 +48,8 @@ public:
     { return GLOBAL; }
 
 private:
-    static const Parameter host_cache_params[];
-    static const Parameter service_params[];
+    static const snort::Parameter host_cache_params[];
+    static const snort::Parameter service_params[];
 
     uint32_t host_cache_size;
 };

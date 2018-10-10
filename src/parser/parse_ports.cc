@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,9 +23,10 @@
 
 #include "parse_ports.h"
 
-#include "main/snort_debug.h"
 #include "protocols/packet.h"
 #include "utils/util.h"
+
+using namespace snort;
 
 static int POParserInit(POParser* pop, const char* s, PortVarTable* pvTable)
 {
@@ -50,7 +51,6 @@ static int POPGetChar(POParser* pop)
         pop->slen--;
         pop->s++;
         pop->pos++;
-        DebugFormat(DEBUG_PORTLISTS,"GetChar: %c, %d bytes left\n",c, pop->slen);
         return c;
     }
     return 0;
@@ -170,13 +170,11 @@ static char* POParserName(POParser* pop)
         }
     }
 
-    DebugFormat(DEBUG_PORTLISTS,">>> POParserName : %s\n",pop->token);
-
     return snort_strdup(pop->token);
 }
 
 /*
-*   Read an unsigned short (a port)
+*   read an unsigned short (a port)
 */
 static uint16_t POParserGetShort(POParser* pop)
 {
@@ -217,8 +215,6 @@ static uint16_t POParserGetShort(POParser* pop)
         pop->errflag = POPERR_BOUNDS;
         return 0;
     }
-
-    DebugFormat(DEBUG_PORTLISTS,"GetUNumber: %d\n",c);
 
     return c;
 }
@@ -290,7 +286,7 @@ static PortObject* _POParsePort(POParser* pop)
             (c == ','))
         {
             /* Open ended range, highport is 65k */
-            hport = MAX_PORTS-1;
+            hport = snort::MAX_PORTS - 1;
             PortObjectAddRange(po, lport, hport);
             return po;
         }
@@ -480,8 +476,6 @@ PortObject* PortObjectParseString(PortVarTable* pvTable, POParser* pop,
     const char* name, const char* s, int nameflag)
 {
     PortObject* po, * potmp;
-
-    DebugFormat(DEBUG_PORTLISTS,"PortObjectParseString: %s\n",s);
 
     POParserInit(pop, s, pvTable);
 

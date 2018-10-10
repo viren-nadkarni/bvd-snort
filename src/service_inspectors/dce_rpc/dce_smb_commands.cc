@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,11 +27,12 @@
 
 #include "dce_smb_commands.h"
 
-#include "main/snort_debug.h"
 #include "utils/util.h"
 
 #include "dce_smb_module.h"
 #include "dce_smb_transaction_utils.h"
+
+using namespace snort;
 
 #define SMB_DIALECT_NT_LM_012       "NT LM 0.12"  // NT LAN Manager
 
@@ -275,9 +276,6 @@ static DCE2_Ret DCE2_SmbCheckData(DCE2_SmbSsnData*,
 static DCE2_Ret DCE2_SmbWriteAndXRawRequest(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
     const DCE2_SmbComInfo* com_info, const uint8_t* nb_ptr, uint32_t nb_len)
 {
-    DebugMessage(DEBUG_DCE_SMB,
-        "Processing WriteAndX with raw mode flags\n");
-
     // Set this now for possible reassembled packet
     uint16_t fid = SmbWriteAndXReqFid((const SmbWriteAndXReq*)nb_ptr);
     DCE2_SmbFileTracker* ftracker = DCE2_SmbGetFileTracker(ssd, fid);
@@ -319,7 +317,7 @@ static DCE2_Ret DCE2_SmbWriteAndXRawRequest(DCE2_SmbSsnData* ssd, const SmbNtHdr
             // See below.
             break;
         default:
-            DebugFormat(DEBUG_DCE_SMB, "Invalid policy: %d", policy);
+            assert(false);
             break;
         }
     }
@@ -418,7 +416,7 @@ static DCE2_Ret DCE2_SmbWriteAndXRawRequest(DCE2_SmbSsnData* ssd, const SmbNtHdr
             {
                 const uint8_t* data_ptr = DCE2_BufferData(ftracker->fp_writex_raw->buf);
                 uint32_t data_len = DCE2_BufferLength(ftracker->fp_writex_raw->buf);
-                Packet* rpkt = DCE2_SmbGetRpkt(ssd,
+                snort::Packet* rpkt = DCE2_SmbGetRpkt(ssd,
                     &data_ptr, &data_len, DCE2_RPKT_TYPE__SMB_TRANS);
 
                 if (rpkt == nullptr)
@@ -426,9 +424,6 @@ static DCE2_Ret DCE2_SmbWriteAndXRawRequest(DCE2_SmbSsnData* ssd, const SmbNtHdr
                     DCE2_BufferEmpty(ftracker->fp_writex_raw->buf);
                     return DCE2_RET__ERROR;
                 }
-
-                DebugMessage(DEBUG_DCE_SMB, "Reassembled WriteAndX raw mode request\n");
-                DCE2_PrintPktData(rpkt->data, rpkt->dsize);
 
                 (void)DCE2_SmbProcessRequestData(ssd, fid, data_ptr, data_len, 0);
 
@@ -452,7 +447,7 @@ static DCE2_Ret DCE2_SmbWriteAndXRawRequest(DCE2_SmbSsnData* ssd, const SmbNtHdr
         // if both flags are set.
         break;
     default:
-        DebugFormat(DEBUG_DCE_SMB, "Invalid policy: %d", policy);
+        assert(false);
         break;
     }
 
@@ -645,7 +640,7 @@ DCE2_Ret DCE2_SmbClose(DCE2_SmbSsnData* ssd, const SmbNtHdr*,
 
         if ((ssd->fb_ftracker != nullptr) && (ssd->fb_ftracker == ssd->cur_rtracker->ftracker))
         {
-            FileVerdict verdict = DCE2_get_file_verdict(ssd);
+            FileVerdict verdict = DCE2_get_file_verdict();
 
             if ((verdict == FILE_VERDICT_BLOCK) || (verdict == FILE_VERDICT_REJECT))
                 ssd->block_pdus = true;
@@ -747,7 +742,7 @@ DCE2_Ret DCE2_SmbRead(DCE2_SmbSsnData* ssd, const SmbNtHdr*,
         uint16_t byte_count = DCE2_ComInfoByteCount(com_info);
         uint16_t com_dcnt = SmbReadRespCount((const SmbReadResp*)nb_ptr);
         uint8_t fmt = *(nb_ptr + com_size);
-        uint16_t fmt_dcnt = alignedNtohs((const uint16_t*)(nb_ptr + com_size + 1));
+        uint16_t fmt_dcnt = snort::alignedNtohs((const uint16_t*)(nb_ptr + com_size + 1));
 
         DCE2_MOVE(nb_ptr, nb_len, (com_size + 3));
 
@@ -777,7 +772,7 @@ DCE2_Ret DCE2_SmbWrite(DCE2_SmbSsnData* ssd, const SmbNtHdr*,
         uint16_t byte_count = DCE2_ComInfoByteCount(com_info);
         uint8_t fmt = *(nb_ptr + com_size);
         uint16_t com_dcnt = SmbWriteReqCount((const SmbWriteReq*)nb_ptr);
-        uint16_t fmt_dcnt = alignedNtohs((const uint16_t*)(nb_ptr + com_size + 1));
+        uint16_t fmt_dcnt = snort::alignedNtohs((const uint16_t*)(nb_ptr + com_size + 1));
         uint16_t fid = SmbWriteReqFid((const SmbWriteReq*)nb_ptr);
         uint32_t offset = SmbWriteReqOffset((const SmbWriteReq*)nb_ptr);
 
@@ -886,13 +881,12 @@ DCE2_Ret DCE2_SmbLockAndRead(DCE2_SmbSsnData* ssd, const SmbNtHdr*,
         uint16_t byte_count = DCE2_ComInfoByteCount(com_info);
         uint8_t fmt = *(nb_ptr + com_size);
         uint16_t com_dcnt = SmbLockAndReadRespCount((const SmbLockAndReadResp*)nb_ptr);
-        uint16_t fmt_dcnt = alignedNtohs((const uint16_t*)(nb_ptr + com_size + 1));
+        uint16_t fmt_dcnt = snort::alignedNtohs((const uint16_t*)(nb_ptr + com_size + 1));
 
         DCE2_MOVE(nb_ptr, nb_len, (com_size + 3));
 
         DCE2_SmbCheckFmtData(ssd, nb_len, byte_count, fmt, com_dcnt, fmt_dcnt);
 
-        DebugFormat(DEBUG_DCE_SMB," SmbWriteLockAndRead dcnt %d\n", com_dcnt);
         if (com_dcnt == 0)
         {
             dce_alert(GID_DCE2, DCE2_SMB_DCNT_ZERO, (dce2CommonStats*)&dce2_smb_stats);
@@ -941,7 +935,7 @@ DCE2_Ret DCE2_SmbWriteAndUnlock(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
         uint16_t byte_count = DCE2_ComInfoByteCount(com_info);
         uint8_t fmt = *(nb_ptr + com_size);
         uint16_t com_dcnt = SmbWriteAndUnlockReqCount((const SmbWriteAndUnlockReq*)nb_ptr);
-        uint16_t fmt_dcnt = alignedNtohs((const uint16_t*)(nb_ptr + com_size + 1));
+        uint16_t fmt_dcnt = snort::alignedNtohs((const uint16_t*)(nb_ptr + com_size + 1));
         uint16_t fid = SmbWriteAndUnlockReqFid((const SmbWriteAndUnlockReq*)nb_ptr);
         uint32_t offset = SmbWriteAndUnlockReqOffset((const SmbWriteAndUnlockReq*)nb_ptr);
 
@@ -1207,7 +1201,7 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
             if ((word_count != 13) && (word_count != 12))
                 return DCE2_RET__SUCCESS;
 
-            Profile profile(dce2_smb_pstat_smb_fingerprint);
+            snort::Profile profile(dce2_smb_pstat_smb_fingerprint);
 
             if (word_count == 13)
             {
@@ -1250,9 +1244,7 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                     DCE2_MOVE(nb_ptr, nb_len, 1);
             }
 
-            DebugMessage(DEBUG_DCE_SMB, "Attempting to fingerprint "
-                "Client Windows/Samba version ... \n");
-
+            // Attempting to fingerprint Client Windows/Samba version.
             // Move past Account and Domain strings
             // Blob version doesn't have these as they're in the blob
             if (DCE2_ComInfoWordCount(com_info) == 13)
@@ -1284,33 +1276,9 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
             // is kosher.  It's policy will be used when the server is
             // sending data to it.
 
-#ifdef DEBUG_MSGS
-            {
-                uint32_t k, l = 0;
-                char buf[65535];
-
-                for (k = 0; (k < nb_len) && (nb_ptr[k] != 0); k += increment, l++)
-                    buf[l] = nb_ptr[k];
-
-                buf[l] = 0;
-                DebugFormat(DEBUG_DCE_SMB, "  Client OS: %s\n", buf);
-
-                k += increment;
-
-                l = 0;
-                for (; k < nb_len && nb_ptr[k] != 0; k += increment, l++)
-                    buf[l] = nb_ptr[k];
-
-                buf[l] = 0;
-                DebugFormat(DEBUG_DCE_SMB, "  Client Lanman: %s\n", buf);
-            }
-#endif
-
             // Windows Vista and above don't put anything here
             if (*nb_ptr == '\0')
             {
-                DebugMessage(DEBUG_DCE_SMB,
-                    "Setting client policy to Windows Vista\n");
                 DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WINVISTA);
                 return DCE2_RET__SUCCESS;
             }
@@ -1337,18 +1305,12 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                 switch (state)
                 {
                 case OS_WIN2000:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting client policy to Windows 2000\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WIN2000);
                     break;
                 case OS_WINXP:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting client policy to Windows XP\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WINXP);
                     break;
                 case OS_WIN2003:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting client policy to Windows 2003\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WIN2003);
                     break;
                 default:
@@ -1379,8 +1341,6 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
             // Samba
             if (*nb_ptr == 'S')
             {
-                DebugMessage(DEBUG_DCE_SMB,
-                    "Setting client policy to Samba\n");
                 DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__SAMBA);
             }
         }
@@ -1409,7 +1369,7 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
             if (DCE2_ComInfoByteCount(com_info) == 0)
                 return DCE2_RET__SUCCESS;
 
-            Profile profile(dce2_smb_pstat_smb_fingerprint);
+            snort::Profile profile(dce2_smb_pstat_smb_fingerprint);
 
             if (DCE2_ComInfoWordCount(com_info) == 3)
             {
@@ -1437,35 +1397,10 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                     DCE2_MOVE(nb_ptr, nb_len, 1);
             }
 
-            DebugMessage(DEBUG_DCE_SMB, "Attempting to fingerprint "
-                "Server Windows/Samba version ... \n");
-
+            // Attempting to fingerprint Server Windows/Samba version.
             // Note the below is quick and dirty.  We're assuming the server
             // is kosher.  It's policy will be used when the client is
             // sending data to it.
-
-#ifdef DEBUG_MSGS
-            {
-                uint32_t k, l = 0;
-                char buf[65535];
-
-                for (k = 0; (k < nb_len) && (nb_ptr[k] != 0); k += increment, l++)
-                    buf[l] = nb_ptr[k];
-
-                buf[l] = 0;
-                DebugFormat(DEBUG_DCE_SMB, "  Server OS: %s\n", buf);
-
-                k += increment;
-
-                l = 0;
-                for (; k < nb_len && nb_ptr[k] != 0; k += increment, l++)
-                    buf[l] = nb_ptr[k];
-
-                buf[l] = 0;
-                DebugFormat(DEBUG_DCE_SMB, "  Server Lanman: %s\n", buf);
-            }
-#endif
-
             if ((nb_len < increment) || (*nb_ptr == '\0'))
             {
                 return DCE2_RET__SUCCESS;
@@ -1493,33 +1428,21 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                 switch (state)
                 {
                 case OS_WIN2000:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Windows 2000\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WIN2000);
                     break;
                 case OS_WINXP:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Windows XP\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WINXP);
                     break;
                 case OS_WIN2003:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Windows 2003\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WIN2003);
                     break;
                 case OS_WIN2008:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Windows 2008\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WIN2008);
                     break;
                 case OS_WINVISTA:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Windows Vista\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WINVISTA);
                     break;
                 case OS_WIN7:
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Windows 7\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__WIN7);
                     break;
                 default:
@@ -1568,8 +1491,6 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                 // If less than 3 set policy to earliest Samba policy we use
                 if ((nb_ptr[i] == '0') || (nb_ptr[i] == '1') || (nb_ptr[i] == '2'))
                 {
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Samba 3.0.20\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__SAMBA_3_0_20);
                     return DCE2_RET__SUCCESS;
                 }
@@ -1585,8 +1506,6 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                 // If it's not 0, then set to latest Samba policy we use
                 if (nb_ptr[i] != '0')
                 {
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to current Samba\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__SAMBA);
                     return DCE2_RET__SUCCESS;
                 }
@@ -1597,8 +1516,6 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                 // First digit is 1 or no second digit or 20, Samba 3.0.20
                 if ((r1 == '1') || (r2 == '\0') || ((r1 == '2') && (r2 == '0')))
                 {
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Samba 3.0.20\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__SAMBA_3_0_20);
                     return DCE2_RET__SUCCESS;
                 }
@@ -1606,8 +1523,6 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                 // 21 or 22, Samba 3.0.22
                 if ((r1 == '2') && (r2 <= '2'))
                 {
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Samba 3.0.22\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__SAMBA_3_0_22);
                     return DCE2_RET__SUCCESS;
                 }
@@ -1615,14 +1530,10 @@ DCE2_Ret DCE2_SmbSessionSetupAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
                 // 23, 24 ... 30 ... 37, Samba 3.0.37
                 if ((r1 == '2') || ((r1 == '3') && (r2 <= '7')))
                 {
-                    DebugMessage(DEBUG_DCE_SMB,
-                        "Setting server policy to Samba 3.0.37\n");
                     DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__SAMBA_3_0_37);
                     return DCE2_RET__SUCCESS;
                 }
 
-                DebugMessage(DEBUG_DCE_SMB,
-                    "Setting server policy to current Samba\n");
                 DCE2_SsnSetPolicy(&ssd->sd, DCE2_POLICY__SAMBA);
             }
         }
@@ -1638,7 +1549,7 @@ DCE2_Ret DCE2_SmbNegotiate(DCE2_SmbSsnData* ssd, const SmbNtHdr*,
     if (!DCE2_ComInfoCanProcessCommand(com_info))
         return DCE2_RET__ERROR;
 
-    Profile profile(dce2_smb_pstat_smb_negotiate);
+    snort::Profile profile(dce2_smb_pstat_smb_negotiate);
 
     if (DCE2_ComInfoIsRequest(com_info))
     {
@@ -1780,13 +1691,9 @@ DCE2_Ret DCE2_SmbTreeConnectAndX(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
         switch (state)
         {
         case SERVICE_IPC:
-            DebugFormat(DEBUG_DCE_SMB,
-                "Tid (%hu) is an IPC tree.\n", tid);
             break;
         case SERVICE_DISK:
             is_ipc = false;
-            DebugFormat(DEBUG_DCE_SMB,
-                "Tid (%hu) is a DISK tree.\n", tid);
             break;
         default:
             return DCE2_RET__IGNORE;
@@ -1881,9 +1788,6 @@ DCE2_Ret DCE2_SmbTreeConnect(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
         // in the TreeConnect command response?
         uint16_t tid = SmbTid(smb_hdr);
         DCE2_SmbInsertTid(ssd, tid, ssd->cur_rtracker->is_ipc);
-
-        DebugFormat(DEBUG_DCE_SMB, "Tid (%hu) %s an IPC tree\n", tid,
-            (ssd->cur_rtracker->is_ipc) ? "is" : "is not");
     }
 
     return DCE2_RET__SUCCESS;

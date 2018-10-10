@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,6 +33,7 @@
 
 #include "value.h"
 
+using namespace snort;
 using namespace std;
 
 static bool valid_bool(Value& v, const char*)
@@ -252,7 +253,7 @@ static bool valid_multi(Value& v, const char* r)
     vector<string> list;
     split(s, list);
 
-    unsigned mask = 0;
+    unsigned long long mask = 0;
 
     for ( const auto& p : list )
     {
@@ -263,7 +264,7 @@ static bool valid_multi(Value& v, const char* r)
         unsigned idx = get_index(r, t);
 
         if ( idx < Value::mask_bits )
-            mask |= (1 << idx);
+            mask |= (1ULL << idx);
     }
     v.set_aux(mask);
     return true;

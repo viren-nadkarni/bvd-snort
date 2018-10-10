@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,6 +27,8 @@
 #include "flow/flow.h"
 #include "log/messages.h"
 
+#include "appid_types.h"
+
 class ClientDetector;
 class AppIdSession;
 
@@ -44,17 +46,22 @@ class ClientDiscovery : public AppIdDiscovery
 public:
     ~ClientDiscovery() override;
     static ClientDiscovery& get_instance(AppIdInspector* ins = nullptr);
+    static void release_instance();
 
     void finalize_client_plugins();
-    bool do_client_discovery(AppIdSession&, Packet*, int direction);
+    void release_thread_resources();
+    bool do_client_discovery(AppIdSession&, snort::Packet*,
+        AppidSessionDirection direction, AppidChangeBits& change_bits);
 
 private:
     ClientDiscovery(AppIdInspector& ins);
     void initialize() override;
-    int exec_client_detectors(AppIdSession&, Packet*, int direction);
-    ClientAppMatch* find_detector_candidates(const Packet* pkt, IpProtocol);
-    void create_detector_candidates_list(AppIdSession&, Packet*);
-    int get_detector_candidates_list(AppIdSession&, Packet*, int direction);
+    int exec_client_detectors(AppIdSession&, snort::Packet*,
+        AppidSessionDirection direction, AppidChangeBits& change_bits);
+    ClientAppMatch* find_detector_candidates(const snort::Packet* pkt, IpProtocol);
+    void create_detector_candidates_list(AppIdSession&, snort::Packet*);
+    int get_detector_candidates_list(AppIdSession&, snort::Packet*, AppidSessionDirection direction);
+    static ClientDiscovery* discovery_manager;
 };
 
 #endif

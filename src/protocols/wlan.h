@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,6 +22,8 @@
 
 #include <cstdint>
 
+namespace snort
+{
 namespace wlan
 {
 /*
@@ -69,7 +71,7 @@ struct WifiHdr
 #define WLAN_TYPE_DATA_ACKPL   0x78     /* 0111    10  CF-Ack+CF-Poll  */
 
 /*** Flags for IEEE 802.11 Frame Control **
-   The following are designed to be bitwise-AND-d in an 8-bit u_char */
+   The following are designed to be bitwise-AND-d in a uint8_t */
 #define WLAN_FLAG_TODS      0x0100    /* To DS Flag   10000000 */
 #define WLAN_FLAG_FROMDS    0x0200    /* From DS Flag 01000000 */
 #define WLAN_FLAG_FRAG      0x0400    /* More Frag    00100000 */
@@ -79,6 +81,7 @@ struct WifiHdr
 #define WLAN_FLAG_WEP       0x4000    /* Wep Enabled  00000010 */
 #define WLAN_FLAG_ORDER     0x8000    /* Strict Order 00000001 */
 } // namespace wlan
+} // namespace snort
 
 #endif
 

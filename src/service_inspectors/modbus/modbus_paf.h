@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -37,14 +37,13 @@ enum modbus_paf_state_t
     MODBUS_PAF_STATE__SET_FLUSH
 };
 
-class ModbusSplitter : public StreamSplitter
+class ModbusSplitter : public snort::StreamSplitter
 {
 public:
     ModbusSplitter(bool);
 
-    Status scan(
-        Flow*, const uint8_t* data, uint32_t len,
-        uint32_t flags, uint32_t* fp) override;
+    Status scan(snort::Flow*, const uint8_t* data, uint32_t len, uint32_t flags,
+        uint32_t* fp) override;
 
     bool is_paf() override { return true; }
 

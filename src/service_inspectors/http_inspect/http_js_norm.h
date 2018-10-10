@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -51,8 +51,8 @@ private:
     const int max_javascript_whitespaces;
     const HttpParaList::UriParam& uri_param;
 
-    SearchTool* javascript_search_mpse;
-    SearchTool* htmltype_search_mpse;
+    snort::SearchTool* javascript_search_mpse;
+    snort::SearchTool* htmltype_search_mpse;
 
     static int search_js_found(void*, void*, int index, void*, void*);
     static int search_html_found(void* id, void*, int, void*, void*);

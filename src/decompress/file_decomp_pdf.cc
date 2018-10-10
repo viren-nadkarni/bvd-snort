@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,12 +24,16 @@
 
 #include "file_decomp_pdf.h"
 
+#include <cassert>
+
 #include "main/thread.h"
 #include "utils/util.h"
 
 #ifdef UNIT_TEST
 #include "catch/snort_catch.h"
 #endif
+
+using namespace snort;
 
 /* Define characters and tokens in PDF grammar */
 #define TOK_STRM_OPEN      "stream"
@@ -601,6 +605,7 @@ static inline fd_status_t Handle_State_IND_OBJ(fd_session_t* SessionPtr, uint8_t
             return( File_Decomp_Error );
         }
     }
+    // fallthrough
 
     case ( P_OBJ_EOL ):
     {
@@ -1134,7 +1139,8 @@ fd_status_t File_Decomp_PDF(fd_session_t* SessionPtr)
         } // switch()
     } // while()
 
-    return( File_Decomp_OK );
+    // can not reach this point
+    assert(false);
 }
 
 //--------------------------------------------------------------------------

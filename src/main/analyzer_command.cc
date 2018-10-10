@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -62,7 +62,7 @@ void ACResume::execute(Analyzer& analyzer)
 
 void ACRotate::execute(Analyzer&)
 {
-    Snort::thread_rotate();
+    snort::Snort::thread_rotate();
 }
 
 void ACGetStats::execute(Analyzer&)
@@ -70,7 +70,7 @@ void ACGetStats::execute(Analyzer&)
     // FIXIT-P This incurs locking on all threads to retrieve stats.  It could be reimplemented to
     //  optimize for large thread counts by retrieving stats in the command and accumulating in the
     //  main thread.
-    ModuleManager::accumulate(SnortConfig::get_conf());
+    ModuleManager::accumulate(snort::SnortConfig::get_conf());
 }
 
 ACGetStats::~ACGetStats()
@@ -96,7 +96,7 @@ ACSwap::~ACSwap()
 {
     delete ps;
     Swapper::set_reload_in_progress(false);
-    LogMessage("== reload complete\n");
+    snort::LogMessage("== reload complete\n");
 }
 
 void ACDAQSwap::execute(Analyzer& analyzer)
@@ -106,6 +106,6 @@ void ACDAQSwap::execute(Analyzer& analyzer)
 
 ACDAQSwap::~ACDAQSwap()
 {
-    LogMessage("== daq module reload complete\n");
+    snort::LogMessage("== daq module reload complete\n");
 }
 

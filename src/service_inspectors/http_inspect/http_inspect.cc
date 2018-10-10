@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,7 @@
 #include "http_inspect.h"
 
 #include "detection/detection_engine.h"
+#include "detection/detection_util.h"
 #include "log/unified2.h"
 #include "protocols/packet.h"
 #include "stream/stream.h"
@@ -39,6 +40,7 @@
 #include "http_msg_trailer.h"
 #include "http_test_manager.h"
 
+using namespace snort;
 using namespace HttpEnums;
 
 uint32_t HttpInspect::xtra_trueip_id;
@@ -274,6 +276,13 @@ void HttpInspect::eval(Packet* p)
     if (session_data->section_type[source_id] == SEC__NOT_COMPUTE)
         return;
 
+    // Limit alt_dsize of message body sections to request/response depth
+    if ((session_data->detect_depth_remaining[source_id] > 0) &&
+        (session_data->detect_depth_remaining[source_id] < p->dsize))
+    {
+        p->set_detect_limit(session_data->detect_depth_remaining[source_id]);
+    }
+
     const int remove_workaround = session_data->zero_byte_workaround[source_id] ? 1 : 0;
     if (!process(p->data, p->dsize - remove_workaround, p->flow, source_id, true))
     {
@@ -370,6 +379,8 @@ bool HttpInspect::process(const uint8_t* data, const uint16_t dsize, Flow* const
 
 void HttpInspect::clear(Packet* p)
 {
+    Profile profile(HttpModule::get_profile_stats());
+
     HttpFlowData* const session_data =
         (HttpFlowData*)p->flow->get_flow_data(HttpFlowData::inspector_id);
 
@@ -378,6 +389,19 @@ void HttpInspect::clear(Packet* p)
     session_data->latest_section = nullptr;
 
     const SourceId source_id = (p->is_from_client()) ? SRC_CLIENT : SRC_SERVER;
+
+    if (session_data->detection_status[source_id] == DET_DEACTIVATING)
+    {
+        if (source_id == SRC_CLIENT)
+        {
+            p->flow->set_to_server_detection(false);
+        }
+        else
+        {
+            p->flow->set_to_client_detection(false);
+        }
+        session_data->detection_status[source_id] = DET_OFF;
+    }
 
     if (session_data->transaction[source_id] == nullptr)
         return;

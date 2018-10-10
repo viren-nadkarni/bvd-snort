@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,19 +26,25 @@
 #include "detection/rule_option_types.h"
 #include "framework/base_api.h"
 #include "main/snort_types.h"
-
-struct Packet;
-
-// this is the current version of the api
-#define IPSAPI_VERSION ((BASE_API_VERSION << 16) | 0)
+#include "target_based/snort_protocols.h"
 
 //-------------------------------------------------------------------------
 // api for class
 // eval and action are packet thread specific
 //-------------------------------------------------------------------------
 
-struct SnortConfig;
 class Cursor;
+struct OptTreeNode;
+struct PatternMatchData;
+
+namespace snort
+{
+struct Packet;
+struct SnortConfig;
+class Module;
+
+// this is the current version of the api
+#define IPSAPI_VERSION ((BASE_API_VERSION << 16) | 0)
 
 enum CursorActionType
 {
@@ -90,10 +96,10 @@ public:
     { return CAT_NONE; }
 
     // for fast-pattern options like content
-    virtual struct PatternMatchData* get_pattern(int /*proto*/, RuleDirection = RULE_WO_DIR)
+    virtual PatternMatchData* get_pattern(SnortProtocolId, RuleDirection = RULE_WO_DIR)
     { return nullptr; }
 
-    virtual struct PatternMatchData* get_alternate_pattern()
+    virtual PatternMatchData* get_alternate_pattern()
     { return nullptr; }
 
     static int eval(void* v, Cursor& c, Packet* p)
@@ -123,7 +129,7 @@ enum RuleOptType
 
 typedef void (* IpsOptFunc)(SnortConfig*);
 
-typedef IpsOption* (* IpsNewFunc)(class Module*, struct OptTreeNode*);
+typedef IpsOption* (* IpsNewFunc)(Module*, OptTreeNode*);
 typedef void (* IpsDelFunc)(IpsOption*);
 
 struct IpsApi
@@ -142,6 +148,6 @@ struct IpsApi
     IpsDelFunc dtor;
     IpsOptFunc verify;
 };
-
+}
 #endif
 

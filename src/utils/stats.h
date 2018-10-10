@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -77,33 +77,16 @@ struct AuxCount
     PegCount rx_bytes;
 };
 
-//-------------------------------------------------------------------------
-// FIXIT-L daq stats should be moved to sfdaq
-
-struct DAQStats
-{
-    PegCount pcaps;
-    PegCount received;
-    PegCount analyzed;
-    PegCount dropped;
-    PegCount filtered;
-    PegCount outstanding;
-    PegCount injected;
-    PegCount verdicts[MAX_DAQ_VERDICT];
-    PegCount internal_blacklist;
-    PegCount internal_whitelist;
-    PegCount skipped;
-    PegCount idle;
-    PegCount rx_bytes;
-};
-
 extern ProcessCount proc_stats;
 extern THREAD_LOCAL AuxCount aux_counts;
-extern SO_PUBLIC THREAD_LOCAL PacketCount pc;
 
 extern const PegInfo daq_names[];
 extern const PegInfo pc_names[];
 extern const PegInfo proc_names[];
+
+namespace snort
+{
+extern SO_PUBLIC THREAD_LOCAL PacketCount pc;
 
 SO_PUBLIC PegCount get_packet_number();
 
@@ -113,12 +96,12 @@ SO_PUBLIC void LogCount(const char*, uint64_t, FILE* = stdout);
 
 SO_PUBLIC void LogStat(const char*, uint64_t n, uint64_t tot, FILE* = stdout);
 SO_PUBLIC void LogStat(const char*, double, FILE* = stdout);
-
-void get_daq_stats(DAQStats& daq_stats);
+}
 
 void sum_stats(PegCount* sums, PegCount* counts, unsigned n);
+void show_stats(PegCount*, const PegInfo*, const char* module_name = nullptr);
 void show_stats(PegCount*, const PegInfo*, unsigned n, const char* module_name = nullptr);
-void show_stats( PegCount*, const PegInfo*, IndexVec&, const char* module_name, FILE*);
+void show_stats(PegCount*, const PegInfo*, IndexVec&, const char* module_name, FILE*);
 void show_percent_stats(PegCount*, const char*[], unsigned n, const char* module_name = nullptr);
 
 void sum_stats(SimpleStats* sums, SimpleStats* counts);
@@ -126,7 +109,6 @@ void show_stats(SimpleStats*, const char* module_name);
 
 double CalcPct(uint64_t, uint64_t);
 void DropStats();
-void pc_sum();
 void PrintStatistics();
 void TimeStart();
 void TimeStop();

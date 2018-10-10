@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,7 @@
 #include "protocols/packet.h"
 
 #include "http_inspect.h"
+#include "http_module.h"
 #include "http_stream_splitter.h"
 #include "http_test_input.h"
 
@@ -45,7 +46,9 @@ void HttpStreamSplitter::chunk_spray(HttpFlowData* session_data, uint8_t* buffer
         switch (curr_state)
         {
         case CHUNK_NEWLINES:
-            if (!is_cr_lf[data[k]])
+        case CHUNK_LEADING_WS:
+            // Cases are combined in reassemble(). CHUNK_LEADING_WS here to avoid compiler warning.
+            if (!is_sp_tab_cr_lf[data[k]])
             {
                 curr_state = CHUNK_NUMBER;
                 k--;
@@ -64,13 +67,13 @@ void HttpStreamSplitter::chunk_spray(HttpFlowData* session_data, uint8_t* buffer
             else if (data[k] == ';')
                 curr_state = CHUNK_OPTIONS;
             else if (is_sp_tab[data[k]])
-                curr_state = CHUNK_WHITESPACE;
+                curr_state = CHUNK_TRAILING_WS;
             else
                 expected = expected * 16 + as_hex[data[k]];
             break;
+        case CHUNK_TRAILING_WS:
         case CHUNK_OPTIONS:
-        case CHUNK_WHITESPACE:
-            // No practical difference between white space and options in reassemble()
+            // No practical difference between trailing white space and options in reassemble()
             if (data[k] == '\r')
                 curr_state = CHUNK_HCRLF;
             else if (data[k] == '\n')
@@ -141,7 +144,7 @@ void HttpStreamSplitter::decompress_copy(uint8_t* buffer, uint32_t& offset, cons
 {
     if ((compression == CMP_GZIP) || (compression == CMP_DEFLATE))
     {
-        compress_stream->next_in = (Bytef*)data;
+        compress_stream->next_in = const_cast<Bytef*>(data);
         compress_stream->avail_in = length;
         compress_stream->next_out = buffer + offset;
         compress_stream->avail_out = MAX_OCTETS - offset;
@@ -157,11 +160,11 @@ void HttpStreamSplitter::decompress_copy(uint8_t* buffer, uint32_t& offset, cons
                 {
                     // The zipped data stream ended but there is more input data
                     *infractions += INF_GZIP_EARLY_END;
-                    events->create_event(EVENT_GZIP_FAILURE);
+                    events->create_event(EVENT_GZIP_EARLY_END);
                     const uInt num_copy =
                         (compress_stream->avail_in <= compress_stream->avail_out) ?
                         compress_stream->avail_in : compress_stream->avail_out;
-                    memcpy(buffer + offset, data, num_copy);
+                    memcpy(buffer + offset, data + (length - compress_stream->avail_in), num_copy);
                     offset += num_copy;
                 }
                 else
@@ -182,10 +185,10 @@ void HttpStreamSplitter::decompress_copy(uint8_t* buffer, uint32_t& offset, cons
         {
             // Some incorrect implementations of deflate don't use the expected header. Feed a
             // dummy header to zlib and retry the inflate.
-            static constexpr char zlib_header[2] = { 0x78, 0x01 };
+            static constexpr uint8_t zlib_header[2] = { 0x78, 0x01 };
 
             inflateReset(compress_stream);
-            compress_stream->next_in = (Bytef*)zlib_header;
+            compress_stream->next_in = const_cast<Bytef*>(zlib_header);
             compress_stream->avail_in = sizeof(zlib_header);
             inflate(compress_stream, Z_SYNC_FLUSH);
 
@@ -218,10 +221,12 @@ void HttpStreamSplitter::decompress_copy(uint8_t* buffer, uint32_t& offset, cons
     offset += length;
 }
 
-const StreamBuffer HttpStreamSplitter::reassemble(Flow* flow, unsigned total, unsigned,
+const snort::StreamBuffer HttpStreamSplitter::reassemble(snort::Flow* flow, unsigned total, unsigned,
     const uint8_t* data, unsigned len, uint32_t flags, unsigned& copied)
 {
-    StreamBuffer http_buf { nullptr, 0 };
+    snort::Profile profile(HttpModule::get_profile_stats());
+
+    snort::StreamBuffer http_buf { nullptr, 0 };
 
     copied = len;
 
@@ -296,6 +301,10 @@ const StreamBuffer HttpStreamSplitter::reassemble(Flow* flow, unsigned total, un
         else
         {
 #ifdef REG_TEST
+	    // FIXIT-M: known case: if session clears w/o a flush point,
+	    // stream_tcp will flush to paf max which could be well below what
+	    // has been scanned so far.  since no flush point was specified,
+	    // NHI should just deal with what it gets.
             assert(false);
 #endif
             return http_buf;
@@ -352,7 +361,7 @@ const StreamBuffer HttpStreamSplitter::reassemble(Flow* flow, unsigned total, un
         if (is_body)
             buffer = new uint8_t[MAX_OCTETS];
         else
-            buffer = new uint8_t[total];
+            buffer = new uint8_t[(total > 0) ? total : 1];
         session_data->section_total[source_id] = total;
     }
     else

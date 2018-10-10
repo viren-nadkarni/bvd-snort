@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -35,7 +35,7 @@ class ScriptManager
 public:
     static void load_scripts(const std::vector<std::string>& paths);
     static void release_scripts();
-    static const BaseApi** get_plugins();
+    static const snort::BaseApi** get_plugins();
     static std::string* get_chunk(const char* key);
 };
 

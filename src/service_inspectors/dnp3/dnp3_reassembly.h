@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,7 +25,7 @@
 #include "dnp3_module.h"
 #include "dnp3.h"
 
-bool dnp3_full_reassembly(dnp3ProtoConf& config, dnp3_session_data_t* session, Packet* p,
+bool dnp3_full_reassembly(dnp3ProtoConf& config, dnp3_session_data_t* session, snort::Packet* p,
     const uint8_t* pdu_start, uint16_t pdu_length);
 void dnp3_reassembly_reset(dnp3_reassembly_data_t* rdata);
 

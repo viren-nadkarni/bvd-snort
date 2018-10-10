@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,13 +27,16 @@
 
 #include <cassert>
 #include <climits>
+#include <fstream>
 #include <limits>
 
 #include "log/messages.h"
 #include "parser/config_file.h"
 #include "sfip/sf_cidr.h"
 #include "utils/util.h"
+#include "utils/util_cstring.h"
 
+using namespace snort;
 using namespace std;
 
 enum
@@ -47,9 +50,21 @@ enum
 
 #define MAX_ADDR_LINE_LENGTH    8192
 
+#define MANIFEST_SEPARATORS         ",\r\n"
+#define MIN_MANIFEST_COLUMNS         3
+
 static char black_info[] = "blacklist";
 static char white_info[] = "whitelist";
 static char monitor_info[] = "monitorlist";
+
+#define WHITE_TYPE_KEYWORD       "white"
+#define BLACK_TYPE_KEYWORD       "block"
+#define MONITOR_TYPE_KEYWORD     "monitor"
+
+#define UNKNOWN_LIST    0
+#define MONITOR_LIST    1
+#define BLACK_LIST      2
+#define WHITE_LIST      3
 
 #define MAX_MSGS_TO_PRINT      20
 
@@ -58,23 +73,23 @@ unsigned long total_invalids;
 
 int totalNumEntries = 0;
 
+static void load_list_file(ListFile*, ReputationConfig* config);
+
 ReputationConfig::~ReputationConfig()
 {
     if (reputation_segment != nullptr)
         snort_free(reputation_segment);
 
-    if (blacklist_path)
-        snort_free(blacklist_path);
-
-    if (whitelist_path)
-        snort_free(whitelist_path);
+    for (auto& file : list_files)
+    {
+        delete file;
+    }
 }
 
-
-static uint32_t estimateSizeFromEntries(uint32_t num_entries, uint32_t memcap)
+static uint32_t estimate_size(uint32_t num_entries, uint32_t memcap)
 {
     uint64_t size;
-    uint64_t sizeFromEntries;
+    uint64_t size_from_entries;
 
     /*memcap value is in Megabytes*/
     size = (uint64_t)memcap << 20;
@@ -84,89 +99,83 @@ static uint32_t estimateSizeFromEntries(uint32_t num_entries, uint32_t memcap)
 
     /*Worst case,  15k ~ 2^14 per entry, plus one Megabytes for empty table*/
     if (num_entries > ((std::numeric_limits<uint32_t>::max() - (1 << 20))>> 15))
-        sizeFromEntries = std::numeric_limits<uint32_t>::max();
+        size_from_entries = std::numeric_limits<uint32_t>::max();
     else
-        sizeFromEntries = (num_entries << 15) + (1 << 20);
+        size_from_entries = (num_entries << 15) + (1 << 20);
 
-    if (size > sizeFromEntries)
+    if (size > size_from_entries)
     {
-        size = sizeFromEntries;
+        size = size_from_entries;
     }
 
     return (uint32_t)size;
 }
 
-void IpListInit(uint32_t maxEntries, ReputationConfig* config)
+void ip_list_init(uint32_t max_entries, ReputationConfig* config)
 {
-    if ( !config->iplist )
+    if ( !config->ip_list )
     {
         uint32_t mem_size;
-        mem_size = estimateSizeFromEntries(maxEntries, config->memcap);
+        mem_size = estimate_size(max_entries, config->memcap);
         config->reputation_segment = (uint8_t*)snort_alloc(mem_size);
 
         segment_meminit(config->reputation_segment, mem_size);
-        uint8_t* base = config->reputation_segment;
 
         /*DIR_16x7_4x4 for performance, but memory usage is high
          *Use  DIR_8x16 worst case IPV4 5K, IPV6 15K (bytes)
          *Use  DIR_16x7_4x4 worst case IPV4 500, IPV6 2.5M
          */
-        config->iplist = sfrt_flat_new(DIR_8x16, IPv6, maxEntries, config->memcap);
+        config->ip_list = sfrt_flat_new(DIR_8x16, IPv6, max_entries, config->memcap);
 
-        if ( !config->iplist )
-            FatalError("Failed to create IP list.\n");
-
-        MEM_OFFSET list_ptr = segment_snort_calloc((size_t)DECISION_MAX, sizeof(ListInfo));
-
-        if ( !list_ptr )
-            FatalError("Failed to create IP list.\n");
-
-        config->iplist->list_info = list_ptr;
-
-        config->local_black_ptr = list_ptr + BLACKLISTED * sizeof(ListInfo);
-        ListInfo* blackInfo = (ListInfo*)&base[config->local_black_ptr];
-        blackInfo->listType = BLACKLISTED;
-        blackInfo->listIndex = BLACKLISTED + 1;
-
-        if (UNBLACK == config->whiteAction)
+        if ( !config->ip_list )
         {
-            config->local_white_ptr = list_ptr + WHITELISTED_UNBLACK * sizeof(ListInfo);
-            ListInfo* whiteInfo = (ListInfo*)&base[config->local_white_ptr];
-            whiteInfo->listType = WHITELISTED_UNBLACK;
-            whiteInfo->listIndex = WHITELISTED_UNBLACK + 1;
+            ErrorMessage("Failed to create IP list.\n");
+            return;
         }
-        else
+
+        total_duplicates = 0;
+        for (size_t i = 0; i < config->list_files.size(); i++)
         {
-            config->local_white_ptr = list_ptr + WHITELISTED_TRUST * sizeof(ListInfo);
-            ListInfo* whiteInfo = (ListInfo*)&base[config->local_white_ptr];
-            whiteInfo->listType = WHITELISTED_TRUST;
-            whiteInfo->listIndex = WHITELISTED_TRUST + 1;
+            config->list_files[i]->list_index = (uint8_t)i + 1;
+            if (config->list_files[i]->file_type == WHITE_LIST)
+            {
+                if (config->white_action == UNBLACK)
+                    config->list_files[i]->list_type = WHITELISTED_UNBLACK;
+                else
+                    config->list_files[i]->list_type = WHITELISTED_TRUST;
+            }
+            else if (config->list_files[i]->file_type == BLACK_LIST)
+                config->list_files[i]->list_type = BLACKLISTED;
+            else if (config->list_files[i]->file_type == MONITOR_LIST)
+                config->list_files[i]->list_type = MONITORED;
+
+            load_list_file(config->list_files[i], config);
         }
     }
 }
 
-static inline IPrepInfo* getLastIndex(IPrepInfo* repInfo, uint8_t* base, int* lastIndex)
+static inline IPrepInfo* get_last_index(IPrepInfo* rep_info, uint8_t* base, int* last_index)
 {
     int i;
 
-    assert(repInfo);
+    assert(rep_info);
 
     /* Move to the end of current info*/
-    while (repInfo->next)
+    while (rep_info->next)
     {
-        repInfo =  (IPrepInfo*)&base[repInfo->next];
+        rep_info =  (IPrepInfo*)&base[rep_info->next];
     }
 
     for (i = 0; i < NUM_INDEX_PER_ENTRY; i++)
     {
-        if (!repInfo->listIndexes[i])
+        if (!rep_info->list_indexes[i])
             break;
     }
 
     if (i > 0)
     {
-        *lastIndex = i-1;
-        return repInfo;
+        *last_index = i-1;
+        return rep_info;
     }
     else
     {
@@ -174,44 +183,44 @@ static inline IPrepInfo* getLastIndex(IPrepInfo* repInfo, uint8_t* base, int* la
     }
 }
 
-static inline int duplicateInfo(IPrepInfo* destInfo,IPrepInfo* currentInfo,
+static inline int duplicate_info(IPrepInfo* dest_info,IPrepInfo* current_info,
     uint8_t* base)
 {
-    int bytesAllocated = 0;
+    int bytes_allocated = 0;
 
-    while (currentInfo)
+    while (current_info)
     {
-        INFO nextInfo;
-        *destInfo = *currentInfo;
-        if (!currentInfo->next)
+        INFO next_info;
+        *dest_info = *current_info;
+        if (!current_info->next)
             break;
-        nextInfo = segment_snort_calloc(1,sizeof(IPrepInfo));
-        if (!nextInfo)
+        next_info = segment_snort_calloc(1,sizeof(IPrepInfo));
+        if (!next_info)
         {
-            destInfo->next = 0;
+            dest_info->next = 0;
             return -1;
         }
         else
         {
-            destInfo->next = nextInfo;
+            dest_info->next = next_info;
         }
-        bytesAllocated += sizeof(IPrepInfo);
-        currentInfo =  (IPrepInfo*)&base[currentInfo->next];
-        destInfo =  (IPrepInfo*)&base[nextInfo];
+        bytes_allocated += sizeof(IPrepInfo);
+        current_info =  (IPrepInfo*)&base[current_info->next];
+        dest_info =  (IPrepInfo*)&base[next_info];
     }
 
-    return bytesAllocated;
+    return bytes_allocated;
 }
 
-static int64_t updateEntryInfo(INFO* current, INFO new_entry, SaveDest saveDest, uint8_t* base)
+static int64_t update_entry_info(INFO* current, INFO new_entry, SaveDest save_dest, uint8_t* base)
 {
-    IPrepInfo* currentInfo;
-    IPrepInfo* newInfo;
-    IPrepInfo* destInfo;
-    IPrepInfo* lastInfo;
-    int64_t bytesAllocated = 0;
+    IPrepInfo* current_info;
+    IPrepInfo* new_info;
+    IPrepInfo* dest_info;
+    IPrepInfo* last_info;
+    int64_t bytes_allocated = 0;
     int i;
-    char newIndex;
+    char new_index;
 
     if (!(*current))
     {
@@ -221,47 +230,42 @@ static int64_t updateEntryInfo(INFO* current, INFO new_entry, SaveDest saveDest,
         {
             return -1;
         }
-        bytesAllocated = sizeof(IPrepInfo);
+        bytes_allocated = sizeof(IPrepInfo);
     }
 
     if (*current == new_entry)
-        return bytesAllocated;
+        return bytes_allocated;
 
-    currentInfo = (IPrepInfo*)&base[*current];
-    newInfo = (IPrepInfo*)&base[new_entry];
+    current_info = (IPrepInfo*)&base[*current];
+    new_info = (IPrepInfo*)&base[new_entry];
 
     /*The latest information is always the last entry
      */
-    lastInfo = getLastIndex(newInfo, base, &i);
+    last_info = get_last_index(new_info, base, &i);
 
-    if (!lastInfo)
+    if (!last_info)
     {
-        return bytesAllocated;
+        return bytes_allocated;
     }
-    newIndex = lastInfo->listIndexes[i++];
+    new_index = last_info->list_indexes[i++];
 
-    DEBUG_WRAP(DebugMessage(DEBUG_REPUTATION, "Current IP reputation information: \n"); );
-    DEBUG_WRAP(ReputationPrintRepInfo(currentInfo, base); );
-    DEBUG_WRAP(DebugMessage(DEBUG_REPUTATION, "New IP reputation information: \n"); );
-    DEBUG_WRAP(ReputationPrintRepInfo(newInfo, base); );
-
-    if (SAVE_TO_NEW == saveDest)
+    if (SAVE_TO_NEW == save_dest)
     {
-        int bytesDuplicated;
+        int bytes_duplicated;
 
         /* When updating new entry, current information should be reserved
          * because current information is inherited from parent
          */
-        if ((bytesDuplicated = duplicateInfo(newInfo, currentInfo, base)) < 0)
+        if ((bytes_duplicated = duplicate_info(new_info, current_info, base)) < 0)
             return -1;
         else
-            bytesAllocated += bytesDuplicated;
+            bytes_allocated += bytes_duplicated;
 
-        destInfo = newInfo;
+        dest_info = new_info;
     }
     else
     {
-        destInfo = currentInfo;
+        dest_info = current_info;
     }
 
     /* Add the new list information to the end
@@ -270,125 +274,91 @@ static int64_t updateEntryInfo(INFO* current, INFO new_entry, SaveDest saveDest,
      * because it is checked first during lookup.
      */
 
-    while (destInfo->next)
+    while (dest_info->next)
     {
-        destInfo =  (IPrepInfo*)&base[destInfo->next];
+        dest_info =  (IPrepInfo*)&base[dest_info->next];
     }
 
     for (i = 0; i < NUM_INDEX_PER_ENTRY; i++)
     {
-        if (!destInfo->listIndexes[i])
+        if (!dest_info->list_indexes[i])
             break;
-        else if (destInfo->listIndexes[i] == newIndex)
+        else if (dest_info->list_indexes[i] == new_index)
         {
-            DEBUG_WRAP(DebugMessage(DEBUG_REPUTATION, "Final IP reputation information: \n"); );
-            DEBUG_WRAP(ReputationPrintRepInfo(destInfo, base); );
-            return bytesAllocated;
+            return bytes_allocated;
         }
     }
 
     if (i < NUM_INDEX_PER_ENTRY)
     {
-        destInfo->listIndexes[i] = newIndex;
+        dest_info->list_indexes[i] = new_index;
     }
     else
     {
-        IPrepInfo* nextInfo;
+        IPrepInfo* next_info;
         MEM_OFFSET ipInfo_ptr = segment_snort_calloc(1,sizeof(IPrepInfo));
         if (!ipInfo_ptr)
             return -1;
-        destInfo->next = ipInfo_ptr;
-        nextInfo = (IPrepInfo*)&base[destInfo->next];
-        nextInfo->listIndexes[0] = newIndex;
-        bytesAllocated += sizeof(IPrepInfo);
+        dest_info->next = ipInfo_ptr;
+        next_info = (IPrepInfo*)&base[dest_info->next];
+        next_info->list_indexes[0] = new_index;
+        bytes_allocated += sizeof(IPrepInfo);
     }
 
-    DEBUG_WRAP(DebugMessage(DEBUG_REPUTATION, "Final IP reputation information: \n"); );
-    DEBUG_WRAP(ReputationPrintRepInfo(destInfo, base); );
-
-    return bytesAllocated;
+    return bytes_allocated;
 }
 
-static int AddIPtoList(SfCidr* ipAddr,INFO ipInfo_ptr, ReputationConfig* config)
+static int add_ip(snort::SfCidr* ip_addr,INFO info_ptr, ReputationConfig* config)
 {
-    int iRet;
-    int iFinalRet = IP_INSERT_SUCCESS;
+    int ret;
+    int final_ret = IP_INSERT_SUCCESS;
     /*This variable is used to check whether a more generic address
      * overrides specific address
      */
-    uint32_t usageBeforeAdd;
-    uint32_t usageAfterAdd;
+    uint32_t usage_before;
+    uint32_t usage_after;
 
-#ifdef DEBUG_MSGS
-    if (nullptr != sfrt_flat_lookup(ipAddr->get_addr(), config->iplist))
-    {
-        DebugFormat(DEBUG_REPUTATION, "Find address before insert: %s\n", ipAddr->ntoa() );
-    }
-    else
-    {
-        DebugFormat(DEBUG_REPUTATION,
-            "Can't find address before insert: %s\n", ipAddr->ntoa() );
-    }
-#endif
-
-    usageBeforeAdd =  sfrt_flat_usage(config->iplist);
+    usage_before =  sfrt_flat_usage(config->ip_list);
 
     /*Check whether the same or more generic address is already in the table*/
-    if (nullptr != sfrt_flat_lookup(ipAddr->get_addr(), config->iplist))
+    if (nullptr != sfrt_flat_lookup(ip_addr->get_addr(), config->ip_list))
     {
-        iFinalRet = IP_INSERT_DUPLICATE;
+        final_ret = IP_INSERT_DUPLICATE;
     }
 
-    iRet = sfrt_flat_insert(ipAddr, (unsigned char)ipAddr->get_bits(), ipInfo_ptr, RT_FAVOR_ALL,
-        config->iplist, &updateEntryInfo);
-    DEBUG_WRAP(DebugFormat(DEBUG_REPUTATION, "Unused memory: %zu \n",segment_unusedmem()); );
+    ret = sfrt_flat_insert(ip_addr, (unsigned char)ip_addr->get_bits(), info_ptr, RT_FAVOR_ALL,
+        config->ip_list, &update_entry_info);
 
-    if (RT_SUCCESS == iRet)
+    if (RT_SUCCESS == ret)
     {
-#ifdef DEBUG_MSGS
-        IPrepInfo* result;
-        DebugFormat(DEBUG_REPUTATION, "Number of entries input: %d, in table: %u \n",
-            totalNumEntries,sfrt_flat_num_entries(config->iplist) );
-        DebugFormat(DEBUG_REPUTATION, "Memory allocated: %u \n",sfrt_flat_usage(config->iplist) );
-        result = (IPrepInfo*)sfrt_flat_lookup(ipAddr->get_addr(), config->iplist);
-        if (nullptr != result)
-        {
-            DebugFormat(DEBUG_REPUTATION, "Find address after insert: %s \n", ipAddr->ntoa() );
-            DEBUG_WRAP(ReputationPrintRepInfo(result, (uint8_t*)config->iplist); );
-        }
-#endif
         totalNumEntries++;
     }
-    else if (MEM_ALLOC_FAILURE == iRet)
+    else if (MEM_ALLOC_FAILURE == ret)
     {
-        iFinalRet = IP_MEM_ALLOC_FAILURE;
-        DEBUG_WRAP(DebugFormat(DEBUG_REPUTATION, "Insert error: %d for address: %s \n",iRet,
-            ipAddr->ntoa() ); );
+        final_ret = IP_MEM_ALLOC_FAILURE;
     }
     else
     {
-        iFinalRet = IP_INSERT_FAILURE;
-        DEBUG_WRAP(DebugFormat(DEBUG_REPUTATION, "Insert error: %d for address: %s \n",iRet,
-            ipAddr->ntoa() ); );
+        final_ret = IP_INSERT_FAILURE;
     }
 
-    usageAfterAdd = sfrt_flat_usage(config->iplist);
+    usage_after = sfrt_flat_usage(config->ip_list);
     /*Compare in the same scale*/
-    if (usageAfterAdd  > (config->memcap << 20))
+    if (usage_after  > (config->memcap << 20))
     {
-        iFinalRet = IP_MEM_ALLOC_FAILURE;
+        final_ret = IP_MEM_ALLOC_FAILURE;
     }
     /*Check whether there a more specific address will be overridden*/
-    if (usageBeforeAdd > usageAfterAdd )
+    if (usage_before > usage_after )
     {
-        iFinalRet = IP_INSERT_DUPLICATE;
+        final_ret = IP_INSERT_DUPLICATE;
     }
 
-    return iFinalRet;
+    return final_ret;
 }
 
 // FIXIT-L X Remove this or at least move it to SfCidr?
-static int snort_pton__address(char const* src, SfCidr* dest)
+static int snort_pton_address(char const* src, snort::SfCidr* dest)
 {
     unsigned char _temp[sizeof(struct in6_addr)];
 
@@ -404,7 +374,7 @@ static int snort_pton__address(char const* src, SfCidr* dest)
 
 // FIXIT-L X Remove this or at least move it to SfCidr?
 #define isident(x) (isxdigit((x)) || (x) == ':' || (x) == '.')
-static int snort_pton(char const* src, SfCidr* dest)
+static int snort_pton(char const* src, snort::SfCidr* dest)
 {
     char ipbuf[INET6_ADDRSTRLEN];
     char cidrbuf[sizeof("128")];
@@ -506,7 +476,7 @@ static int snort_pton(char const* src, SfCidr* dest)
             return -1;
     }
 
-    if ( snort_pton__address(ipbuf, dest) < 1 )
+    if ( snort_pton_address(ipbuf, dest) < 1 )
         return 0;
 
     if ( *cidrbuf )
@@ -526,9 +496,9 @@ static int snort_pton(char const* src, SfCidr* dest)
     return 1;
 }
 
-static int ProcessLine(char* line, INFO info, ReputationConfig* config)
+static int process_line(char* line, INFO info, ReputationConfig* config)
 {
-    SfCidr address;
+    snort::SfCidr address;
 
     if ( !line || *line == '\0' )
         return IP_INSERT_SUCCESS;
@@ -536,21 +506,19 @@ static int ProcessLine(char* line, INFO info, ReputationConfig* config)
     if ( snort_pton(line, &address) < 1 )
         return IP_INVALID;
 
-    return AddIPtoList(&address, info, config);
+    return add_ip(&address, info, config);
 }
 
-static int UpdatePathToFile(char* full_path_filename, unsigned int max_size, char* filename)
+static int update_path_to_file(char* full_filename, unsigned int max_size, const char* filename)
 {
     const char* snort_conf_dir = get_snort_conf_dir();
 
-    if (!snort_conf_dir || !(*snort_conf_dir) || !full_path_filename || !filename)
-        FatalError("can't create path.\n");
-
-    /*filename is too long*/
+    /*file_name is too long*/
     if ( max_size < strlen(filename) )
     {
-        FatalError("The file name length %u is longer than allowed %u.\n",
+        ErrorMessage("The file name length %u is longer than allowed %u.\n",
             (unsigned)strlen(filename), max_size);
+        return 0;
     }
 
     /*
@@ -558,7 +526,7 @@ static int UpdatePathToFile(char* full_path_filename, unsigned int max_size, cha
      */
     if (filename[0] == '/')
     {
-        snprintf(full_path_filename, max_size, "%s", filename);
+        snprintf(full_filename, max_size, "%s", filename);
     }
     else
     {
@@ -567,27 +535,23 @@ static int UpdatePathToFile(char* full_path_filename, unsigned int max_size, cha
          */
         if (snort_conf_dir[strlen(snort_conf_dir) - 1] == '/')
         {
-            snprintf(full_path_filename,max_size,
+            snprintf(full_filename,max_size,
                 "%s%s", snort_conf_dir, filename);
         }
         else
         {
-            snprintf(full_path_filename, max_size,
+            snprintf(full_filename, max_size,
                 "%s/%s", snort_conf_dir, filename);
         }
     }
     return 1;
 }
 
-static char* GetListInfo(INFO info)
+static char* get_list_type_name(ListFile* list_info)
 {
-    uint8_t* base;
-    ListInfo* info_value;
-    base = (uint8_t*)segment_basePtr();
-    info_value = (ListInfo*)(&base[info]);
-    if (!info_value)
+    if (!list_info)
         return nullptr;
-    switch (info_value->listType)
+    switch (list_info->list_type)
     {
     case DECISION_NULL:
         return nullptr;
@@ -600,22 +564,20 @@ static char* GetListInfo(INFO info)
     case WHITELISTED_TRUST:
         return white_info;
     default:
-        break;
+        return nullptr;
     }
-    return nullptr;
 }
 
-void LoadListFile(char* filename, INFO info, ReputationConfig* config)
+static void load_list_file(ListFile* list_info, ReputationConfig* config)
 {
     char linebuf[MAX_ADDR_LINE_LENGTH];
     char full_path_filename[PATH_MAX+1];
     int addrline = 0;
     FILE* fp = nullptr;
     char* cmt = nullptr;
-    char* list_info;
-    ListInfo* listInfo;
-    IPrepInfo* ipInfo;
-    MEM_OFFSET ipInfo_ptr;
+    char* list_type_name;
+    IPrepInfo* ip_info;
+    MEM_OFFSET ip_info_ptr;
     uint8_t* base;
 
     /*entries processing statistics*/
@@ -624,42 +586,40 @@ void LoadListFile(char* filename, INFO info, ReputationConfig* config)
     unsigned int fail_count = 0;   /*number of invalid entries in this file*/
     unsigned int num_loaded_before = 0;     /*number of valid entries loaded */
 
-    if ((nullptr == filename)||(0 == info)|| (nullptr == config)||config->memCapReached)
+    if (config->memcap_reached)
         return;
 
-    UpdatePathToFile(full_path_filename, PATH_MAX, filename);
+    update_path_to_file(full_path_filename, PATH_MAX, list_info->file_name.c_str());
 
-    list_info = GetListInfo(info);
+    list_type_name = get_list_type_name(list_info);
 
-    if (!list_info)
+    if (!list_type_name)
         return;
 
     /*convert list info to ip entry info*/
-    ipInfo_ptr = segment_snort_calloc(1,sizeof(IPrepInfo));
-    if (!(ipInfo_ptr))
+    ip_info_ptr = segment_snort_calloc(1,sizeof(IPrepInfo));
+    if (!(ip_info_ptr))
     {
         return;
     }
-    base = (uint8_t*)config->iplist;
-    ipInfo = ((IPrepInfo*)&base[ipInfo_ptr]);
-    listInfo = ((ListInfo*)&base[info]);
-    ipInfo->listIndexes[0] = listInfo->listIndex;
+    base = (uint8_t*)config->ip_list;
+    ip_info = ((IPrepInfo*)&base[ip_info_ptr]);
+    ip_info->list_indexes[0] = list_info->list_index;
 
-    LogMessage("    Processing %s file %s\n", list_info, full_path_filename);
+    LogMessage("    Processing %s file %s\n", list_type_name, full_path_filename);
 
     if ((fp = fopen(full_path_filename, "r")) == nullptr)
     {
-        ErrorMessage("Unable to open address file %s, Error: %s\n", full_path_filename, get_error(errno));
+        ErrorMessage("Unable to open address file %s, Error: %s\n", full_path_filename,
+            get_error(errno));
         return;
     }
 
-    num_loaded_before = sfrt_flat_num_entries(config->iplist);
+    num_loaded_before = sfrt_flat_num_entries(config->ip_list);
     while ( fgets(linebuf, MAX_ADDR_LINE_LENGTH, fp) )
     {
-        int iRet;
+        int ret;
         addrline++;
-
-        DEBUG_WRAP(DebugFormat(DEBUG_REPUTATION, "Reputation configurations: %s\n",linebuf); );
 
         // Remove comments
         if ( (cmt = strchr(linebuf, '#')) )
@@ -669,34 +629,32 @@ void LoadListFile(char* filename, INFO info, ReputationConfig* config)
         if ( (cmt = strchr(linebuf, '\n')) )
             *cmt = '\0';
 
-        DEBUG_WRAP(DebugFormat(DEBUG_REPUTATION, "Reputation configurations: %s\n",linebuf); );
-
         /* process the line */
-        iRet = ProcessLine(linebuf, ipInfo_ptr, config);
+        ret = process_line(linebuf, ip_info_ptr, config);
 
-        if (IP_INSERT_SUCCESS == iRet)
+        if (IP_INSERT_SUCCESS == ret)
         {
             continue;
         }
-        else if (IP_INSERT_FAILURE == iRet && fail_count++ < MAX_MSGS_TO_PRINT)
+        else if (IP_INSERT_FAILURE == ret && fail_count++ < MAX_MSGS_TO_PRINT)
         {
             ErrorMessage("      (%d) => Failed to insert address: \'%s\'\n", addrline, linebuf);
         }
-        else if (IP_INVALID == iRet && invalid_count++ < MAX_MSGS_TO_PRINT)
+        else if (IP_INVALID == ret && invalid_count++ < MAX_MSGS_TO_PRINT)
         {
             ErrorMessage("      (%d) => Invalid address: \'%s\'\n", addrline, linebuf);
         }
-        else if (IP_INSERT_DUPLICATE == iRet && duplicate_count++ < MAX_MSGS_TO_PRINT)
+        else if (IP_INSERT_DUPLICATE == ret && duplicate_count++ < MAX_MSGS_TO_PRINT)
         {
             ErrorMessage("      (%d) => Re-defined address: '%s'\n", addrline, linebuf);
         }
-        else if (IP_MEM_ALLOC_FAILURE == iRet)
+        else if (IP_MEM_ALLOC_FAILURE == ret)
         {
             ErrorMessage(
                 "WARNING: %s(%d) => Memcap %u Mbytes reached when inserting IP Address: %s\n",
                 full_path_filename, addrline, config->memcap,linebuf);
 
-            config->memCapReached = true;
+            config->memcap_reached = true;
             break;
         }
     }
@@ -712,13 +670,13 @@ void LoadListFile(char* filename, INFO info, ReputationConfig* config)
         ErrorMessage("    Additional duplicate addresses were not listed.\n");
 
     LogMessage("    Reputation entries loaded: %u, invalid: %u, re-defined: %u (from file %s)\n",
-        sfrt_flat_num_entries(config->iplist) - num_loaded_before,
+        sfrt_flat_num_entries(config->ip_list) - num_loaded_before,
         invalid_count, duplicate_count, full_path_filename);
 
     fclose(fp);
 }
 
-static int numLinesInFile(char* fname)
+static int num_lines_in_file(char* fname)
 {
     FILE* fp;
     uint32_t numlines = 0;
@@ -746,98 +704,258 @@ static int numLinesInFile(char* fname)
     return numlines;
 }
 
-static int LoadFile(int totalLines, char* path)
+static int load_file(int total_lines, const char* path)
 {
-    int numlines;
+    int num_lines;
     char full_path_filename[PATH_MAX+1];
 
     if (!path)
         return 0;
 
     errno = 0;
-    UpdatePathToFile(full_path_filename,PATH_MAX, path);
-    numlines = numLinesInFile(full_path_filename);
+    update_path_to_file(full_path_filename,PATH_MAX, path);
+    num_lines = num_lines_in_file(full_path_filename);
 
-    if ((0 == numlines) && (0 != errno))
+    if ((0 == num_lines) && (0 != errno))
     {
-        FatalError("Unable to open address file %s, Error: %s\n", full_path_filename, get_error(errno));
+        ErrorMessage("Unable to open address file %s, Error: %s\n", full_path_filename,
+            get_error(errno));
+        return 0;
     }
 
-    if (totalLines + numlines < totalLines)
+    if (total_lines + num_lines < total_lines)
     {
-        FatalError("Too many entries in one file.\n");
+        ErrorMessage("Too many entries in one file.\n");
+        return 0;
     }
 
-    return numlines;
+    return num_lines;
 }
 
-void EstimateNumEntries(ReputationConfig* config)
+void estimate_num_entries(ReputationConfig* config)
 {
-    int totalLines = 0;
+    int total_lines = 0;
 
-    totalLines += LoadFile(totalLines, config->blacklist_path);
-    totalLines += LoadFile(totalLines, config->whitelist_path);
-
-    config->numEntries = totalLines;
-}
-
-#ifdef DEBUG_MSGS
-static void ReputationRepInfo(IPrepInfo* repInfo, uint8_t* base, char* repInfoBuff,
-    int bufLen)
-{
-    char* index = repInfoBuff;
-    int len = bufLen -1;
-    int writed;
-
-    writed = snprintf(index, len, "Reputation Info: ");
-    if (writed >= len || writed < 0)
-        return;
-
-    index += writed;
-    len -= writed;
-
-    while (repInfo)
+    for (auto& file : config->list_files)
     {
-        int i;
-        for (i = 0; i < NUM_INDEX_PER_ENTRY; i++)
-        {
-            writed = snprintf(index, len, "%d,",repInfo->listIndexes[i]);
-            if (writed >= len || writed < 0)
-                return;
-            else
-            {
-                index += writed;
-                len -=writed;
-            }
-        }
-        writed = snprintf(index, len, "->");
-        if (writed >= len || writed < 0)
-            return;
-        else
-        {
-            index += writed;
-            len -=writed;
-        }
+        total_lines += load_file(total_lines, file->file_name.c_str());
+    }
 
-        if (!repInfo->next)
+    config->num_entries = total_lines;
+}
+
+void add_black_white_List(ReputationConfig* config)
+{
+    if (config->blacklist_path.size())
+    {
+        ListFile* listItem = new ListFile;
+        listItem->all_zones_enabled = true;
+        listItem->file_name = config->blacklist_path;
+        listItem->file_type = BLACK_LIST;
+        listItem->list_id = 0;
+        config->list_files.push_back(listItem);
+    }
+    if (config->whitelist_path.size())
+    {
+        ListFile* listItem = new ListFile;
+        listItem->all_zones_enabled = true;
+        listItem->file_name = config->whitelist_path;
+        listItem->file_type = WHITE_LIST;
+        listItem->list_id = 0;
+        config->list_files.push_back(listItem);
+    }
+}
+
+/*Ignore the space characters from string*/
+static char* ignore_start_space(char* str)
+{
+    while ((*str) && (isspace((int)*str)))
+    {
+        str++;
+    }
+    return str;
+}
+
+/*Get file type */
+static int get_file_type(char* type_name)
+{
+    int type = UNKNOWN_LIST;
+
+    if (!type_name)
+        return type;
+
+    type_name = ignore_start_space(type_name);
+
+    if (strncasecmp(type_name, WHITE_TYPE_KEYWORD, strlen(WHITE_TYPE_KEYWORD)) == 0)
+    {
+        type = WHITE_LIST;
+        type_name += strlen(WHITE_TYPE_KEYWORD);
+    }
+    else if (strncasecmp(type_name, BLACK_TYPE_KEYWORD, strlen(BLACK_TYPE_KEYWORD)) == 0)
+    {
+        type = BLACK_LIST;
+        type_name += strlen(BLACK_TYPE_KEYWORD);
+    }
+    else if (strncasecmp(type_name, MONITOR_TYPE_KEYWORD, strlen(MONITOR_TYPE_KEYWORD)) == 0)
+    {
+        type = MONITOR_LIST;
+        type_name += strlen(MONITOR_TYPE_KEYWORD);
+    }
+
+    if ( type != UNKNOWN_LIST )
+    {
+        /*Ignore spaces in the end*/
+        type_name = ignore_start_space(type_name);
+
+        if ( *type_name )
+        {
+            type = UNKNOWN_LIST;
+        }
+    }
+    return type;
+}
+
+//The format of manifest is:
+//    file_name, list_id, action (black, white, monitor), zone information
+//If no zone information provided, this means all zones are applied.
+
+static bool process_line_in_manifest(ListFile* list_item, const char* manifest, const char* line,
+    int line_number, ReputationConfig* config)
+{
+    char* token;
+    int token_index = 0;
+    char* next_ptr = const_cast<char*>(line);
+    bool has_zone = false;
+
+    list_item->zones.clear();
+
+    while ((token = strtok_r(next_ptr, MANIFEST_SEPARATORS, &next_ptr)) != NULL)
+    {
+        char* end_str;
+        long zone_id;
+        long list_id;
+
+        switch (token_index)
+        {
+        case 0:    // File name
+            list_item->file_name = config->list_dir + '/' + token;
             break;
 
-        repInfo = (IPrepInfo*)(&base[repInfo->next]);
+        case 1:    // List ID
+            list_id = SnortStrtol(token, &end_str, 10);
+            end_str = ignore_start_space(end_str);
+            if ( *end_str )
+            {
+                ErrorMessage("%s(%d) => Bad value (%s) specified for listID. "
+                    "Please specify an integer between 0 and %u.\n",
+                    manifest, line_number, token, MAX_LIST_ID);
+                return false;
+            }
+
+            if ((list_id < 0)  || (list_id > MAX_LIST_ID) || (errno == ERANGE))
+            {
+                ErrorMessage(" %s(%d) => Value specified (%s) is out of "
+                    "bounds.  Please specify an integer between 0 and %u.\n",
+                    manifest, line_number, token, MAX_LIST_ID);
+                return false;
+            }
+            list_item->list_id = (uint32_t)list_id;
+            break;
+
+        case 2:    // Action
+            token = ignore_start_space(token);
+            list_item->file_type = get_file_type(token);
+            if (UNKNOWN_LIST == list_item->file_type)
+            {
+                ErrorMessage(" %s(%d) => Unknown action specified (%s)."
+                    " Please specify a value: %s | %s | %s.\n", manifest, line_number, token,
+                    WHITE_TYPE_KEYWORD, BLACK_TYPE_KEYWORD, MONITOR_TYPE_KEYWORD);
+                return false;
+            }
+            break;
+
+        default:
+            token= ignore_start_space(token);
+            if ('0' == (*token))
+                break;
+            zone_id = SnortStrtol(token, &end_str, 10);
+            end_str = ignore_start_space(end_str);
+
+            if ( *end_str )
+            {
+                ErrorMessage("%s(%d) => Bad value (%s) specified for zone. "
+                    "Please specify an integer between 0 and %u.\n",
+                    manifest, line_number, token, MAX_NUM_ZONES);
+                return false;
+            }
+            if ((zone_id < 0)  || (zone_id > MAX_NUM_ZONES ) || (errno == ERANGE))
+            {
+                ErrorMessage(" %s(%d) => Value specified (%s) for zone is "
+                    "out of bounds. Please specify an integer between 0 and %u.\n",
+                    manifest, line_number, token, MAX_NUM_ZONES);
+                return false;
+            }
+
+            list_item->zones.insert(zone_id);
+            has_zone = true;
+        }
+
+        token_index++;
     }
+
+    if ( token_index < MIN_MANIFEST_COLUMNS )
+    {
+        if ( token_index > 0 )
+        {
+            ErrorMessage("%s(%d) => Too few columns in line: %s.\n", manifest, line_number, line);
+        }
+        return false;
+    }
+
+    if (!has_zone)
+    {
+        list_item->all_zones_enabled = true;
+    }
+
+    config->list_files.push_back(list_item);
+    return true;
 }
 
-void ReputationPrintRepInfo(IPrepInfo* repInfo, uint8_t* base)
+int read_manifest(const char* manifest_file, ReputationConfig* config)
 {
-    char repInfoBuff[STD_BUF];
-    int len = STD_BUF -1;
+    int line_number = 0;
+    std::string line;
+    char full_path_dir[PATH_MAX+1];
 
-    repInfoBuff[STD_BUF -1] = '\0';
+    update_path_to_file(full_path_dir, PATH_MAX, config->list_dir.c_str());
+    std::string manifest_full_path = std::string(full_path_dir) + '/' + manifest_file;
 
-    ReputationRepInfo(repInfo, base, repInfoBuff, len);
+    std::fstream fs;
+    fs.open (manifest_full_path, std::fstream::in);
 
-    DEBUG_WRAP(DebugFormat(DEBUG_REPUTATION, "Reputation Info: %s \n",
-        repInfoBuff); );
+    if (!fs.good())
+    {
+        ErrorMessage("Can't open file: %s\n", manifest_full_path.c_str());
+        return -1;
+    }
+
+    while (std::getline(fs, line))
+    {
+        line_number++;
+
+        /* remove comments */
+        size_t pos = line.find_first_of('#');
+        if (pos != line.npos)
+           line[pos] = '\0';
+
+        //Processing the line
+        ListFile* list_item = new ListFile;
+        if (!process_line_in_manifest(list_item, manifest_file, line.c_str(), line_number, config))
+            delete list_item;
+    }
+
+    fs.close();
+
+    return 0;
 }
-
-#endif
 

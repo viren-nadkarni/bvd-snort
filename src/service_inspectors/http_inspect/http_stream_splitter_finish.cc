@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,14 +23,17 @@
 
 #include "file_api/file_flows.h"
 
+#include "http_module.h"
 #include "http_msg_request.h"
 #include "http_stream_splitter.h"
 #include "http_test_input.h"
 
 using namespace HttpEnums;
 
-bool HttpStreamSplitter::finish(Flow* flow)
+bool HttpStreamSplitter::finish(snort::Flow* flow)
 {
+    snort::Profile profile(HttpModule::get_profile_stats());
+
     HttpFlowData* session_data = (HttpFlowData*)flow->get_flow_data(HttpFlowData::inspector_id);
     // FIXIT-M - this assert has been changed to check for null session data and return false if so
     //           due to lack of reliable feedback to stream that scan has been called...if that is
@@ -87,6 +90,9 @@ bool HttpStreamSplitter::finish(Flow* flow)
             session_data->cutter[source_id]->get_num_good_chunks(),
             session_data->cutter[source_id]->get_octets_seen(),
             true);
+        delete session_data->cutter[source_id];
+        session_data->cutter[source_id] = nullptr;
+
         return true;
     }
 
@@ -116,7 +122,7 @@ bool HttpStreamSplitter::finish(Flow* flow)
     {
         if (!session_data->mime_state[source_id])
         {
-            FileFlows* file_flows = FileFlows::get_file_flows(flow);
+            snort::FileFlows* file_flows = snort::FileFlows::get_file_flows(flow);
             const bool download = (source_id == SRC_SERVER);
 
             size_t file_index = 0;

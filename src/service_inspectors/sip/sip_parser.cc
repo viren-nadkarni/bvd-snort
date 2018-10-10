@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,12 +27,13 @@
 
 #include "detection/detection_engine.h"
 #include "events/event_queue.h"
-#include "main/snort_debug.h"
 #include "utils/util.h"
 #include "utils/util_cstring.h"
 
 #include "sip_module.h"
 #include "sip_utils.h"
+
+using namespace snort;
 
 #define MAX_NUM_32BIT  2147483647
 
@@ -145,7 +146,6 @@ static int sip_process_headField(SIPMsg* msg, const char* start, const char* end
     char* colonIndex;
     const char* newStart, * newEnd;
     char newLength;
-    DebugFormat(DEBUG_SIP, "process line: %.*s\n", length, start);
 
     // If this is folding
     if ((' ' == start[0]) || ('\t' == start[0]))
@@ -327,20 +327,15 @@ static bool sip_startline_parse(SIPMsg* msg, const char* buff, const char* end, 
     if (numOfLineBreaks < 1)
     {
         /*No CRLF */
-        DebugMessage(DEBUG_SIP, "No CRLF, check failed\n");
         return false;
     }
 
     /*Exclude CRLF from start line*/
     length =  next - start - numOfLineBreaks;
 
-    DebugFormat(DEBUG_SIP, "Start line: %.*s \n", length, start);
-    DebugMessage(DEBUG_SIP, "End of Start line \n");
-
     /*Should at least have SIP/2.0 */
     if (length < SIP_MIN_MSG_LEN)
     {
-        DebugMessage(DEBUG_SIP, "Message too short, check failed\n");
         return false;
     }
 
@@ -372,7 +367,6 @@ static bool sip_startline_parse(SIPMsg* msg, const char* buff, const char* end, 
         }
         else
             msg->status_code =  (uint16_t)statusCode;
-        DebugFormat(DEBUG_SIP, "Status code: %d \n", msg->status_code);
     }
     else  /* This might be a request*/
     {
@@ -389,14 +383,11 @@ static bool sip_startline_parse(SIPMsg* msg, const char* buff, const char* end, 
             return false;
         msg->method = buff;
         msg->methodLen = space - buff;
-        DebugFormat(DEBUG_SIP, "method: %.*s\n", msg->methodLen, msg->method);
 
         method = SIP_FindMethod (config->methods, msg->method, msg->methodLen);
         if (method)
         {
             msg->methodFlag = method->methodFlag;
-            DebugFormat(DEBUG_SIP, "Found the method: %s, Flag: 0x%x\n",
-                method->methodName, method->methodFlag);
         }
 
         // parse the uri
@@ -407,8 +398,7 @@ static bool sip_startline_parse(SIPMsg* msg, const char* buff, const char* end, 
         if (space == nullptr)
             return false;
         msg->uriLen = space - msg->uri;
-        DebugFormat(DEBUG_SIP, "uri: %.*s, length: %hu\n", msg->uriLen, msg->uri,
-            msg->uriLen);
+
         if (0 == msg->uriLen)
             DetectionEngine::queue_event(GID_SIP, SIP_EVENT_EMPTY_REQUEST_URI);
         else if (config->maxUriLen && (msg->uriLen > config->maxUriLen))
@@ -467,7 +457,6 @@ static bool sip_headers_parse(
         /*Processing this line*/
         int length =  next - start - numOfLineBreaks;
 
-        DebugFormat(DEBUG_SIP, "Header line: %.*s\n", length, start);
         /*Process headers*/
         sip_process_headField(msg, start, start + length, &lastFieldIndex, config);
 
@@ -506,21 +495,13 @@ static bool sip_headers_parse(
  ********************************************************************/
 static bool sip_body_parse(SIPMsg* msg, const char* buff, const char* end, const char** bodyEnd)
 {
-#ifdef DEBUG_MSGS
-    {
-        int length = end - buff;
-        DebugFormat(DEBUG_SIP, "Body length: %d\n", length);
-        DebugFormat(DEBUG_SIP, "Body line: %.*s\n", length, buff);
-    }
-#endif
-
     // Initialize it
     *bodyEnd = end;
 
     if (buff == end)
         return true;
 
-    msg->body_data = (const uint8_t*) buff;
+    msg->body_data = (const uint8_t*)buff;
     msg->bodyLen = end - buff;
 
     // Create a media session
@@ -538,7 +519,6 @@ static bool sip_body_parse(SIPMsg* msg, const char* buff, const char* end, const
         /*Processing this line*/
         int length = next - start - numOfLineBreaks;
 
-        DebugFormat(DEBUG_SIP, "Body line: %.*s\n", length, start);
         /*Process body fields*/
         sip_process_bodyField(msg, start, start + length);
 
@@ -622,8 +602,6 @@ static bool sip_check_headers(SIPMsg* msg, SIP_PROTO_CONF* config)
         ret = false;
     }
 
-    DebugFormat(DEBUG_SIP, "Method flag: %d\n", msg->methodFlag);
-
     // Contact is required for invite message
     if ((0 == msg->contactLen)&&(msg->methodFlag == SIP_METHOD_INVITE)&&(0 == msg->status_code))
     {
@@ -662,9 +640,7 @@ static bool sip_check_headers(SIPMsg* msg, SIP_PROTO_CONF* config)
 static int sip_parse_via(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
 {
     int length = end -start;
-    DebugFormat(DEBUG_SIP, "Via value: %.*s\n", length, start);
     msg->viaLen = msg->viaLen + length;
-    DebugFormat(DEBUG_SIP, "Via length: %d\n", msg->viaLen);
 
     return SIP_PARSE_SUCCESS;
 }
@@ -686,17 +662,12 @@ static int sip_parse_via(SIPMsg* msg, const char* start, const char* end, SIP_PR
 
 static int sip_parse_from(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
 {
-    DEBUG_WRAP(int length = end -start; )
     char* buff;
     char* userEnd;
     char* userStart;
 
-    DebugFormat(DEBUG_SIP, "From value: %.*s\n", length, start);
     msg->from = start;
     msg->fromLen = end - start;
-
-    DebugFormat(DEBUG_SIP, "From length: %d , content: %.*s\n",
-        msg->fromLen, msg->fromLen, msg->from);
 
     /*Get the from tag*/
     msg->fromTagLen = 0;
@@ -728,9 +699,6 @@ static int sip_parse_from(SIPMsg* msg, const char* start, const char* end, SIP_P
         msg->userNameLen = 0;
     }
 
-    DebugFormat(DEBUG_SIP, "From tag length: %d , hash: %u, content: %.*s\n",
-        msg->fromTagLen, msg->dlgID.fromTagHash, msg->fromTagLen, msg->from_tag);
-
     return SIP_PARSE_SUCCESS;
 }
 
@@ -751,14 +719,9 @@ static int sip_parse_from(SIPMsg* msg, const char* start, const char* end, SIP_P
 
 static int sip_parse_to(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
 {
-    DEBUG_WRAP(int length = end -start; )
     char* buff;
-    DebugFormat(DEBUG_SIP, "To value: %.*s\n", length, start);
     msg->to = start;
     msg->toLen = end - start;
-
-    DebugFormat(DEBUG_SIP, "To length: %d , content: %.*s\n",
-        msg->toLen, msg->toLen, msg->to);
 
     /*Processing tag information*/
     msg->toTagLen = 0;
@@ -776,31 +739,24 @@ static int sip_parse_to(SIPMsg* msg, const char* start, const char* end, SIP_PRO
         buff = (char*)memchr(buff + 1, ';', msg->toLen);
     }
 
-    DebugFormat(DEBUG_SIP, "To tag length: %d , Hash: %u, content: %.*s\n",
-        msg->toTagLen, msg->dlgID.toTagHash, msg->toTagLen, msg->to_tag);
     return SIP_PARSE_SUCCESS;
 }
 
-static inline bool is_valid_ip(const char *start, int length)
+static inline bool is_valid_ip(const char* start, int length)
 {
     SfIp ip;
     char ipStr[INET6_ADDRSTRLEN];
 
     /*Get the IP address*/
-    if(length > INET6_ADDRSTRLEN - 1)
+    if (length > INET6_ADDRSTRLEN - 1)
     {
         length = INET6_ADDRSTRLEN - 1;
     }
     memcpy(ipStr, start, length);
     ipStr[length] = '\0';
 
-    DebugFormat(DEBUG_SIP, "IP data: %s\n", ipStr);
-
-    if( ip.set(ipStr) != SFIP_SUCCESS)
-    {
-        DebugMessage(DEBUG_SIP, "Not valid IP! \n");
+    if ( ip.set(ipStr) != SFIP_SUCCESS)
         return false;
-    }
 
     return true;
 }
@@ -823,19 +779,16 @@ static inline bool is_valid_ip(const char *start, int length)
 static int sip_parse_call_id(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
 {
     int length = end -start;
-    DebugFormat(DEBUG_SIP, "Call-Id value: %.*s\n", length, start);
     msg->call_id = start;
     /*ignore ip address in call id by adjusting length*/
     char* at = (char*)memchr(start, '@', length);
-    if(at && (at < end) && is_valid_ip(at+1, (end-at-1)))
+    if (at && (at < end) && is_valid_ip(at+1, (end-at-1)))
     {
         length = at - start;
     }
 
     msg->callIdLen = end - start;
     msg->dlgID.callIdHash =  strToHash(msg->call_id, length);
-    DebugFormat(DEBUG_SIP, "Call-Id length: %d, Hash: %u\n",
-        msg->callIdLen, msg->dlgID.callIdHash);
 
     return SIP_PARSE_SUCCESS;
 }
@@ -855,9 +808,6 @@ static int sip_parse_call_id(SIPMsg* msg, const char* start, const char* end, SI
  ********************************************************************/
 static int sip_parse_user_agent(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
 {
-    DEBUG_WRAP(int length = end -start; )
-    DebugFormat(DEBUG_SIP, "User-Agent value: %.*s\n", length, start);
-
     msg->userAgent = start;
     msg->userAgentLen = end - start;
 
@@ -879,9 +829,6 @@ static int sip_parse_user_agent(SIPMsg* msg, const char* start, const char* end,
  ********************************************************************/
 static int sip_parse_server(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
 {
-    DEBUG_WRAP(int length = end -start; )
-    DebugFormat(DEBUG_SIP, "Server value: %.*s\n", length, start);
-
     msg->server = start;
     msg->serverLen = end - start;
 
@@ -906,10 +853,8 @@ static int sip_parse_server(SIPMsg* msg, const char* start, const char* end, SIP
 static int sip_parse_cseq(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF* config)
 {
     char* next = nullptr;
-    DEBUG_WRAP(int length = end -start; )
     SIPMethodNode* method = nullptr;
 
-    DebugFormat(DEBUG_SIP, "CSeq value: %.*s\n", length, start);
     msg->cseqnum = SnortStrtoul(start, &next, 10);
     if ((nullptr != next )&&(next < end))
     {
@@ -917,8 +862,6 @@ static int sip_parse_cseq(SIPMsg* msg, const char* start, const char* end, SIP_P
         msg->cseqNameLen = end - msg->cseqName;
         method = SIP_FindMethod (config->methods, msg->cseqName, msg->cseqNameLen);
     }
-    DebugFormat(DEBUG_SIP, "CSeq number: %" PRIu64 ", CSeqName: %.*s\n",
-        msg->cseqnum, msg->cseqNameLen, msg->cseqName);
 
     if (nullptr == method)
     {
@@ -934,8 +877,6 @@ static int sip_parse_cseq(SIPMsg* msg, const char* start, const char* end, SIP_P
         {
             DetectionEngine::queue_event(GID_SIP, SIP_EVENT_MISMATCH_METHOD);
         }
-        DebugFormat(DEBUG_SIP, "Found the method: %s, Flag: 0x%x\n",
-            method->methodName, method->methodFlag);
     }
 
     return SIP_PARSE_SUCCESS;
@@ -959,10 +900,8 @@ static int sip_parse_cseq(SIPMsg* msg, const char* start, const char* end, SIP_P
 static int sip_parse_contact(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
 {
     int length = end -start;
-    DebugFormat(DEBUG_SIP, "Contact value: %.*s\n", length, start);
     msg->contact = start;
     msg->contactLen = msg->contactLen + length;
-    DebugFormat(DEBUG_SIP, "Contact length: %d\n", msg->contactLen);
     return SIP_PARSE_SUCCESS;
 }
 
@@ -981,14 +920,8 @@ static int sip_parse_contact(SIPMsg* msg, const char* start, const char* end, SI
  ********************************************************************/
 
 static int sip_parse_authorization(
-    SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
+    SIPMsg* msg, const char* start, const char*, SIP_PROTO_CONF*)
 {
-#ifdef DEBUG_MSGS
-    DEBUG_WRAP(int length = end -start; )
-    DebugFormat(DEBUG_SIP, "Authorization value: %.*s\n", length, start);
-#else
-    UNUSED(end);
-#endif
     msg->authorization = start;
     return SIP_PARSE_SUCCESS;
 }
@@ -1009,8 +942,6 @@ static int sip_parse_authorization(
 
 static int sip_parse_content_type(SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
 {
-    DEBUG_WRAP(int length = end -start; )
-    DebugFormat(DEBUG_SIP, "Content type value: %.*s\n", length, start);
     msg->contentTypeLen = end - start;
     msg->content_type = start;
     return SIP_PARSE_SUCCESS;
@@ -1045,7 +976,6 @@ static int sip_parse_content_len(SIPMsg* msg, const char* start, const char*,
             DetectionEngine::queue_event(GID_SIP, SIP_EVENT_BAD_CONTENT_LEN);
         return SIP_PARSE_ERROR;
     }
-    DebugFormat(DEBUG_SIP, "Content length: %u\n", msg->content_len);
 
     return SIP_PARSE_SUCCESS;
 }
@@ -1065,14 +995,8 @@ static int sip_parse_content_len(SIPMsg* msg, const char* start, const char*,
  ********************************************************************/
 
 static int sip_parse_content_encode(
-    SIPMsg* msg, const char* start, const char* end, SIP_PROTO_CONF*)
+    SIPMsg* msg, const char* start, const char*, SIP_PROTO_CONF*)
 {
-#ifdef DEBUG_MSGS
-    DEBUG_WRAP(int length = end -start; )
-    DebugFormat(DEBUG_SIP, "Content encode value: %.*s\n", length, start);
-#else
-    UNUSED(end);
-#endif
     msg->content_encode = start;
     return SIP_PARSE_SUCCESS;
 }
@@ -1099,7 +1023,6 @@ static int sip_parse_sdp_o(SIPMsg* msg, const char* start, const char* end)
     if (nullptr == msg->mediaSession)
         return SIP_PARSE_ERROR;
     length = end - start;
-    DebugFormat(DEBUG_SIP, "Origination information: %.*s\n", length, start);
     // Get username and session ID information (before second space)
     spaceIndex = (char*)memchr(start, ' ', length);  // first space
     if ((nullptr == spaceIndex)||(spaceIndex == end))
@@ -1111,13 +1034,10 @@ static int sip_parse_sdp_o(SIPMsg* msg, const char* start, const char* end)
     if (nullptr == spaceIndex2)
         return SIP_PARSE_ERROR;
 
-    DebugFormat(DEBUG_SIP, "Session information: %.*s\n", static_cast<int>(spaceIndex - start), start);
-
     //sessionId uses all elements from o: line except sessionId version
     msg->mediaSession->sessionID =  strToHash(start, spaceIndex - start);
     msg->mediaSession->sessionID +=  strToHash(spaceIndex2+1, end - (spaceIndex2+1));
 
-    DebugFormat(DEBUG_SIP, "Session ID: %u\n", msg->mediaSession->sessionID);
     return SIP_PARSE_SUCCESS;
 }
 
@@ -1145,7 +1065,6 @@ static int sip_parse_sdp_c(SIPMsg* msg, const char* start, const char* end)
     if (nullptr == msg->mediaSession)
         return SIP_PARSE_ERROR;
     length = end - start;
-    DebugFormat(DEBUG_SIP, "Connection data: %.*s\n", length, start);
 
     /*Get the IP address*/
     spaceIndex = (char*)memchr(start, ' ', length);  // first space
@@ -1163,7 +1082,6 @@ static int sip_parse_sdp_c(SIPMsg* msg, const char* start, const char* end)
     }
     strncpy(ipStr, spaceIndex, length);
     ipStr[length] = '\0';
-    DebugFormat(DEBUG_SIP, "IP data: %s\n", ipStr);
 
     // If no default session connect information, add it
     if (nullptr == msg->mediaSession->medias)
@@ -1176,10 +1094,8 @@ static int sip_parse_sdp_c(SIPMsg* msg, const char* start, const char* end)
     }
     if ( ip->set(ipStr) != SFIP_SUCCESS)
     {
-        DebugMessage(DEBUG_SIP, "Parsed error! \n");
         return SIP_PARSE_ERROR;
     }
-    DebugFormat(DEBUG_SIP, "Parsed Connection data: %s\n", ip->ntoa());
 
     return SIP_PARSE_SUCCESS;
 }
@@ -1207,7 +1123,6 @@ static int sip_parse_sdp_m(SIPMsg* msg, const char* start, const char* end)
     if (nullptr == msg->mediaSession)
         return SIP_PARSE_ERROR;
     length = end - start;
-    DebugFormat(DEBUG_SIP, "Media information: %.*s\n", length, start);
 
     spaceIndex = (char*)memchr(start, ' ', length);  // first space
 
@@ -1223,8 +1138,7 @@ static int sip_parse_sdp_m(SIPMsg* msg, const char* start, const char* end)
     mdata->nextM = msg->mediaSession->medias;
     mdata->maddress = msg->mediaSession->maddress_default;
     msg->mediaSession->medias = mdata;
-    DebugFormat(DEBUG_SIP, "Media IP: %s, Media port %hu, number of media: %d\n",
-        mdata->maddress.ntoa(), mdata->mport, mdata->numPort);
+
     return SIP_PARSE_SUCCESS;
 }
 
@@ -1246,7 +1160,6 @@ bool sip_parse(SIPMsg* msg, const char* buff, const char* end, SIP_PROTO_CONF* c
 {
     const char* nextIndex;
     const char* start;
-    bool status;
 
     /*Initialize key values*/
     msg->methodFlag = SIP_METHOD_NULL;
@@ -1255,33 +1168,17 @@ bool sip_parse(SIPMsg* msg, const char* buff, const char* end, SIP_PROTO_CONF* c
     /*Parse the start line*/
     start = buff;
     nextIndex = nullptr;
-    DebugMessage(DEBUG_SIP, "Start parsing...\n");
 
     msg->header = (const uint8_t*)buff;
-    status = sip_startline_parse(msg, start, end, &nextIndex, config);
-
-    if ( !status )
-    {
-        DebugMessage(DEBUG_SIP, "Start line parsing failed...\n");
-        return status;
-    }
+    if (!sip_startline_parse(msg, start, end, &nextIndex, config))
+        return false;
 
     /*Parse the headers*/
     start = nextIndex;
-    status = sip_headers_parse(msg, start, end, &nextIndex, config);
+    sip_headers_parse(msg, start, end, &nextIndex, config);
     msg->headerLen =  nextIndex - buff;
 
-    if ( !status )
-    {
-        DebugMessage(DEBUG_SIP, "Header parsing failed...\n");
-    }
-
-    status = sip_check_headers(msg, config);
-
-    if ( !status )
-    {
-        DebugMessage(DEBUG_SIP, "Headers validation failed...\n");
-    }
+    sip_check_headers(msg, config);
 
     /*Parse the body*/
     start = nextIndex;
@@ -1291,12 +1188,7 @@ bool sip_parse(SIPMsg* msg, const char* buff, const char* end, SIP_PROTO_CONF* c
     if ((!msg->isTcp)&&(msg->content_len > bodyLen))
         DetectionEngine::queue_event(GID_SIP, SIP_EVENT_MISMATCH_CONTENT_LEN);
 
-    status = sip_body_parse(msg, start, start + msg->content_len, &nextIndex);
-
-    if ( !status )
-    {
-        DebugMessage(DEBUG_SIP, "Headers validation failed...\n");
-    }
+    bool status = sip_body_parse(msg, start, start + msg->content_len, &nextIndex);
 
     // Find out whether multiple SIP messages in this packet
     /*Disable this check for TCP. Revisit this again when PAF enabled for SIP*/
@@ -1358,8 +1250,6 @@ void sip_freeMediaSession(SIP_MediaSession* mediaSession)
 
     while (nullptr != curNode)
     {
-        DebugFormat(DEBUG_SIP, "Clear media ip: %s, port: %d, number of port: %d\n",
-            curNode->maddress.ntoa(), curNode->mport, curNode->numPort);
         nextNode = curNode->nextM;
         snort_free(curNode);
         curNode = nextNode;
@@ -1387,8 +1277,6 @@ void sip_freeMediaList(SIP_MediaList medias)
 
     while (nullptr != curNode)
     {
-        DebugFormat(DEBUG_SIP, "Clean Media session default IP: %s,  session ID: %u\n",
-            curNode->maddress_default.ntoa(), curNode->sessionID);
         nextNode = curNode->nextS;
         sip_freeMediaSession(curNode);
         curNode = nextNode;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -36,20 +36,20 @@ struct SSLData
     uint16_t partial_rec_len[4];
 };
 
-class SslFlowData : public FlowData
+class SslFlowData : public snort::FlowData
 {
 public:
     SslFlowData();
     ~SslFlowData() override;
 
     static void init()
-    { inspector_id = FlowData::create_flow_data_id(); }
+    { inspector_id = snort::FlowData::create_flow_data_id(); }
 
 public:
     static unsigned inspector_id;
     SSLData session;
 };
 //Function: API to get the ssl flow data from the packet flow.
-SSLData* get_ssl_session_data(Flow* flow);
+SSLData* get_ssl_session_data(snort::Flow* flow);
 
 #endif

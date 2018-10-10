@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -36,6 +36,7 @@
 #include "managers/module_manager.h"
 #include "parser/parser.h"
 
+using namespace snort;
 using namespace std;
 
 #define required "require('snort_config'); "
@@ -71,12 +72,18 @@ static int get_line_number(lua_State* L)
 
 #endif
 
-static void load_config(lua_State* L, const char* file)
+static void load_config(lua_State* L, const char* file, const char* tweaks)
 {
     Lua::ManageStack ms(L);
 
     if ( luaL_loadfile(L, file) )
         FatalError("can't load %s: %s\n", file, lua_tostring(L, -1));
+
+    if ( tweaks and *tweaks )
+    {
+        lua_pushstring(L, tweaks);
+        lua_setglobal(L, "tweaks");
+    }
 
     if ( lua_pcall(L, 0, 0, 0) )
         FatalError("can't init %s: %s\n", file, lua_tostring(L, -1));
@@ -116,10 +123,10 @@ static void run_config(lua_State* L, const char* t)
 }
 
 static void config_lua(
-    lua_State* L, const char* file, string& s)
+    lua_State* L, const char* file, string& s, const char* tweaks)
 {
     if ( file && *file )
-        load_config(L, file);
+        load_config(L, file, tweaks);
 
     if ( !s.empty() )
         load_overrides(L, s);
@@ -189,18 +196,18 @@ void Shell::configure(SnortConfig* sc)
 
     //set_*_policy can set to null. this is used
     //to tell which pieces to pick from sub policy
-    auto pt = sc->policy_map->shell_map.find(this);
-    if ( pt == sc->policy_map->shell_map.end() )
+    auto pt = sc->policy_map->get_policies(this);
+    if ( pt.get() == nullptr )
         set_default_policy(sc);
     else
     {
-        set_inspection_policy(pt->second->inspection);
-        set_ips_policy(pt->second->ips);
-        set_network_policy(pt->second->network);
+        set_inspection_policy(pt->inspection);
+        set_ips_policy(pt->ips);
+        set_network_policy(pt->network);
     }
 
     const char* base_name = push_relative_path(file.c_str());
-    config_lua(lua, base_name, overrides);
+    config_lua(lua, base_name, overrides, sc->tweaks.c_str());
 
     set_default_policy(sc);
     ModuleManager::set_config(nullptr);

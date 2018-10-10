@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,10 @@
 
 #include <functional>
 #include "main/snort_types.h"
+
+namespace snort
+{
+class Value;
 
 struct SO_PUBLIC Parameter
 {
@@ -67,7 +71,7 @@ struct SO_PUBLIC Parameter
     const char* get_type() const;
     const char* get_range() const;
 
-    bool validate(class Value&) const;
+    bool validate(Value&) const;
 
     bool is_positional() const
     { return ( name && *name == '~' ); }
@@ -91,6 +95,6 @@ struct SO_PUBLIC Parameter
     // 0-based; -1 if not found; list is | delimited
     static int index(const char* list, const char* key);
 };
-
+}
 #endif
 

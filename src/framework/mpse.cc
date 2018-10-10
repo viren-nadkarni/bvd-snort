@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,8 +26,11 @@
 #include "profiler/profiler_defs.h"
 #include "search_engines/pat_stats.h"
 
+
 using namespace std;
 
+namespace snort
+{
 THREAD_LOCAL ProfileStats mpsePerfStats;
 
 //-------------------------------------------------------------------------
@@ -38,6 +41,7 @@ Mpse::Mpse(const char* m)
 {
     method = m;
     verbose = 0;
+    api = nullptr;
 }
 
 int Mpse::search(
@@ -45,18 +49,18 @@ int Mpse::search(
     void* context, int* current_state)
 {
     Profile profile(mpsePerfStats);
-
-    int ret = _search(T, n, match, context, current_state);
-
     pmqs.matched_bytes += n;
-
-    return ret;
+    return _search(T, n, match, context, current_state);
 }
 
 int Mpse::search_all(
     const unsigned char* T, int n, MpseMatch match,
     void* context, int* current_state)
 {
+    Profile profile(mpsePerfStats);
+    pmqs.matched_bytes += n;
     return _search(T, n, match, context, current_state);
+}
+
 }
 

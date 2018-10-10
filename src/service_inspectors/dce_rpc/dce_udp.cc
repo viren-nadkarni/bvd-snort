@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,7 +28,10 @@
 #include "detection/detection_engine.h"
 #include "utils/util.h"
 
+#include "dce_context_data.h"
 #include "dce_udp_module.h"
+
+using namespace snort;
 
 THREAD_LOCAL dce2UdpStats dce2_udp_stats;
 
@@ -90,18 +93,12 @@ static DCE2_UdpSsnData* dce2_create_new_udp_session(Packet* p, dce2UdpProtoConf*
 {
     Profile profile(dce2_udp_pstat_new_session);
 
-    DebugMessage(DEBUG_DCE_UDP, "DCE over UDP packet detected\n");
-    DebugMessage(DEBUG_DCE_UDP, "Creating new session\n");
-
     DCE2_UdpSsnData* dce2_udp_sess = set_new_dce2_udp_session(p);
 
-    DCE2_ResetRopts(&dce2_udp_sess->sd.ropts);
+    DCE2_ResetRopts(&dce2_udp_sess->sd, p);
 
     dce2_udp_stats.udp_sessions++;
-    DebugFormat(DEBUG_DCE_UDP,"Created (%p)\n", (void*)dce2_udp_sess);
-
     dce2_udp_sess->sd.trans = DCE2_TRANS_TYPE__UDP;
-    dce2_udp_sess->sd.wire_pkt = p;
     dce2_udp_sess->sd.config = (void*)config;
 
     return dce2_udp_sess;
@@ -118,8 +115,6 @@ static DCE2_UdpSsnData* dce2_handle_udp_session(Packet* p, dce2UdpProtoConf* con
         dce2_udp_sess = dce2_create_new_udp_session(p, config);
     }
 
-    DebugFormat(DEBUG_DCE_UDP, "Session pointer: %p\n", (void*)dce2_udp_sess);
-
     return dce2_udp_sess;
 }
 
@@ -129,6 +124,7 @@ public:
     Dce2Udp(dce2UdpProtoConf&);
     void show(SnortConfig*) override;
     void eval(Packet*) override;
+    void clear(Packet*) override;
 
 private:
     dce2UdpProtoConf config;
@@ -148,14 +144,6 @@ void Dce2Udp::eval(Packet* p)
 {
     DCE2_UdpSsnData* dce2_udp_sess;
     Profile profile(dce2_udp_pstat_main);
-    if (DCE2_SsnFromServer(p))
-    {
-        DebugMessage(DEBUG_DCE_UDP, "Packet from Server.\n");
-    }
-    else
-    {
-        DebugMessage(DEBUG_DCE_UDP, "Packet from Client.\n");
-    }
 
     assert(p->flow);
 
@@ -174,11 +162,19 @@ void Dce2Udp::eval(Packet* p)
         if (!dce2_detected)
             DCE2_Detect(&dce2_udp_sess->sd);
 
-        DCE2_ResetRopts(&dce2_udp_sess->sd.ropts);
-
         delete p->endianness;
         p->endianness = nullptr;
     }
+}
+
+void Dce2Udp::clear(Packet* p)
+{
+    DCE2_UdpSsnData* dce2_udp_sess = get_dce2_udp_session_data(p->flow);
+    if ( dce2_udp_sess )
+    {
+        DCE2_ResetRopts(&dce2_udp_sess->sd, p);
+    }
+
 }
 
 //-------------------------------------------------------------------------
@@ -211,6 +207,7 @@ static void dce2_udp_dtor(Inspector* p)
 static void dce2_udp_init()
 {
     Dce2UdpFlowData::init();
+    DceContextData::init(DCE2_TRANS_TYPE__UDP);
 }
 
 const InspectApi dce2_udp_api =
@@ -228,9 +225,9 @@ const InspectApi dce2_udp_api =
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::UDP,
+    PROTO_BIT__UDP,
     nullptr,  // buffers
-    "dcerpc",
+    DCE_RPC_SERVICE_NAME,
     dce2_udp_init,
     nullptr, // pterm
     nullptr, // tinit

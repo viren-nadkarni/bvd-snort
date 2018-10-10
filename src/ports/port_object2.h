@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,7 @@
 // PortObject2 is similar to PortObject
 //-------------------------------------------------------------------------
 
+
 struct PortObject;
 
 struct PortObject2
@@ -40,7 +41,7 @@ struct PortObject2
     int id;                     /* internal tracking - compiling sets this value */
 
     SF_LIST* item_list;         /* list of port and port-range items */
-    GHash* rule_hash;         /* hash of rule (rule-indexes) in use */
+    snort::GHash* rule_hash;         /* hash of rule (rule-indexes) in use */
 
     PortBitSet* port_list;      /* for collecting ports that use this object */
     struct PortGroup* group;    /* PortGroup based on rule_hash  */

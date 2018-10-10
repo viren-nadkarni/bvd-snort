@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -43,6 +43,8 @@
 
 #include "ft_main.h"
 #include "ftpp_return_codes.h"
+
+using namespace snort;
 
 /*
  * Function: ftp_bounce_lookup_init(BOUNCE_LOOKUP **BounceLookup)
@@ -119,8 +121,8 @@ int ftp_bounce_lookup_cleanup(BOUNCE_LOOKUP** BounceLookup)
  * Returns: int => return code indicating error or success
  *
  */
-int ftp_bounce_lookup_add(BOUNCE_LOOKUP* BounceLookup,
-    const SfIp* Ip, FTP_BOUNCE_TO* BounceTo)
+int ftp_bounce_lookup_add(BOUNCE_LOOKUP* BounceLookup, const snort::SfIp* Ip,
+    FTP_BOUNCE_TO* BounceTo)
 {
     int iRet;
 
@@ -167,8 +169,8 @@ int ftp_bounce_lookup_add(BOUNCE_LOOKUP* BounceLookup,
  *                            matching IP if found, NULL otherwise.
  *
  */
-FTP_BOUNCE_TO* ftp_bounce_lookup_find(
-    BOUNCE_LOOKUP* BounceLookup, const SfIp* Ip, int* iError)
+FTP_BOUNCE_TO* ftp_bounce_lookup_find(BOUNCE_LOOKUP* BounceLookup, const snort::SfIp* Ip,
+    int* iError)
 {
     FTP_BOUNCE_TO* BounceTo = nullptr;
 
@@ -209,8 +211,7 @@ FTP_BOUNCE_TO* ftp_bounce_lookup_find(
  * Returns: FTP_BOUNCE_TO* => Pointer to first bounce configuration structure
  *
  */
-FTP_BOUNCE_TO* ftp_bounce_lookup_first(BOUNCE_LOOKUP* BounceLookup,
-    int* iError)
+FTP_BOUNCE_TO* ftp_bounce_lookup_first(BOUNCE_LOOKUP* BounceLookup, int* iError)
 {
     FTP_BOUNCE_TO* BounceTo;
 
@@ -252,8 +253,7 @@ FTP_BOUNCE_TO* ftp_bounce_lookup_first(BOUNCE_LOOKUP* BounceLookup,
  * Returns: FTP_BOUNCE_TO*  => Pointer to next bounce configuration structure
  *
  */
-FTP_BOUNCE_TO* ftp_bounce_lookup_next(BOUNCE_LOOKUP* BounceLookup,
-    int* iError)
+FTP_BOUNCE_TO* ftp_bounce_lookup_next(BOUNCE_LOOKUP* BounceLookup, int* iError)
 {
     FTP_BOUNCE_TO* BounceTo;
 

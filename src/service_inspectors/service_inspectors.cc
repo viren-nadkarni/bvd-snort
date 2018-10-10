@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,12 +25,15 @@
 
 #include "managers/plugin_manager.h"
 
+using namespace snort;
+
 extern const BaseApi* sin_imap;
 extern const BaseApi* sin_pop;
 extern const BaseApi* sin_smtp;
 
 extern const BaseApi* sin_file[];
 extern const BaseApi* sin_http[];
+extern const BaseApi* sin_http2[];
 extern const BaseApi* sin_sip[];
 extern const BaseApi* sin_ssl[];
 
@@ -78,6 +81,7 @@ void load_service_inspectors()
 
     PluginManager::load_plugins(sin_file);
     PluginManager::load_plugins(sin_http);
+    PluginManager::load_plugins(sin_http2);
     PluginManager::load_plugins(sin_sip);
     PluginManager::load_plugins(sin_ssl);
 

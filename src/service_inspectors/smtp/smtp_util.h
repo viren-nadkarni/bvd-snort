@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,13 +26,16 @@
 
 #include "smtp_config.h"
 
+namespace snort
+{
 struct Packet;
+}
 
 void SMTP_GetEOL(const uint8_t*, const uint8_t*, const uint8_t**, const uint8_t**);
-void SMTP_LogFuncs(SMTP_PROTO_CONF*, Packet*, MimeSession*);
+void SMTP_LogFuncs(SMTP_PROTO_CONF*, snort::Packet*, snort::MimeSession*);
 
-int SMTP_CopyToAltBuffer(Packet*, const uint8_t*, int);
-const uint8_t* SMTP_GetAltBuffer(Packet*, unsigned& len);
-void SMTP_ResetAltBuffer(Packet*);
+int SMTP_CopyToAltBuffer(snort::Packet*, const uint8_t*, int);
+const uint8_t* SMTP_GetAltBuffer(snort::Packet*, unsigned& len);
+void SMTP_ResetAltBuffer(snort::Packet*);
 
 #endif

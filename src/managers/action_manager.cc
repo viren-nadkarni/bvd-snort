@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,7 @@
 #include "packet_io/active.h"
 #include "parser/parser.h"
 
+using namespace snort;
 using namespace std;
 
 struct Actor
@@ -94,14 +95,14 @@ static void store(const ActionApi* api, IpsAction* act)
 
 //-------------------------------------------------------------------------
 
-RuleType ActionManager::get_action_type(const char* s)
+Actions::Type ActionManager::get_action_type(const char* s)
 {
     for ( auto& p : s_actors )
     {
         if ( !strcmp(p.api->base.name, s) )
             return p.api->type;
     }
-    return RULE_TYPE__NONE;
+    return Actions::NONE;
 }
 
 void ActionManager::instantiate(
@@ -151,28 +152,8 @@ void ActionManager::queue(IpsAction* a)
         s_action = a;
 }
 
-void ActionManager::queue_reject(const Packet* p)
+void ActionManager::queue_reject()
 {
-    if ( !p->ptrs.ip_api.is_ip() )
-        return;
-
-    switch ( p->type() )
-    {
-    case PktType::TCP:
-        if ( !Active::is_reset_candidate(p) )
-            return;
-        break;
-
-    case PktType::UDP:
-    case PktType::ICMP:
-    case PktType::IP:
-        if ( !Active::is_unreachable_candidate(p) )
-            return;
-        break;
-
-    default:
-        return;
-    }
     if ( s_reject )
         queue(s_reject);
 }

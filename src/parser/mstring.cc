@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -28,6 +28,8 @@
 
 #include "utils/util.h"
 
+namespace snort
+{
 static char* mSplitAddTok(const char*, const int, const char*, const char);
 
 /****************************************************************
@@ -422,4 +424,4 @@ void mSplitFree(char*** pbuf, int num_toks)
     snort_free(buf);
     *pbuf = nullptr;
 }
-
+} // namespace snort

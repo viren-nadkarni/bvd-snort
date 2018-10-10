@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -45,6 +45,8 @@ class FileConfig
 {
 public:
     FileMagicRule* get_rule_from_id(uint32_t);
+    void get_magic_rule_ids_from_type(const std::string&, const std::string&,
+        snort::FileTypeBitSet&);
     void process_file_rule(FileMagicRule&);
     void process_file_policy_rule(FileRule&);
     bool process_file_magic(FileMagicData&);

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,6 +28,11 @@
 
 #include "framework/counts.h"
 #include "main/thread.h"
+
+namespace snort
+{
+struct Packet;
+}
 
 #define MIN_GTP_VERSION_CODE   (0)
 #define MAX_GTP_VERSION_CODE   (2)
@@ -73,7 +78,7 @@ struct GTP_Stats
 
 extern THREAD_LOCAL GTP_Stats gtp_stats;
 
-void GTPmain(const GTPConfig&, struct Packet*);
+void GTPmain(const GTPConfig&, snort::Packet*);
 
 #endif
 

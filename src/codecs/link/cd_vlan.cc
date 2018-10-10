@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,8 @@
 #include "framework/codec.h"
 #include "log/text_log.h"
 #include "protocols/vlan.h"
+
+using namespace snort;
 
 #define CD_VLAN_NAME "vlan"
 #define CD_VLAN_HELP "support for local area network"

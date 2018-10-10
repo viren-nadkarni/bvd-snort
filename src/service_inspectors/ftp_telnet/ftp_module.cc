@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,12 +26,11 @@
 
 #include "log/messages.h"
 
+#include "ft_main.h"
 #include "ftpp_si.h"
 
+using namespace snort;
 using namespace std;
-
-#define FTP_CLIENT "ftp_client"
-#define FTP_SERVER "ftp_server"
 
 #define ftp_client_help \
     "FTP client configuration module for use with ftp_server"
@@ -46,7 +45,7 @@ using namespace std;
 static const Parameter client_bounce_params[] =
 {
     { "address", Parameter::PT_ADDR, nullptr, "1.0.0.0/32",
-      "allowed ip address in CIDR format" },
+      "allowed IP address in CIDR format" },
 
     // FIXIT-L port and last_port should be replaced with a port list
     { "port", Parameter::PT_PORT, "1:", "20",
@@ -70,16 +69,16 @@ static const Parameter ftp_client_params[] =
       "ignore erase character and erase line commands when normalizing" },
 
     { "max_resp_len", Parameter::PT_INT, "-1:", "-1",
-      "maximum ftp response accepted by client" },
+      "maximum FTP response accepted by client" },
 
     { "telnet_cmds", Parameter::PT_BOOL, nullptr, "false",
-      "detect telnet escape sequences on ftp control channel" },
+      "detect Telnet escape sequences on FTP control channel" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
 FtpClientModule::FtpClientModule() :
-    Module(FTP_CLIENT, ftp_client_help, ftp_client_params)
+    Module(FTP_CLIENT_NAME, ftp_client_help, ftp_client_params)
 {
     conf = nullptr;
 }
@@ -300,13 +299,13 @@ static const Parameter ftp_server_params[] =
       "default maximum length of commands handled by server; 0 is unlimited" },
 
     { "encrypted_traffic", Parameter::PT_BOOL, nullptr, "false",
-      "check for encrypted telnet and ftp" },
+      "check for encrypted Telnet and FTP" },
 
     { "ftp_cmds", Parameter::PT_STRING, nullptr, nullptr,
       "specify additional commands supported by server beyond RFC 959" },
 
     { "ignore_data_chan", Parameter::PT_BOOL, nullptr, "false",
-      "do not inspect ftp data channels" },
+      "do not inspect FTP data channels" },
 
     { "ignore_telnet_erase_cmds", Parameter::PT_BOOL, nullptr, "false",
       "ignore erase character and erase line commands when normalizing" },
@@ -315,7 +314,7 @@ static const Parameter ftp_server_params[] =
       "print command configurations on start up" },
 
     { "telnet_cmds", Parameter::PT_BOOL, nullptr, "false",
-      "detect telnet escape sequences of ftp control channel" },
+      "detect Telnet escape sequences of FTP control channel" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -340,8 +339,8 @@ static const RuleMap ftp_server_rules[] =
 static const PegInfo ftp_pegs[] =
 {
     { CountType::SUM, "total_packets", "total packets" },
-    { CountType::NOW, "concurrent_sessions", "total concurrent ftp sessions" },
-    { CountType::MAX, "max_concurrent_sessions", "maximum concurrent ftp sessions" },
+    { CountType::NOW, "concurrent_sessions", "total concurrent FTP sessions" },
+    { CountType::MAX, "max_concurrent_sessions", "maximum concurrent FTP sessions" },
 
     { CountType::END, nullptr, nullptr }
 };
@@ -349,7 +348,7 @@ static const PegInfo ftp_pegs[] =
 //-------------------------------------------------------------------------
 
 FtpServerModule::FtpServerModule() :
-    Module(FTP_SERVER, ftp_server_help, ftp_server_params)
+    Module(FTP_SERVER_NAME, ftp_server_help, ftp_server_params)
 {
     conf = nullptr;
 }

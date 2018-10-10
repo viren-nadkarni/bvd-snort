@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,7 +33,6 @@
 #include "lua/lua.h"
 #include "main/analyzer.h"
 #include "main/analyzer_command.h"
-#include "main/inclusion.h"
 #include "main/request.h"
 #include "main/shell.h"
 #include "main/snort.h"
@@ -52,17 +51,8 @@
 #include "utils/util.h"
 #include "utils/safec.h"
 
-// ADDED -----------------------------------------------------------------
-
-#include "CL/cl.hpp"
-#include <iostream>     // std::cout
-#include <fstream>      // std::ifstream
-
-#include "my_util.h"
-// ADDED END -------------------------------------------------------------
-
 #ifdef UNIT_TEST
-#include "catch/unit_test_main.h"
+#include "catch/unit_test.h"
 #endif
 
 #ifdef PIGLET
@@ -74,7 +64,8 @@
 #endif
 
 //-------------------------------------------------------------------------
-unsigned long my_total_matches = 0;
+
+using namespace snort;
 
 static bool exit_requested = false;
 static int main_exit_code = 0;
@@ -202,7 +193,7 @@ bool Pig::queue_command(AnalyzerCommand* ac, bool orphan)
 
 #ifdef DEBUG_MSGS
     unsigned ac_ref_count = ac->get();
-    DebugFormat(DEBUG_ANALYZER, "[%u] Queuing command %s for execution (refcount %u)\n",
+    trace_logf(snort, "[%u] Queuing command %s for execution (refcount %u)\n",
             idx, ac->stringify(), ac_ref_count);
 #else
     ac->get();
@@ -216,13 +207,13 @@ void Pig::reap_command(AnalyzerCommand* ac)
     unsigned ac_ref_count = ac->put();
     if (ac_ref_count == 0)
     {
-        DebugFormat(DEBUG_ANALYZER, "[%u] Destroying completed command %s\n",
+        trace_logf(snort, "[%u] Destroying completed command %s\n",
                 idx, ac->stringify());
         delete ac;
     }
 #ifdef DEBUG_MSGS
     else
-        DebugFormat(DEBUG_ANALYZER, "[%u] Reaped ongoing command %s (refcount %u)\n",
+        trace_logf(snort, "[%u] Reaped ongoing command %s (refcount %u)\n",
                 idx, ac->stringify(), ac_ref_count);
 #endif
 }
@@ -265,22 +256,6 @@ static Pig* get_lazy_pig(unsigned max)
 // main commands
 //-------------------------------------------------------------------------
 
-static void broadcast(AnalyzerCommand* ac)
-{
-    unsigned dispatched = 0;
-
-    DebugFormat(DEBUG_ANALYZER, "Broadcasting %s command\n", ac->stringify());
-
-    for (unsigned idx = 0; idx < max_pigs; ++idx)
-    {
-        if (pigs[idx].queue_command(ac))
-            dispatched++;
-    }
-
-    if (!dispatched)
-        orphan_commands.push(ac);
-}
-
 static AnalyzerCommand* get_command(AnalyzerCommand* ac, bool from_shell)
 {
 #ifndef SHELL
@@ -293,11 +268,28 @@ static AnalyzerCommand* get_command(AnalyzerCommand* ac, bool from_shell)
         return ac;
 }
 
+void snort::main_broadcast_command(AnalyzerCommand* ac, bool from_shell)
+{
+    unsigned dispatched = 0;
+    
+    ac = get_command(ac, from_shell);
+    trace_logf(snort, "Broadcasting %s command\n", ac->stringify());
+
+    for (unsigned idx = 0; idx < max_pigs; ++idx)
+    {
+        if (pigs[idx].queue_command(ac))
+            dispatched++;
+    }
+
+    if (!dispatched)
+        orphan_commands.push(ac);
+}
+
 int main_dump_stats(lua_State* L)
 {
     bool from_shell = ( L != nullptr );
     current_request->respond("== dumping stats\n", from_shell);
-    broadcast(get_command(new ACGetStats(), from_shell));
+    main_broadcast_command(new ACGetStats(), from_shell);
     return 0;
 }
 
@@ -305,7 +297,7 @@ int main_rotate_stats(lua_State* L)
 {
     bool from_shell = ( L != nullptr );
     current_request->respond("== rotating stats\n", from_shell);
-    broadcast(get_command(new ACRotate(), from_shell));
+    main_broadcast_command(new ACRotate(), from_shell);
     return 0;
 }
 
@@ -333,12 +325,21 @@ int main_reload_config(lua_State* L)
         current_request->respond("== reload failed\n");
         return 0;
     }
+
+    tTargetBasedConfig* old_tc = SFAT_GetConfig();
+    tTargetBasedConfig* tc = SFAT_Swap();
+
+    if ( !tc )
+    {
+        current_request->respond("== reload failed\n");
+        return 0;
+    }
     SnortConfig::set_conf(sc);
     proc_stats.conf_reloads++;
 
     bool from_shell = ( L != nullptr );
     current_request->respond(".. swapping configuration\n", from_shell);
-    broadcast(get_command(new ACSwap(new Swapper(old, sc)), from_shell));
+    main_broadcast_command(new ACSwap(new Swapper(old, sc, old_tc, tc)), from_shell);
 
     return 0;
 }
@@ -379,7 +380,48 @@ int main_reload_policy(lua_State* L)
 
     bool from_shell = ( L != nullptr );
     current_request->respond(".. swapping policy\n", from_shell);
-    broadcast(get_command(new ACSwap(new Swapper(old, sc)), from_shell));
+    main_broadcast_command(new ACSwap(new Swapper(old, sc)), from_shell);
+
+    return 0;
+}
+
+int main_reload_module(lua_State* L)
+{
+    if ( Swapper::get_reload_in_progress() )
+    {
+        current_request->respond("== reload pending; retry\n");
+        return 0;
+    }
+    const char* fname =  nullptr;
+
+    if ( L )
+    {
+        Lua::ManageStack(L, 1);
+        fname = luaL_checkstring(L, 1);
+    }
+
+    if ( fname and *fname )
+        current_request->respond(".. reloading module\n");
+    else
+    {
+        current_request->respond("== module name required\n");
+        return 0;
+    }
+
+    SnortConfig* old = SnortConfig::get_conf();
+    SnortConfig* sc = Snort::get_updated_module(old, fname);
+
+    if ( !sc )
+    {
+        current_request->respond("== reload failed\n");
+        return 0;
+    }
+    SnortConfig::set_conf(sc);
+    proc_stats.policy_reloads++;
+
+    bool from_shell = ( L != nullptr );
+    current_request->respond(".. swapping module\n", from_shell);
+    main_broadcast_command(new ACSwap(new Swapper(old, sc)), from_shell);
 
     return 0;
 }
@@ -388,7 +430,7 @@ int main_reload_daq(lua_State* L)
 {
     bool from_shell = ( L != nullptr );
     current_request->respond(".. reloading daq module\n", from_shell);
-    broadcast(get_command(new ACDAQSwap(), from_shell));
+    main_broadcast_command(new ACDAQSwap(), from_shell);
     proc_stats.daq_reloads++;
 
     return 0;
@@ -426,7 +468,7 @@ int main_reload_hosts(lua_State* L)
 
     bool from_shell = ( L != nullptr );
     current_request->respond(".. swapping hosts table\n", from_shell);
-    broadcast(get_command(new ACSwap(new Swapper(old, tc)), from_shell));
+    main_broadcast_command(new ACSwap(new Swapper(old, tc)), from_shell);
 
     return 0;
 }
@@ -467,7 +509,7 @@ int main_delete_inspector(lua_State* L)
 
     bool from_shell = ( L != nullptr );
     current_request->respond(".. deleted inspector\n", from_shell);
-    broadcast(get_command(new ACSwap(new Swapper(old, sc)), from_shell));
+    main_broadcast_command(new ACSwap(new Swapper(old, sc)), from_shell);
 
     return 0;
 }
@@ -489,7 +531,7 @@ int main_pause(lua_State* L)
 {
     bool from_shell = ( L != nullptr );
     current_request->respond("== pausing\n", from_shell);
-    broadcast(get_command(new ACPause(), from_shell));
+    main_broadcast_command(new ACPause(), from_shell);
     paused = true;
     return 0;
 }
@@ -498,7 +540,7 @@ int main_resume(lua_State* L)
 {
     bool from_shell = ( L != nullptr );
     current_request->respond("== resuming\n", from_shell);
-    broadcast(get_command(new ACResume(), from_shell));
+    main_broadcast_command(new ACResume(), from_shell);
     paused = false;
     return 0;
 }
@@ -522,7 +564,7 @@ int main_quit(lua_State* L)
 {
     bool from_shell = ( L != nullptr );
     current_request->respond("== stopping\n", from_shell);
-    broadcast(get_command(new ACStop(), from_shell));
+    main_broadcast_command(new ACStop(), from_shell);
     exit_requested = true;
     return 0;
 }
@@ -602,7 +644,7 @@ static void reap_commands()
     {
         AnalyzerCommand* ac = orphan_commands.front();
         orphan_commands.pop();
-        DebugFormat(DEBUG_ANALYZER, "Destroying orphan command %s\n", ac->stringify());
+        trace_logf(snort, "Destroying orphan command %s\n", ac->stringify());
         delete ac;
     }
 }
@@ -746,7 +788,7 @@ static void handle(Pig& pig, unsigned& swine, unsigned& pending_privileges)
                 FatalError("Failed to drop privileges!\n");
 
             Snort::do_pidfile();
-            broadcast(new ACStart());
+            main_broadcast_command(new ACStart());
         }
         else
         {
@@ -771,7 +813,7 @@ static void handle(Pig& pig, unsigned& swine, unsigned& pending_privileges)
                 FatalError("Failed to drop privileges!\n");
 
             Snort::do_pidfile();
-            broadcast(new ACRun(paused));
+            main_broadcast_command(new ACRun(paused));
         }
         else
         {
@@ -793,9 +835,6 @@ static void handle(Pig& pig, unsigned& swine, unsigned& pending_privileges)
 static void main_loop()
 {
     unsigned swine = 0, pending_privileges = 0;
-    my_total_matches = 0;
-
-    std::cout << "=> Main loop begins\n";
 
     if (SnortConfig::change_privileges())
         pending_privileges = max_pigs;
@@ -839,9 +878,6 @@ static void main_loop()
         }
         service_check();
     }
-
-    std::cout << "=> Main loop ends\n";
-    std::cout << "=> Total matches: " << my_total_matches << "\n";
 }
 
 static void snort_main()

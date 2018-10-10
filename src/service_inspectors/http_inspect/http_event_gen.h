@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -45,14 +45,14 @@ public:
         assert((sid > 0) && (sid <= MAX));
         if (!events_generated[sid-1])
         {
-            DetectionEngine::queue_event(HttpEnums::HTTP_GID, (uint32_t)sid);
+            snort::DetectionEngine::queue_event(HttpEnums::HTTP_GID, (uint32_t)sid);
             events_generated[sid-1] = true;
         }
     }
 
     void generate_misformatted_http(const uint8_t* buffer, uint32_t length)
     {
-        if ( SnortStrnStr((const char*)buffer, length, "HTTP/") != nullptr )
+        if ( snort::SnortStrnStr((const char*)buffer, length, "HTTP/") != nullptr )
             create_event(HttpEnums::EVENT_MISFORMATTED_HTTP);
         else
             create_event(HttpEnums::EVENT_LOSS_OF_SYNC);
@@ -60,11 +60,14 @@ public:
 
     // The following methods are for convenience of debug and test output only!
     uint64_t get_raw() const { return
-        (events_generated & std::bitset<MAX>(0xFFFFFFFFFFFFFFFF)).to_ulong(); }
+       (events_generated & std::bitset<MAX>(0xFFFFFFFFFFFFFFFF)).to_ulong(); }
     uint64_t get_raw2() const { return
-        ((events_generated >> 64) & std::bitset<MAX>(0xFFFFFFFFFFFFFFFF)).to_ulong(); }
-
+       ((events_generated >> BASE_1XX_EVENTS) & std::bitset<MAX>(0xFFFFFFFFFFFFFFFF)).to_ulong(); }
+    uint64_t get_raw3() const { return
+       ((events_generated >> BASE_2XX_EVENTS) & std::bitset<MAX>(0xFFFFFFFFFFFFFFFF)).to_ulong(); }
 private:
+    static const unsigned BASE_1XX_EVENTS = 100;
+    static const unsigned BASE_2XX_EVENTS = 200;
     static const int MAX = HttpEnums::EVENT__MAX_VALUE;
     std::bitset<MAX> events_generated = 0;
 };

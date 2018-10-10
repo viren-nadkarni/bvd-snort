@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -113,7 +113,7 @@ struct CombinedMemoryStats
 
 inline void CombinedMemoryStats::update_allocs(size_t n)
 {
-    if ( is_packet_thread() )
+    if ( snort::is_packet_thread() )
         runtime.update_allocs(n);
     else
         startup.update_allocs(n);
@@ -121,7 +121,7 @@ inline void CombinedMemoryStats::update_allocs(size_t n)
 
 inline void CombinedMemoryStats::update_deallocs(size_t n)
 {
-    if ( is_packet_thread() )
+    if ( snort::is_packet_thread() )
         runtime.update_deallocs(n);
     else
         startup.update_deallocs(n);

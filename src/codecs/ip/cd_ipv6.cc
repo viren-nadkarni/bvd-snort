@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,14 +22,19 @@
 #include "config.h"
 #endif
 
+#include <sfbpf_dlt.h>
+
 #include "codecs/codec_module.h"
 #include "framework/codec.h"
 #include "log/text_log.h"
 #include "main/snort_config.h"
 #include "packet_io/active.h"
 
+using namespace snort;
+
 #define CD_IPV6_NAME "ipv6"
-#define CD_IPV6_HELP "support for Internet protocol v6"
+#define CD_IPV6_HELP_STR "support for Internet protocol v6"
+#define CD_IPV6_HELP ADD_DLT(CD_IPV6_HELP_STR, DLT_IPV6)
 
 namespace
 {
@@ -84,6 +89,7 @@ class Ipv6Codec : public Codec
 public:
     Ipv6Codec() : Codec(CD_IPV6_NAME) { }
 
+    void get_data_link_type(std::vector<int>&) override;
     void get_protocol_ids(std::vector<ProtocolId>& v) override;
     bool decode(const RawData&, CodecData&, DecodeData&) override;
     bool encode(const uint8_t* const raw_in, const uint16_t raw_len,
@@ -106,6 +112,11 @@ private:
 /********************************************************************
  *************************   CLASS FUNCTIONS ************************
  ********************************************************************/
+
+void Ipv6Codec::get_data_link_type(std::vector<int>& v)
+{
+    v.push_back(DLT_IPV6);
+}
 
 void Ipv6Codec::get_protocol_ids(std::vector<ProtocolId>& v)
 {

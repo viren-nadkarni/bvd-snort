@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2009-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,22 +23,23 @@
 #define RATE_FILTER_H
 
 // rate filter interface for Snort
-
-struct RateFilterConfig;
-struct SnortConfig;
-struct tSFRFConfigNode;
+namespace snort
+{
 struct Packet;
+struct SnortConfig;
+}
+struct RateFilterConfig;
+struct tSFRFConfigNode;
 struct OptTreeNode;
 
 RateFilterConfig* RateFilter_ConfigNew();
 void RateFilter_ConfigFree(RateFilterConfig*);
 void RateFilter_Cleanup();
 
-struct SnortConfig;
-int RateFilter_Create(SnortConfig* sc, RateFilterConfig*, tSFRFConfigNode*);
+int RateFilter_Create(snort::SnortConfig* sc, RateFilterConfig*, tSFRFConfigNode*);
 void RateFilter_PrintConfig(RateFilterConfig*);
 
-int RateFilter_Test(const OptTreeNode*, Packet*);
+int RateFilter_Test(const OptTreeNode*, snort::Packet*);
 
 #endif
 

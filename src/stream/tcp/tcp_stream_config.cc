@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,8 @@
 #include "tcp_stream_config.h"
 
 #include "log/messages.h"
+
+using namespace snort;
 
 static const char* const reassembly_policy_names[] =
 { "no policy", "first", "last", "linux", "old_linux", "bsd", "macos", "solaris", "irix",
@@ -62,9 +64,6 @@ void TcpStreamConfig::show_config(TcpStreamConfig* config)
     if ( config->flags )
     {
         LogMessage("    Options:\n");
-        if (config->flags & STREAM_CONFIG_IGNORE_ANY)
-            LogMessage("        Ignore Any -> Any Rules: YES\n");
-
         if (config->flags & STREAM_CONFIG_NO_ASYNC_REASSEMBLY)
             LogMessage("        Don't queue packets on one-sided sessions: YES\n");
     }

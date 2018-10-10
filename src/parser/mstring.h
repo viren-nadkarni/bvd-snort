@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -28,8 +28,10 @@
 
 #define TOKS_BUF_SIZE   100
 
+namespace snort
+{
 SO_PUBLIC char** mSplit(const char*, const char*, const int, int*, const char);
 SO_PUBLIC void mSplitFree(char*** toks, int numtoks);
-
+}
 #endif
 

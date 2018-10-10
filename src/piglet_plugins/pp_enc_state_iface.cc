@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,8 @@
 
 #include "framework/codec.h"
 #include "lua/lua_arg.h"
+
+using namespace snort;
 
 // FIXIT-M ip_api should also be its own object (copyable)
 static const class ip::IpApi ip_api {};

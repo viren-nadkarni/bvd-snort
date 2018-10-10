@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -33,14 +33,16 @@
 #include "app_info_table.h"
 #include "appid_session.h"
 
+using namespace snort;
+
 #define URLCATBUCKETS   100
 #define URLREPBUCKETS   5
 
 struct AppIdStatRecord
 {
     uint32_t app_id;
-    uint32_t initiatorBytes;
-    uint32_t responderBytes;
+    uint64_t initiatorBytes;
+    uint64_t responderBytes;
 };
 
 static const char appid_stats_filename[] = "appid_stats.log";
@@ -65,9 +67,6 @@ StatsBucket* AppIdStatistics::get_stats_bucket(time_t startTime)
 
     if ( !currBuckets )
         currBuckets = sflist_new();
-
-    if ( !currBuckets )
-        return nullptr;
 
     SF_LNODE* lNode = nullptr;
     StatsBucket* lBucket = nullptr;
@@ -108,9 +107,6 @@ void AppIdStatistics::open_stats_log_file()
 
 void AppIdStatistics::dump_statistics()
 {
-    if ( !enabled )
-        return;
-
     if ( !logBuckets )
         return;
 
@@ -170,7 +166,7 @@ void AppIdStatistics::dump_statistics()
                     app_name = tmpBuff;
                 }
 
-                TextLog_Print(log, "%lu,%s,%u,%u\n",
+                TextLog_Print(log, "%lu,%s,%lu,%lu\n",
                     packet_time(), app_name, record->initiatorBytes, record->responderBytes);
             }
         }
@@ -181,17 +177,14 @@ void AppIdStatistics::dump_statistics()
 
 AppIdStatistics::AppIdStatistics(const AppIdModuleConfig& config)
 {
-    if ( config.stats_logging_enabled )
-    {
-        enabled = true;
+    enabled = true;
 
-        rollPeriod = config.app_stats_rollover_time;
-        rollSize = config.app_stats_rollover_size;
-        bucketInterval = config.app_stats_period;
+    rollPeriod = config.app_stats_rollover_time;
+    rollSize = config.app_stats_rollover_size;
+    bucketInterval = config.app_stats_period;
 
-        time_t now = get_time();
-        start_stats_period(now);
-    }
+    time_t now = get_time();
+    start_stats_period(now);
 }
 
 AppIdStatistics::~AppIdStatistics()
@@ -222,6 +215,9 @@ AppIdStatistics::~AppIdStatistics()
 
 AppIdStatistics* AppIdStatistics::initialize_manager(const AppIdModuleConfig& config)
 {
+    if ( !config.stats_logging_enabled )
+        return nullptr;
+
     appid_stats_manager = new AppIdStatistics(config);
     return appid_stats_manager;
 }
@@ -232,7 +228,7 @@ AppIdStatistics* AppIdStatistics::get_stats_manager()
 void AppIdStatistics::cleanup()
 { delete appid_stats_manager; }
 
-static void update_stats(AppIdSession* asd, AppId app_id, StatsBucket* bucket)
+static void update_stats(AppIdSession& asd, AppId app_id, StatsBucket* bucket)
 {
     AppIdStatRecord* record = (AppIdStatRecord*)(fwAvlLookup(app_id, bucket->appsTree));
     if ( !record )
@@ -245,7 +241,7 @@ static void update_stats(AppIdSession* asd, AppId app_id, StatsBucket* bucket)
         }
         else
         {
-            WarningMessage("Error saving statistics record for app id: %d", app_id);
+            snort::WarningMessage("Error saving statistics record for app id: %d", app_id);
             snort_free(record);
             record = nullptr;
         }
@@ -253,16 +249,13 @@ static void update_stats(AppIdSession* asd, AppId app_id, StatsBucket* bucket)
 
     if ( record )
     {
-        record->initiatorBytes += asd->stats.initiator_bytes;
-        record->responderBytes += asd->stats.responder_bytes;
+        record->initiatorBytes += asd.stats.initiator_bytes;
+        record->responderBytes += asd.stats.responder_bytes;
     }
 }
 
-void AppIdStatistics::update(AppIdSession* asd)
+void AppIdStatistics::update(AppIdSession& asd)
 {
-    if ( !enabled )
-        return;
-
     time_t now = get_time();
 
     if ( now >= bucketEnd )
@@ -272,30 +265,31 @@ void AppIdStatistics::update(AppIdSession* asd)
         start_stats_period(now);
     }
 
-    time_t bucketTime = asd->stats.first_packet_second -
-        (asd->stats.first_packet_second % bucketInterval);
+    time_t bucketTime = asd.stats.first_packet_second -
+        (asd.stats.first_packet_second % bucketInterval);
 
     StatsBucket* bucket = get_stats_bucket(bucketTime);
     if ( !bucket )
         return;
 
-    bucket->totalStats.txByteCnt += asd->stats.initiator_bytes;
-    bucket->totalStats.rxByteCnt += asd->stats.responder_bytes;
+    bucket->totalStats.txByteCnt += asd.stats.initiator_bytes;
+    bucket->totalStats.rxByteCnt += asd.stats.responder_bytes;
 
-    AppId web_app_id = asd->pick_payload_app_id();
+    AppId web_app_id, service_id, client_id;
+    asd.get_application_ids(service_id, client_id, web_app_id);
+
     if ( web_app_id > APP_ID_NONE )
         update_stats(asd, web_app_id, bucket);
 
-    AppId service_id = asd->pick_service_app_id();
     if ( service_id && ( service_id != web_app_id ) )
         update_stats(asd, service_id, bucket);
 
-    AppId client_id = asd->pick_client_app_id();
     if ( client_id > APP_ID_NONE && client_id != service_id
         && client_id != web_app_id )
         update_stats(asd, client_id, bucket);
 }
 
+// Currently not registered to IdleProcessing
 void AppIdStatistics::flush()
 {
     if ( !enabled )

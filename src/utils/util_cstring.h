@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -29,6 +29,8 @@
 
 #include "main/snort_types.h"
 
+namespace snort
+{
 #define SNORT_SNPRINTF_SUCCESS 0
 #define SNORT_SNPRINTF_TRUNCATION 1
 #define SNORT_SNPRINTF_ERROR (-1)
@@ -131,6 +133,6 @@ inline int SnortStrToU32(const char* buffer, char** endptr,
 
     return 0;
 }
-
+}
 #endif
 

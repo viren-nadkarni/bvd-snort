@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,6 +24,8 @@
 #endif
 
 #include "service_direct_connect.h"
+
+using namespace snort;
 
 enum CONNECTION_STATES
 {
@@ -92,38 +94,37 @@ DirectConnectServiceDetector::DirectConnectServiceDetector(ServiceDiscovery* sd)
 int DirectConnectServiceDetector::validate(AppIdDiscoveryArgs& args)
 {
     ServiceData* fd;
-    AppIdSession* asd = args.asd;
     const uint8_t* data = args.data;
     uint16_t size = args.size;
 
     if (!size)
     {
-        service_inprocess(asd, args.pkt, args.dir);
+        service_inprocess(args.asd, args.pkt, args.dir);
         return APPID_INPROCESS;
     }
 
-    fd = (ServiceData*)data_get(asd);
+    fd = (ServiceData*)data_get(args.asd);
     if (!fd)
     {
         fd = (ServiceData*)snort_calloc(sizeof(ServiceData));
-        data_add(asd, fd, &snort_free);
+        data_add(args.asd, fd, &snort_free);
     }
 
-    if (asd->protocol == IpProtocol::TCP)
-        return tcp_validate(data, size, args.dir, asd, args.pkt, fd);
+    if (args.asd.protocol == IpProtocol::TCP)
+        return tcp_validate(data, size, args.dir, args.asd, args.pkt, fd, args.change_bits);
     else
-        return udp_validate(data, size, args.dir, asd, args.pkt, fd);
+        return udp_validate(data, size, args.dir, args.asd, args.pkt, fd, args.change_bits);
 }
 
-int DirectConnectServiceDetector::tcp_validate(const uint8_t* data, uint16_t size, const int dir,
-    AppIdSession* asd, const Packet* pkt, ServiceData* serviceData)
+int DirectConnectServiceDetector::tcp_validate(const uint8_t* data, uint16_t size, const AppidSessionDirection dir,
+    AppIdSession& asd, const Packet* pkt, ServiceData* serviceData, AppidChangeBits& change_bits)
 {
     switch (serviceData->state)
     {
     case CONN_STATE_INIT:
         if (size > 6
-            && data[size-2] == '|'
-            && data[size-1] == '$')
+            && data[size-1] == '|'
+            /*&& data[size-1] == '$'*/)
         {
             if (memcmp(data, PATTERN1, sizeof(PATTERN1)-1) == 0)
             {
@@ -214,15 +215,15 @@ success:
         goto inprocess;
     }
 
-    return add_service(asd, pkt, dir, APP_ID_DIRECT_CONNECT);
+    return add_service(change_bits, asd, pkt, dir, APP_ID_DIRECT_CONNECT);
 
 fail:
     fail_service(asd, pkt, dir);
     return APPID_NOMATCH;
 }
 
-int DirectConnectServiceDetector::udp_validate(const uint8_t* data, uint16_t size, const int dir,
-    AppIdSession* asd, const Packet* pkt, ServiceData* serviceData)
+int DirectConnectServiceDetector::udp_validate(const uint8_t* data, uint16_t size, const AppidSessionDirection dir,
+    AppIdSession& asd, const Packet* pkt, ServiceData* serviceData, AppidChangeBits& change_bits)
 {
     if (dir == APP_ID_FROM_RESPONDER && serviceData->state == CONN_STATE_SERVICE_DETECTED)
     {
@@ -262,7 +263,7 @@ success:
     }
 
 reportSuccess:
-    return add_service(asd, pkt, dir, APP_ID_DIRECT_CONNECT);
+    return add_service(change_bits, asd, pkt, dir, APP_ID_DIRECT_CONNECT);
 
 fail:
     fail_service(asd, pkt, dir);

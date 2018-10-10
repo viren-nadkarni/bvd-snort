@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,17 +21,19 @@
 
 #include <cstdint>
 
+namespace snort
+{
 class Inspector;
+}
 
 struct StreamUdpConfig
 {
     uint32_t session_timeout;
-    bool ignore_any;
 
     StreamUdpConfig();
 };
 
-StreamUdpConfig* get_udp_cfg(Inspector*);
+StreamUdpConfig* get_udp_cfg(snort::Inspector*);
 
 #endif
 

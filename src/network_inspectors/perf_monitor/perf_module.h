@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,6 +21,8 @@
 #ifndef PERF_MODULE_H
 #define PERF_MODULE_H
 
+#include <unordered_map>
+
 #include "framework/module.h"
 
 #define PERF_NAME "perf_monitor"
@@ -39,68 +41,83 @@
 #define MAX_PERF_FILE_SIZE  UINT64_MAX
 #define MIN_PERF_FILE_SIZE  4096
 
-enum PerfFormat
+enum class PerfFormat
 {
-    PERF_CSV,
-    PERF_TEXT,
-    PERF_JSON,
-    PERF_FBS,
-    PERF_MOCK
+    CSV,
+    TEXT,
+    JSON,
+    FBS,
+    MOCK
 };
 
-enum PerfOutput
+enum class PerfOutput
 {
-    PERF_FILE,
-    PERF_CONSOLE
+    TO_FILE,
+    TO_CONSOLE
 };
 
-struct PerfConfigBase
+struct ModuleConfig
 {
+    // state optimized for run time using indices
+    // can't be determined until all modules have loaded (PerfMonitor::configure)
+    snort::Module* ptr;
+    IndexVec pegs;
 
-    int perf_flags;
-    uint32_t pkt_cnt;
-    int sample_interval;
-    uint64_t max_file_size;
-    int flow_max_port_to_track;
-    uint32_t flowip_memcap;
-    PerfFormat format;
-    PerfOutput output;
+    void set_name(std::string name);
+    void set_peg_names(snort::Value& peg_names);
+    bool confirm_parse();
+    bool resolve();
+
+private:
+    std::string name;
+    std::unordered_map<std::string, bool> peg_names;
 };
 
-struct PerfConfig:public PerfConfigBase
+struct PerfConfig
 {
-    std::vector<Module*> modules;
-    std::vector<IndexVec> mod_peg_idxs;
+    int perf_flags = 0;
+    uint32_t pkt_cnt = 0;
+    int sample_interval = 0;
+    uint64_t max_file_size = 0;
+    int flow_max_port_to_track = 0;
+    uint32_t flowip_memcap = 0;
+    PerfFormat format = PerfFormat::CSV;
+    PerfOutput output = PerfOutput::TO_FILE;
+    std::vector<ModuleConfig> modules;
+    std::vector<snort::Module*> mods_to_prep;
+
+    bool resolve();
 };
 
 /* The Module Class for incorporation into Snort++ */
-class PerfMonModule : public Module
+class PerfMonModule : public snort::Module
 {
 public:
     PerfMonModule();
+    ~PerfMonModule() override;
 
-    bool set(const char*, Value&, SnortConfig*) override;
-    bool begin(const char*, int, SnortConfig*) override;
-    bool end(const char*, int, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool end(const char*, int, snort::SnortConfig*) override;
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
-    ProfileStats* get_profile() const override;
+    snort::ProfileStats* get_profile() const override;
 
-    void get_config(PerfConfig&);
+    PerfConfig* get_config();
+#ifdef UNIT_TEST
+    void set_config(PerfConfig* ptr) { config = ptr; }
+#endif
 
     Usage get_usage() const override
-    { return CONTEXT; }
+    { return GLOBAL; }
 
 private:
-    PerfConfig config;
-
-    std::string mod_pegs;
-    std::string mod_name;
+    PerfConfig* config = nullptr;
 };
 
 extern THREAD_LOCAL SimpleStats pmstats;
-extern THREAD_LOCAL ProfileStats perfmonStats;
+extern THREAD_LOCAL snort::ProfileStats perfmonStats;
 
 #endif
 

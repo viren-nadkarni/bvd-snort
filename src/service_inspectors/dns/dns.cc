@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -34,6 +34,8 @@
 #include "stream/stream.h"
 
 #include "dns_module.h"
+
+using namespace snort;
 
 #define MAX_UDP_PAYLOAD 0x1FFF
 #define DNS_RR_PTR 0xC0
@@ -732,20 +734,6 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData)
             dnsSessionData->curr_rec = 0;
         }
 
-        /* Print out the header (but only once -- when we're ready to parse the Questions */
-        if ((dnsSessionData->curr_rec_state == DNS_RESP_STATE_Q_NAME) &&
-            (dnsSessionData->curr_rec == 0))
-        {
-            DebugFormat(DEBUG_DNS,
-                "DNS Header: length %d, id 0x%x, flags 0x%x, "
-                "questions %d, answers %d, authorities %d, additionals %d\n",
-                dnsSessionData->length, dnsSessionData->hdr.id,
-                dnsSessionData->hdr.flags, dnsSessionData->hdr.questions,
-                dnsSessionData->hdr.answers,
-                dnsSessionData->hdr.authorities,
-                dnsSessionData->hdr.additionals);
-        }
-
         if (!(dnsSessionData->hdr.flags & DNS_HDR_FLAG_RESPONSE))
         {
             /* Not a response */
@@ -762,11 +750,6 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData)
 
                 if (dnsSessionData->curr_rec_state == DNS_RESP_STATE_Q_COMPLETE)
                 {
-                    DebugFormat(DEBUG_DNS,
-                        "DNS Question %d: type %d, class %d\n",
-                        i, dnsSessionData->curr_q.type,
-                        dnsSessionData->curr_q.dns_class);
-
                     dnsSessionData->curr_rec_state = DNS_RESP_STATE_Q_NAME;
                     dnsSessionData->curr_rec++;
                 }
@@ -802,14 +785,6 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData)
                 switch (dnsSessionData->curr_rec_state)
                 {
                 case DNS_RESP_STATE_RR_RDATA_START:
-                    DebugFormat(DEBUG_DNS,
-                        "DNS ANSWER RR %d: type %hu, class %hu, "
-                        "ttl %u rdlength %hu\n", i,
-                        dnsSessionData->curr_rr.type,
-                        dnsSessionData->curr_rr.dns_class,
-                        dnsSessionData->curr_rr.ttl,
-                        dnsSessionData->curr_rr.length);
-
                     dnsSessionData->bytes_seen_curr_rec = 0;
                     dnsSessionData->curr_rec_state = DNS_RESP_STATE_RR_RDATA_MID;
                 /* Fall through */
@@ -855,14 +830,6 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData)
                 switch (dnsSessionData->curr_rec_state)
                 {
                 case DNS_RESP_STATE_RR_RDATA_START:
-                    DebugFormat(DEBUG_DNS,
-                        "DNS AUTH RR %d: type %hu, class %hu, "
-                        "ttl %u rdlength %hu\n", i,
-                        dnsSessionData->curr_rr.type,
-                        dnsSessionData->curr_rr.dns_class,
-                        dnsSessionData->curr_rr.ttl,
-                        dnsSessionData->curr_rr.length);
-
                     dnsSessionData->bytes_seen_curr_rec = 0;
                     dnsSessionData->curr_rec_state = DNS_RESP_STATE_RR_RDATA_MID;
                 /* Fall through */
@@ -908,14 +875,6 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData)
                 switch (dnsSessionData->curr_rec_state)
                 {
                 case DNS_RESP_STATE_RR_RDATA_START:
-                    DebugFormat(DEBUG_DNS,
-                        "DNS ADDITIONAL RR %d: type %hu, class %hu, "
-                        "ttl %u rdlength %hu\n", i,
-                        dnsSessionData->curr_rr.type,
-                        dnsSessionData->curr_rr.dns_class,
-                        dnsSessionData->curr_rr.ttl,
-                        dnsSessionData->curr_rr.length);
-
                     dnsSessionData->bytes_seen_curr_rec = 0;
                     dnsSessionData->curr_rec_state = DNS_RESP_STATE_RR_RDATA_MID;
                 /* Fall through */
@@ -961,21 +920,15 @@ static void snort_dns(Packet* p)
         // If session picked up mid-stream, do not process further.
         // Would be almost impossible to tell where we are in the
         // data stream.
-        if ( p->flow->get_session_flags() & SSNFLAG_MIDSTREAM )
-        {
+        if ( p->test_session_flags(SSNFLAG_MIDSTREAM) )
             return;
-        }
 
         if ( !Stream::is_stream_sequenced(p->flow, SSN_DIR_FROM_CLIENT) )
-        {
             return;
-        }
 
         // If we're waiting on stream reassembly, don't process this packet.
         if ( p->packet_flags & PKT_STREAM_INSERT )
-        {
             return;
-        }
     }
 
     // Get the direction of the packet.
@@ -1081,7 +1034,7 @@ const InspectApi dns_api =
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::TCP | (uint16_t)PktType::UDP | (uint16_t)PktType::PDU,
+    PROTO_BIT__ANY_PDU,
     nullptr, // buffers
     "dns",
     dns_init,

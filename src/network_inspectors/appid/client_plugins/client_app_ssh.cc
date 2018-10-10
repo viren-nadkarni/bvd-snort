@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -568,7 +568,7 @@ int SshClientDetector::validate(AppIdDiscoveryArgs& args)
     if (sm_ret != APPID_SUCCESS)
         return sm_ret;
 
-    add_app(args.asd, APP_ID_SSH, fd->client_id, (const char*)fd->version);
+    add_app(args.asd, APP_ID_SSH, fd->client_id, (const char*)fd->version, args.change_bits);
     return APPID_SUCCESS;
 }
 

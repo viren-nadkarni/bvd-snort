@@ -1,6 +1,7 @@
 #!/bin/sh
 # Convenience wrapper for easily viewing/setting options that
 # the project's CMake scripts will recognize
+
 set -e
 command="$0 $*"
 
@@ -46,18 +47,32 @@ Optional Features:
                             developers only)
     --enable-debug          enable debugging options (bugreports and developers
                             only)
-    --enable-gdb            enable gdb debugging information
+    --disable-gdb           disable gdb debugging information
     --enable-gprof-profile  enable gprof profiling options (developers only)
+    --disable-snort-profiler
+                            disable snort performance profiling (cpu and memory) (developers only)
+    --enable-deep-profiling
+                            enabled detailed snort performance profiling (developers only)
+    --disable-memory-manager
+                            disable snort memory manager (developers only)
     --disable-corefiles     prevent Snort from generating core files
     --enable-address-sanitizer
                             enable address sanitizer support
     --enable-thread-sanitizer
                             enable thread sanitizer support
+    --enable-ub-sanitizer
+                            enable undefined behavior sanitizer support
+    --enable-tcmalloc
+                            enable using tcmalloc for dynamic memory management
+    --enable-appid-third-party
+                            enable third party appid
     --enable-unit-tests     build unit tests
     --enable-piglet         build piglet test harness
     --disable-static-daq    link static DAQ modules
     --disable-html-docs     don't create the HTML documentation
     --disable-pdf-docs      don't create the PDF documentation
+    --disable-text-docs     don't create the TEXT documentation
+    --disable-docs          don't create documentation
 
 Optional Packages:
     --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -115,20 +130,6 @@ sourcedir="$( cd "$( dirname "$0" )" && pwd )"
 #   $3 is the cache entry variable value
 append_cache_entry () {
     CMakeCacheEntries="$CMakeCacheEntries -D $1:$2=$3"
-}
-
-check_and_append_cache_entry() {
-    if [ -f $3 ]; then
-        append_cache_entry $1 $2 $3
-    else 
-        echo ""
-        echo "the $1 variable, which is specified using a --with-* options,"
-        echo "requires an absolute path to the library.  Could not stat the"
-        echo "the library:"
-        echo "    $3"
-        echo ""
-        exit 1
-    fi
 }
 
 # set defaults
@@ -238,6 +239,15 @@ while [ $# -ne 0 ]; do
         --enable-tsc-clock)
             append_cache_entry ENABLE_TSC_CLOCK         BOOL true
             ;;
+        --disable-snort-profiler)
+            append_cache_entry DISABLE_SNORT_PROFILER   BOOL true
+            ;;
+        --enable-deep-profiling)
+            append_cache_entry ENABLE_DEEP_PROFILING    BOOL true
+            ;;
+        --disable-memory-manager)
+            append_cache_entry DISABLE_MEMORY_MANAGER   BOOL true
+            ;;
         --disable-large-pcap)
             append_cache_entry ENABLE_LARGE_PCAP        BOOL false
             ;;
@@ -283,6 +293,21 @@ while [ $# -ne 0 ]; do
         --disable-thread-sanitizer)
             append_cache_entry ENABLE_THREAD_SANITIZER  BOOL false
             ;;
+        --enable-ub-sanitizer)
+            append_cache_entry ENABLE_UB_SANITIZER      BOOL true
+            ;;
+        --disable-ub-sanitizer)
+            append_cache_entry ENABLE_UB_SANITIZER      BOOL false
+            ;;
+        --enable-tcmalloc)
+            append_cache_entry ENABLE_TCMALLOC          BOOL true
+            ;;
+        --disable-tcmalloc)
+            append_cache_entry ENABLE_TCMALLOC          BOOL false
+            ;;
+        --enable-appid-third-party)
+            append_cache_entry ENABLE_APPID_THIRD_PARTY BOOL true
+            ;;
         --enable-unit-tests)
             append_cache_entry ENABLE_UNIT_TESTS        BOOL true
             ;;
@@ -313,11 +338,23 @@ while [ $# -ne 0 ]; do
         --enable-pdf-docs)
             append_cache_entry MAKE_PDF_DOC             BOOL true
             ;;
+        --disable-text-docs)
+            append_cache_entry MAKE_TEXT_DOC            BOOL false
+            ;;
+        --enable-text-docs)
+            append_cache_entry MAKE_TEXT_DOC            BOOL true
+            ;;
+        --disable-docs)
+            append_cache_entry MAKE_DOC                 BOOL false
+            ;;
+        --enable-docs)
+            append_cache_entry MAKE_DOC                 BOOL true
+            ;;
         --with-pcap-includes=*)
-            append_cache_entry PCAP_INCLUDE_DIR PATH $optarg
+            append_cache_entry PCAP_INCLUDE_DIR_HINT PATH $optarg
             ;;
         --with-pcap-libraries=*)
-            append_cache_entry PCAP_LIBRARIES_DIR PATH $optarg
+            append_cache_entry PCAP_LIBRARIES_DIR_HINT PATH $optarg
             ;;
         --with-luajit-includes=*)
             append_cache_entry LUAJIT_INCLUDE_DIR_HINT PATH $optarg
@@ -400,8 +437,7 @@ echo "Build Directory : $builddir"
 echo "Source Directory: $sourcedir"
 cd $builddir
 
-gen=""
-[ "$CMakeGenerator" ] && gen+=" -G $CMakeGenerator"
+[ "$CMakeGenerator" ] && gen="-G $CMakeGenerator"
 
 cmake $gen \
     -DCMAKE_CXX_FLAGS:STRING="$CXXFLAGS $CPPFLAGS" \

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,8 @@
 #define IP_MAXPACKET    65535        /* maximum packet size */
 #endif
 
+namespace snort
+{
 namespace ip
 {
 constexpr uint32_t IP4_BROADCAST = 0xffffffff;
@@ -152,15 +154,8 @@ inline bool isPrivateIP(uint32_t addr)
     }
     return false;
 }
-} /* namespace ip */
-
+} // namespace ip
+} // namespace snort
 /* tcpdump shows us the way to cross platform compatibility */
-
-/* we need to change them as well as get them */
-// TYPEDEF WHICH NEED TO BE DELETED
-typedef ip::IP4Hdr IP4Hdr;
-
-/* #define IP_HEADER_LEN ip::ip4_hdr_len() */
-
 #endif
 

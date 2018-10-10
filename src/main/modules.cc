@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -37,11 +37,11 @@
 #include "host_tracker/host_cache_module.h"
 #include "latency/latency_module.h"
 #include "log/messages.h"
-#include "log/packet_tracer.h"
 #include "managers/module_manager.h"
 #include "managers/plugin_manager.h"
 #include "memory/memory_module.h"
 #include "packet_io/sfdaq_module.h"
+#include "packet_tracer/packet_tracer_module.h"
 #include "parser/config_file.h"
 #include "parser/parse_conf.h"
 #include "parser/parse_ip.h"
@@ -58,6 +58,7 @@
 #include "snort_module.h"
 #include "thread_config.h"
 
+using namespace snort;
 using namespace std;
 
 //-------------------------------------------------------------------------
@@ -84,6 +85,9 @@ static const Parameter detection_params[] =
 
     { "pcre_match_limit_recursion", Parameter::PT_INT, "-1:10000", "1500",
       "limit pcre stack consumption, -1 = max, 0 = off" },
+
+    { "enable_address_anomaly_checks", Parameter::PT_BOOL, nullptr, "false",
+      "enable check and alerting of address anomalies" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -128,6 +132,9 @@ bool DetectionModule::set(const char* fqn, Value& v, SnortConfig* sc)
 
     else if ( v.is("pcre_match_limit_recursion") )
         sc->pcre_match_limit_recursion = v.get_long();
+
+    else if ( v.is("enable_address_anomaly_checks") )
+        sc->address_anomaly_check_enabled = v.get_bool();
 
     else
         return Module::set(fqn, v, sc);
@@ -238,8 +245,8 @@ static const Parameter search_engine_params[] =
     { "max_queue_events", Parameter::PT_INT, "2:100", "5",  // upper bound is MAX_EVENT_MATCH
       "maximum number of matching fast pattern states to queue per packet" },
 
-    { "inspect_stream_inserts", Parameter::PT_BOOL, nullptr, "false",
-      "inspect reassembled payload - disabling is good for performance, bad for detection" },
+    { "detect_raw_tcp", Parameter::PT_BOOL, nullptr, "false",
+      "detect on TCP payload before reassembly" },
 
     { "search_method", Parameter::PT_DYNAMIC, (void*)&get_search_methods, "ac_bnfa",
       "set fast pattern algorithm - choose available search engine" },
@@ -259,7 +266,10 @@ static const Parameter search_engine_params[] =
 #define search_engine_help \
     "configure fast pattern matcher"
 
+namespace snort
+{
 THREAD_LOCAL PatMatQStat pmqs;
+}
 
 const PegInfo mpse_pegs[] =
 {
@@ -337,7 +347,7 @@ bool SearchEngineModule::set(const char*, Value& v, SnortConfig* sc)
     else if ( v.is("max_queue_events") )
         fp->set_max_queue_events(v.get_long());
 
-    else if ( v.is("inspect_stream_inserts") )
+    else if ( v.is("detect_raw_tcp") )
         fp->set_stream_insert(v.get_bool());
 
     else if ( v.is("search_method") )
@@ -772,9 +782,6 @@ static const Parameter output_params[] =
 #endif
       "output 20 bytes per lines instead of 16 when dumping buffers" },
 
-    { "enable_packet_trace", Parameter::PT_BOOL, nullptr, "false",
-      "enable summary output of state that determined packet verdict" },
-
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
@@ -801,9 +808,6 @@ bool OutputModule::set(const char*, Value& v, SnortConfig* sc)
 
     else if ( v.is("dump_payload_verbose") )
         v.update_mask(sc->output_flags, OUTPUT_FLAG__VERBOSE_DUMP);
-
-    else if ( v.is("enable_packet_trace") )
-        sc->enable_packet_trace = v.get_bool();
 
     else if ( v.is("quiet") )
         v.update_mask(sc->logging_flags, LOGGING_FLAG__QUIET);
@@ -856,7 +860,7 @@ static const Parameter active_params[] =
     { "max_responses", Parameter::PT_INT, "0:", "0",
       "maximum number of responses" },
 
-    { "min_interval", Parameter::PT_INT, "1:", "255",
+    { "min_interval", Parameter::PT_INT, "1:255", "255",
       "minimum number of seconds between responses" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
@@ -1029,7 +1033,7 @@ static const Parameter network_params[] =
       "correlate unified2 events with configuration" },
 
     { "min_ttl", Parameter::PT_INT, "1:255", "1",
-      "alert / normalize packets with lower ttl / hop limit "
+      "alert / normalize packets with lower TTL / hop limit "
       "(you must enable rules and / or normalization also)" },
 
     { "new_ttl", Parameter::PT_INT, "1:255", "1",
@@ -1076,7 +1080,10 @@ bool NetworkModule::set(const char*, Value& v, SnortConfig* sc)
         p->decoder_drop = v.get_bool();
 
     else if ( v.is("id") )
+    {
         p->user_policy_id = v.get_long();
+        sc->policy_map->set_user_network(p);
+    }
 
     else if ( v.is("min_ttl") )
         p->min_ttl = (uint8_t)v.get_long();
@@ -1206,25 +1213,11 @@ static const Parameter ips_params[] =
 #define ips_help \
     "configure IPS rule processing"
 
-THREAD_LOCAL IpsModuleStats ips_module_stats;
-
-const PegInfo ips_module_pegs[] =
-{
-    { CountType::SUM, "invalid_policy_ids", "Number of times an invalid policy ID was provided" },
-    { CountType::END, nullptr, nullptr }
-};
-
 class IpsModule : public Module
 {
 public:
     IpsModule() : Module("ips", ips_help, ips_params) { }
     bool set(const char*, Value&, SnortConfig*) override;
-
-    const PegInfo* get_pegs() const override
-    { return ips_module_pegs; }
-
-    PegCount* get_counts() const override
-    { return (PegCount*) &ips_module_stats; }
 
     Usage get_usage() const override
     { return DETECT; }
@@ -1452,7 +1445,7 @@ bool SuppressModule::set(const char*, Value& v, SnortConfig*)
         thdx.tracking = v.get_long() + 1;
 
     else if ( v.is("ip") )
-        thdx.ip_address = sfip_var_from_string(v.get_string());
+        thdx.ip_address = sfip_var_from_string(v.get_string(), "suppress");
 
     else
         return false;
@@ -1540,7 +1533,7 @@ bool EventFilterModule::set(const char*, Value& v, SnortConfig*)
         thdx.tracking = v.get_long() + 1;
 
     else if ( v.is("ip") )
-        thdx.ip_address = sfip_var_from_string(v.get_string());
+        thdx.ip_address = sfip_var_from_string(v.get_string(), "event_filter");
 
     else if ( v.is("count") )
         thdx.count = v.get_long();
@@ -1597,7 +1590,7 @@ static const Parameter rate_filter_params[] =
       "count interval" },
 
     { "new_action", Parameter::PT_ENUM,
-      // FIXIT-L new_action options must match RuleType and
+      // FIXIT-L new_action options must match Actions::Type and
       // should include pluggable actions as well
       "log | pass | alert | drop | block | reset", "alert",
       "take this action on future hits until timeout" },
@@ -1658,10 +1651,10 @@ bool RateFilterModule::set(const char*, Value& v, SnortConfig*)
         thdx.timeout = v.get_long();
 
     else if ( v.is("apply_to") )
-        thdx.applyTo = sfip_var_from_string(v.get_string());
+        thdx.applyTo = sfip_var_from_string(v.get_string(), "rate_filter");
 
     else if ( v.is("new_action") )
-        thdx.newAction = (RuleType)(v.get_long() + 1);
+        thdx.newAction = (Actions::Type)(v.get_long() + 1);
 
     else
         return false;
@@ -1760,7 +1753,7 @@ static const Parameter service_params[] =
       "service identifier" },
 
     { "proto", Parameter::PT_ENUM, "tcp | udp", "tcp",
-      "ip protocol" },
+      "IP protocol" },
 
     { "port", Parameter::PT_PORT, nullptr, nullptr,
       "port number" },
@@ -1771,13 +1764,13 @@ static const Parameter service_params[] =
 static const Parameter hosts_params[] =
 {
     { "ip", Parameter::PT_ADDR, nullptr, "0.0.0.0/32",
-      "hosts address / cidr" },
+      "hosts address / CIDR" },
 
     { "frag_policy", Parameter::PT_ENUM, IP_POLICIES, nullptr,
       "defragmentation policy" },
 
     { "tcp_policy", Parameter::PT_ENUM, TCP_POLICIES, nullptr,
-      "tcp reassembly policy" },
+      "TCP reassembly policy" },
 
     { "services", Parameter::PT_LIST, service_params, nullptr,
       "list of service parameters" },
@@ -1819,7 +1812,7 @@ bool HostsModule::set(const char*, Value& v, SnortConfig* sc)
         host->hostInfo.streamPolicy = v.get_long() + 1;
 
     else if ( app and v.is("name") )
-        app->protocol = sc->proto_ref->add(v.get_string());
+        app->snort_protocol_id = sc->proto_ref->add(v.get_string());
 
     else if ( app and v.is("proto") )
         app->ipproto = sc->proto_ref->add(v.get_string());
@@ -1877,6 +1870,7 @@ void module_init()
     ModuleManager::add_module(new CodecModule);
     ModuleManager::add_module(new DetectionModule);
     ModuleManager::add_module(new MemoryModule);
+    ModuleManager::add_module(new PacketTracerModule);
     ModuleManager::add_module(new PacketsModule);
     ModuleManager::add_module(new ProcessModule);
     ModuleManager::add_module(new ProfilerModule);

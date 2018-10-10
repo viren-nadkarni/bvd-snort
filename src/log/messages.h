@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -45,9 +45,12 @@ enum WarningGroup
     WARN_MAX
 };
 
+void reset_parse_errors();
 unsigned get_parse_errors();
 unsigned get_parse_warnings();
 
+namespace snort
+{
 SO_PUBLIC void ParseMessage(const char*, ...) __attribute__((format (printf, 1, 2)));
 SO_PUBLIC void ParseWarning(WarningGroup, const char*, ...) __attribute__((format (printf, 2, 3)));
 SO_PUBLIC void ParseError(const char*, ...) __attribute__((format (printf, 1, 2)));
@@ -94,6 +97,7 @@ private:
     unsigned max;
     unsigned idx;
 };
+}
 
 #endif
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -155,10 +155,11 @@ static inline uint64_t convert_flags_c_to_lua(uint64_t in)
  */
 static int create_detector_flow(lua_State* L)
 {
-    SfIp saddr;
-    SfIp daddr;
+    snort::SfIp saddr;
+    snort::SfIp daddr;
 
     AppIdDetector* ud = *UserData<AppIdDetector>::check(L, DETECTOR, 1);
+    // Verify detector user data and that we are in packet context
     LuaStateDescriptor* lsd = ud->validate_lua_state(true);
 
     const char* pattern = lua_tostring(L, 2);
@@ -210,7 +211,7 @@ static int create_detector_flow(lua_State* L)
     LuaDetectorManager::add_detector_flow(detector_flow);
 
     detector_flow->asd = AppIdSession::create_future_session(lsd->ldp.pkt, &saddr, sport,
-    		&daddr, dport, proto, 0, 0, ud->get_handler().get_inspector());
+        &daddr, dport, proto, 0, 0, ud->get_handler().get_inspector());
 
     if (!detector_flow->asd)
     {
@@ -238,7 +239,7 @@ void free_detector_flow(void* userdata)
     delete detector_flow;
 }
 
-/**Sets a flow flag.
+/**Sets a flow flag
  *
  * @param Lua_State* - Lua state variable.
  * @param detectorFlow/stack - UserData<DetectorFlow> object
@@ -250,6 +251,7 @@ static int set_detector_flow_flag(lua_State* L)
     uint64_t flags;
 
     auto& pLuaData = *UserData<DetectorFlow>::check(L, DETECTORFLOW, 1);
+    // Verify detector user data and that we are in packet context
     assert(pLuaData.ptr);
 
     flags = lua_tonumber(L, 2);
@@ -260,7 +262,7 @@ static int set_detector_flow_flag(lua_State* L)
     return 0;
 }
 
-/**Gets a flow flag value.
+/**Gets a flow flag value
  *
  * @param Lua_State* - Lua state variable.
  * @param detectorFlow/stack - UserData<DetectorFlow> object
@@ -274,6 +276,7 @@ static int get_detector_flow_flag(lua_State* L)
     uint64_t ret;
 
     auto& pLuaData = *UserData<DetectorFlow>::check(L, DETECTORFLOW, 1);
+    // Verify detector user data and that we are in packet context
     assert(pLuaData.ptr);
 
     flags = lua_tonumber(L, 2);
@@ -286,7 +289,7 @@ static int get_detector_flow_flag(lua_State* L)
     return 1;
 }
 
-/**Clear a flow flag.
+/**Clear a flow flag,
  *
  * @param Lua_State* - Lua state variable.
  * @param detectorFlow/stack - UserData<DetectorFlow> object
@@ -298,6 +301,7 @@ static int clear_detector_flow_flag(lua_State* L)
     uint64_t flags;
 
     auto& pLuaData = *UserData<DetectorFlow>::check(L, DETECTORFLOW, 1);
+    // Verify detector user data and that we are in packet context
     assert(pLuaData.ptr);
 
     flags = lua_tonumber(L, 2);
@@ -308,7 +312,9 @@ static int clear_detector_flow_flag(lua_State* L)
     return 0;
 }
 
-/**Set service id on a flow.
+/**Set service id on a flow
+ * If function is implemented, then
+ * verify detector user data and that we are in packet context
  *
  * @param Lua_State* - Lua state variable.
  * @param detectorFlow/stack - UserData<DetectorFlow> object
@@ -318,7 +324,9 @@ static int clear_detector_flow_flag(lua_State* L)
 static int set_detector_flow_service_id(lua_State*)
 { return 0; }
 
-/**Set client application id on a flow.
+/**Set client application id on a flow, during packet processing
+ * If function is implemented, then
+ * verify detector user data and that we are in packet context
  *
  * @param Lua_State* - Lua state variable.
  * @param detectorFlow/stack - UserData<DetectorFlow> object
@@ -330,7 +338,9 @@ static int set_detecter_flow_cln_app_id(lua_State*)
     return 0;
 }
 
-/**Set client application type id on a flow.
+/**Set client application type id on a flow, during packet processing
+ * If function is implemented, then
+ * verify detector user data and that we are in packet context
  *
  * @param Lua_State* - Lua state variable.
  * @param detectorFlow/stack - UserData<DetectorFlow> object
@@ -349,7 +359,7 @@ static int set_detector_flow_cln_app_type(lua_State*)
  * For optimization, I could have created an integer index on C side. This can be taken up in future.
  */
 
-/**Get flow key from a UserData<DetectorFlow> object.
+/**Get flow key from a UserData<DetectorFlow> object
  *
  * @param Lua_State* - Lua state variable.
  * @param detectorflow/stack - UserData<DetectorFlow> object
@@ -359,6 +369,7 @@ static int set_detector_flow_cln_app_type(lua_State*)
 static int get_detector_flow_key(lua_State* L)
 {
     auto& pLuaData = *UserData<DetectorFlow>::check(L, DETECTORFLOW, 1);
+    // Verify detector user data and that we are in packet context
     assert(pLuaData.ptr);
 
     lua_pushlstring(L, (char*)&pLuaData->asd->session_id,

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -47,6 +47,7 @@
 #include "detection/detection_engine.h"
 #include "framework/data_bus.h"
 #include "log/messages.h"
+#include "managers/inspector_manager.h"
 #include "utils/util.h"
 
 #include "ftp_cmd_lookup.h"
@@ -124,7 +125,7 @@ static int CheckFTPCmdOptions(FTP_SERVER_PROTO_CONF* serverConf)
 
         if ( cmdConf->check_validity && !len )
         {
-            ErrorMessage("FTPConfigCheck() configuration for server, "
+            snort::ErrorMessage("FTPConfigCheck() configuration for server, "
                 "command '%s' has max length of 0 and parameters to validate\n",
                 cmdConf->cmd_name);
             config_error = 1;
@@ -145,45 +146,51 @@ static int CheckFTPCmdOptions(FTP_SERVER_PROTO_CONF* serverConf)
  * Returns: -1 on error
  *
  */
-int CheckFTPServerConfigs(
-    SnortConfig*, FTP_SERVER_PROTO_CONF* serverConf)
+int CheckFTPServerConfigs(snort::SnortConfig*, FTP_SERVER_PROTO_CONF* serverConf)
 {
     if (CheckFTPCmdOptions(serverConf))
     {
-        ErrorMessage("FTPConfigCheck(): invalid configuration for FTP commands\n");
+        snort::ErrorMessage("FTPConfigCheck(): invalid configuration for FTP commands\n");
         return -1;
     }
     return 0;
 }
 
 // FIXIT-L eliminate legacy void* cruft
-int FTPCheckConfigs(SnortConfig* sc, void* pData)
+int FTPCheckConfigs(snort::SnortConfig* sc, void* pData)
 {
     FTP_SERVER_PROTO_CONF* config = (FTP_SERVER_PROTO_CONF*)pData;
 
     if ( !config )
     {
-        ErrorMessage("FTP configuration requires "
+        snort::ErrorMessage("FTP configuration requires "
             "default client and default server configurations.\n");
         return -1;
     }
-#if 0
-    if ( file_api->get_max_file_depth() < 0 )
-    {
-        // FIXIT-M need to change to IT_SERVICE and FTPTelnetChecks
-        // for optimization
-    }
-#endif
+
     int rval;
     if ((rval = CheckFTPServerConfigs(sc, config)))
         return rval;
 
+    //  Verify that FTP client and FTP data inspectors are initialized.
+    if(!snort::InspectorManager::get_inspector(FTP_CLIENT_NAME, false))
+    {
+        snort::ParseError("ftp_server requires that %s also be configured.", FTP_CLIENT_NAME);
+        return -1;
+    }
+
+    if(!snort::InspectorManager::get_inspector(FTP_DATA_NAME, false))
+    {
+        snort::ParseError("ftp_server requires that %s also be configured.", FTP_DATA_NAME);
+        return -1;
+    }
+
     return 0;
 }
 
-void do_detection(Packet* p)
+void do_detection(snort::Packet* p)
 {
-    DataBus::publish(PACKET_EVENT, p);
-    DetectionEngine::disable_all(p);
+    snort::DataBus::publish(PACKET_EVENT, p);
+    snort::DetectionEngine::disable_all(p);
 }
 

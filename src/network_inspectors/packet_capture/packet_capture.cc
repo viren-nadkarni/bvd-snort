@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,7 +25,6 @@
 #include "packet_capture.h"
 
 #include <pcap.h>
-#include <sfbpf.h>
 
 #include "framework/inspector.h"
 #include "log/messages.h"
@@ -37,113 +36,30 @@
 
 #include "capture_module.h"
 
+using namespace snort;
 using namespace std;
 
 #define FILE_NAME "packet_capture.pcap"
 #define SNAP_LEN 65535
 
+// -----------------------------------------------------------------------------
+// static variables
+// -----------------------------------------------------------------------------
+
 static CaptureConfig config;
 
 static THREAD_LOCAL pcap_t* pcap = nullptr;
 static THREAD_LOCAL pcap_dumper_t* dumper = nullptr;
-static THREAD_LOCAL struct sfbpf_program bpf;
+static THREAD_LOCAL struct bpf_program bpf;
+
+// -----------------------------------------------------------------------------
+// static functions
+// -----------------------------------------------------------------------------
 
 static inline bool capture_initialized()
 { return dumper != nullptr; }
 
-void packet_capture_enable(const string& f)
-{
-    if ( !config.enabled )
-    {
-        config.filter = f;
-        config.enabled = true;
-    }
-    else
-        WarningMessage("Conflicting packet capture already in progress.\n");
-}
-
-void packet_capture_disable()
-{
-    config.enabled = false;
-    LogMessage("Packet capture disabled\n");
-}
-
-//-------------------------------------------------------------------------
-// class stuff
-//-------------------------------------------------------------------------
-
-class PacketCapture : public Inspector
-{
-public:
-    PacketCapture(CaptureModule*);
-
-    void eval(Packet*) override;
-    void tterm() override { capture_term(); }
-
-protected:
-    virtual bool capture_init();
-    virtual void capture_term();
-    virtual pcap_dumper_t* open_dump(pcap_t*, const char*);
-    virtual void write_packet(Packet* p);
-};
-
-PacketCapture::PacketCapture(CaptureModule* m)
-{ m->get_config(config); }
-
-void PacketCapture::eval(Packet* p)
-{
-    if ( config.enabled )
-    {
-        if ( !capture_initialized() )
-            if ( !capture_init() )
-                return;
-
-        if ( !bpf.bf_insns || sfbpf_filter(bpf.bf_insns, p->pkt,
-                p->pkth->caplen, p->pkth->pktlen) )
-        {
-            write_packet(p);
-            cap_count_stats.matched++;
-        }
-
-        cap_count_stats.checked++;
-    }
-    else if ( capture_initialized() )
-        capture_term();
-}
-
-bool PacketCapture::capture_init()
-{
-    if ( sfbpf_compile(SNAP_LEN, DLT_EN10MB, &bpf,
-        config.filter.c_str(), 1, 0) >= 0 )
-    {
-        if ( sfbpf_validate(bpf.bf_insns, bpf.bf_len) )
-        {
-            string fname;
-            get_instance_file(fname, FILE_NAME);
-
-            pcap = pcap_open_dead(DLT_EN10MB, SNAP_LEN);
-            dumper = open_dump(pcap, fname.c_str());
-
-            if ( dumper )
-                return true;
-            else
-                WarningMessage("Could not initialize dump file\n");
-        }
-        else
-            WarningMessage("Unable to validate BPF filter\n");
-    }
-    else
-        WarningMessage("Unable to compile BPF filter\n");
-
-    packet_capture_disable();
-    capture_term();
-    return false;
-}
-
-pcap_dumper_t* PacketCapture::open_dump(pcap_t* pcap, const char* fname)
-{ return pcap_dump_open(pcap, fname); }
-
-void PacketCapture::capture_term()
+static void _capture_term()
 {
     if ( dumper )
     {
@@ -155,7 +71,150 @@ void PacketCapture::capture_term()
         free(pcap);
         pcap = nullptr;
     }
-    sfbpf_freecode(&bpf);
+    pcap_freecode(&bpf);
+}
+
+static bool bpf_compile_and_validate()
+{
+    // FIXIT-M This BPF compilation is not thread-safe and should be handled by the main thread
+    // and this call should use DLT from DAQ rather then hard coding DLT_EN10MB
+    if ( pcap_compile_nopcap(SNAP_LEN, DLT_EN10MB, &bpf,
+        config.filter.c_str(), 1, 0) >= 0 )
+    {
+        if (bpf_validate(bpf.bf_insns, bpf.bf_len))
+            return true;
+        else
+            WarningMessage("Unable to validate BPF filter\n");
+    }
+    else
+        WarningMessage("Unable to compile BPF filter\n");
+    return false;
+}
+
+static bool open_pcap_dumper()
+{
+    string fname;
+    get_instance_file(fname, FILE_NAME);
+
+    pcap = pcap_open_dead(DLT_EN10MB, SNAP_LEN);
+    dumper = pcap ? pcap_dump_open(pcap, fname.c_str()) : nullptr;
+
+    if (dumper)
+        return true;
+    else
+        WarningMessage("Could not initialize dump file\n");
+
+    return false;
+}
+
+// for unit test
+static void _packet_capture_enable(const string& f)
+{
+    if ( !config.enabled )
+    {
+        config.filter = f;
+        config.enabled = true;
+    }
+}
+
+// for unit test
+static void _packet_capture_disable()
+{
+    config.enabled = false;
+    LogMessage("Packet capture disabled\n");
+}
+
+// -----------------------------------------------------------------------------
+// non-static functions
+// -----------------------------------------------------------------------------
+
+void packet_capture_enable(const string& f)
+{
+
+    _packet_capture_enable(f);
+
+    if ( !capture_initialized() )
+    {
+        if (bpf_compile_and_validate())
+        {
+            if (open_pcap_dumper())
+            {
+                LogMessage("Packet capture enabled\n");
+                return;
+            }
+        }
+        else 
+        {
+            WarningMessage("Failed to enable Packet capture\n");
+            packet_capture_disable();
+        }
+    }
+}
+
+void packet_capture_disable()
+{
+    _packet_capture_disable();
+    if ( capture_initialized() )
+        _capture_term();
+}
+
+//-------------------------------------------------------------------------
+// class stuff
+//-------------------------------------------------------------------------
+
+class PacketCapture : public Inspector
+{
+public:
+    PacketCapture(CaptureModule*);
+
+    // non-static functions
+    void eval(Packet*) override;
+    void tterm() override { capture_term(); }
+
+protected:
+    virtual bool capture_init();
+    virtual void capture_term();
+    virtual void write_packet(Packet* p);
+};
+
+PacketCapture::PacketCapture(CaptureModule* m)
+{ m->get_config(config); }
+
+void PacketCapture::capture_term() { _capture_term(); }
+
+bool PacketCapture::capture_init()
+{
+    if (bpf_compile_and_validate())
+    {
+        if (open_pcap_dumper())
+        {
+            LogMessage("Packet capture enabled\n");
+            return true;
+        }
+    }
+    packet_capture_disable();
+    return false;
+}
+
+void PacketCapture::eval(Packet* p)
+{
+    if ( config.enabled )
+    {
+        if ( !capture_initialized() )
+            if ( !capture_init() )  
+                return;
+
+        if ( !bpf.bf_insns || bpf_filter(bpf.bf_insns, p->pkt,
+                p->pkth->caplen, p->pkth->pktlen) )
+        {
+            write_packet(p);
+            cap_count_stats.matched++;
+        }
+
+        cap_count_stats.checked++;
+    }
+    else if ( capture_initialized() )
+        capture_term();
 }
 
 void PacketCapture::write_packet(Packet* p)
@@ -195,8 +254,8 @@ static const InspectApi pc_api =
         mod_ctor,
         mod_dtor
     },
-    IT_PACKET,
-    (uint16_t)PktType::ANY,
+    IT_PROBE,
+    PROTO_BIT__ANY_TYPE,
     nullptr, // buffers
     nullptr, // service
     nullptr, // pinit
@@ -218,6 +277,10 @@ const BaseApi* nin_packet_capture[] =
     &pc_api.base,
     nullptr
 };
+
+// --------------------------------------------------------------------------
+// unit tests
+// --------------------------------------------------------------------------
 
 #ifdef UNIT_TEST
 static Packet* init_null_packet()
@@ -242,13 +305,22 @@ public:
     MockPacketCapture(CaptureModule* m) : PacketCapture(m) {}
 
 protected:
-    pcap_dumper_t* open_dump(pcap_t*, const char*) override
-    { return (pcap_dumper_t*)1; }
-
     void write_packet(Packet* p) override
     {
         pcap.push_back(p);
         write_packet_called = true;
+    }
+
+    bool capture_init() override
+    {
+        if (bpf_compile_and_validate())
+        {
+            dumper = (pcap_dumper_t*)1;
+            return true;
+        }
+        _packet_capture_disable();
+        capture_term();
+        return false;
     }
 
     void capture_term() override
@@ -271,12 +343,12 @@ TEST_CASE("toggle", "[PacketCapture]")
     CHECK ( !cap.write_packet_called );
 
     cap.write_packet_called = false;
-    packet_capture_enable("");
+    _packet_capture_enable("");
     cap.eval(null_packet);
     CHECK ( cap.write_packet_called );
 
     cap.write_packet_called = false;
-    packet_capture_disable();
+    _packet_capture_disable();
     cap.eval(null_packet);
     CHECK ( !cap.write_packet_called );
 }
@@ -296,13 +368,13 @@ TEST_CASE("lazy init", "[PacketCapture]")
     pc_dtor(real_cap);
     MockPacketCapture cap(mod);
 
-    packet_capture_enable("");
+    _packet_capture_enable("");
     CHECK ( (capture_initialized() == false) );
 
     cap.eval(null_packet);
     CHECK ( (capture_initialized() == true) );
 
-    packet_capture_disable();
+    _packet_capture_disable();
     CHECK ( (capture_initialized() == true) );
 
     cap.eval(null_packet);
@@ -328,13 +400,13 @@ TEST_CASE("blank filter", "[PacketCapture]")
     CaptureModule mod;
     MockPacketCapture cap(&mod);
 
-    packet_capture_enable("");
+    _packet_capture_enable("");
     cap.eval(&p);
 
     REQUIRE ( cap.pcap.size() );
     CHECK ( cap.pcap[0] == &p );
 
-    packet_capture_disable();
+    _packet_capture_disable();
     cap.eval(null_packet);
 }
 
@@ -345,11 +417,11 @@ TEST_CASE("bad filter", "[PacketCapture]")
     CaptureModule mod;
     MockPacketCapture cap(&mod);
 
-    packet_capture_enable("this is garbage");
+    _packet_capture_enable("this is garbage");
     cap.eval(null_packet);
     CHECK ( (capture_initialized() == false) );
 
-    packet_capture_enable(
+    _packet_capture_enable(
     "port 0 "
     "port 1 "
     "port 2 "
@@ -413,8 +485,8 @@ TEST_CASE("bpf filter", "[PacketCapture]")
     cap_count_stats.checked = 0;
     cap_count_stats.matched = 0;
 
-    packet_capture_enable("ip host 10.82.240.82");
-    packet_capture_enable(""); //Test double-enable guard
+    _packet_capture_enable("ip host 10.82.240.82");
+    _packet_capture_enable(""); //Test double-enable guard
 
     cap.write_packet_called = false;
     cap.eval(&p_match);
@@ -436,7 +508,7 @@ TEST_CASE("bpf filter", "[PacketCapture]")
     CHECK ( cap.pcap[0] == &p_match );
     CHECK ( cap.pcap[1] == &p_match );
 
-    packet_capture_disable();
+    _packet_capture_disable();
     cap.eval(null_packet);
 }
 #endif

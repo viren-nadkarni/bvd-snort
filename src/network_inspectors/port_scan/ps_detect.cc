@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -44,6 +44,8 @@
 #include "utils/stats.h"
 
 #include "ps_inspect.h"
+
+using namespace snort;
 
 PADDING_GUARD_BEGIN
 struct PS_HASH_KEY
@@ -416,11 +418,11 @@ void PortScan::ps_proto_update_window(unsigned interval, PS_PROTO* proto, time_t
 **  @param PS_PROTO pointer to structure to update
 **  @param int      number to increment portscan counter
 **  @param u_long   IP address of other host
-**  @param u_short  port/ip_proto to track
+**  @param unsigned short  port/ip_proto to track
 **  @param time_t   time the packet was received. update windows.
 */
 int PortScan::ps_proto_update(PS_PROTO* proto, int ps_cnt, int pri_cnt,
-    unsigned window, const SfIp* ip, u_short port, time_t pkt_time)
+    unsigned window, const SfIp* ip, unsigned short port, time_t pkt_time)
 {
     if (!proto)
         return 0;
@@ -536,11 +538,6 @@ static int ps_update_open_ports(PS_PROTO* proto, unsigned short port)
     {
         proto->open_ports[iCtr] = port;
         proto->open_ports_cnt++;
-
-        if (proto->alerts == PS_ALERT_GENERATED)
-        {
-            proto->alerts = PS_ALERT_OPEN_PORT;
-        }
     }
 
     return 0;
@@ -647,22 +644,14 @@ void PortScan::ps_tracker_update_tcp(PS_PKT* ps_pkt, PS_TRACKER* scanner,
             !(p->packet_flags & PKT_STREAM_EST))
         {
             if (scanned)
-            {
                 ps_update_open_ports(&scanned->proto, p->ptrs.sp);
-            }
-
-            if (scanner)
-            {
-                if (scanner->proto.alerts == PS_ALERT_GENERATED)
-                    scanner->proto.alerts = PS_ALERT_OPEN_PORT;
-            }
         }
     }
     /*
     ** Stream didn't create a session on the SYN packet,
     ** so check specifically for SYN here.
     */
-    else if (p->ptrs.tcph && (p->ptrs.tcph->th_flags == TH_SYN))
+    else if ( p->ptrs.tcph and p->ptrs.tcph->is_syn_only() )
     {
         /* No session established, packet only has SYN.  SYN only
         ** packet always from client, so use dp.
@@ -684,7 +673,7 @@ void PortScan::ps_tracker_update_tcp(PS_PKT* ps_pkt, PS_TRACKER* scanner,
     ** so check specifically for SYN & ACK here.  Clear based
     ** on the 'completion' of three-way handshake.
     */
-    else if (p->ptrs.tcph && (p->ptrs.tcph->th_flags == (TH_SYN|TH_ACK)))
+    else if ( p->ptrs.tcph and p->ptrs.tcph->is_syn_ack() )
     {
         if (scanned)
         {
@@ -745,12 +734,12 @@ void PortScan::ps_tracker_update_ip(PS_PKT* ps_pkt, PS_TRACKER* scanner,
 
     if (scanned)
     {
-        ps_proto_update(&scanned->proto, 1, 0, win, &cleared, (u_short)p->get_ip_proto_next(), 0);
+        ps_proto_update(&scanned->proto, 1, 0, win, &cleared, (unsigned short)p->get_ip_proto_next(), 0);
     }
 
     if (scanner)
     {
-        ps_proto_update(&scanner->proto, 1, 0, win, &cleared, (u_short)p->get_ip_proto_next(), 0);
+        ps_proto_update(&scanner->proto, 1, 0, win, &cleared, (unsigned short)p->get_ip_proto_next(), 0);
     }
 }
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,11 +33,11 @@ struct PacketLatencyConfig
         ALERT_AND_LOG = ALERT | LOG
     };
 
-    hr_duration max_time = 0_ticks;
+    hr_duration max_time = CLOCK_ZERO;
     bool fastpath = false;
     Action action = NONE;
 
-    bool enabled() const { return max_time > 0_ticks; }
+    bool enabled() const { return max_time > CLOCK_ZERO; }
 };
 
 #endif

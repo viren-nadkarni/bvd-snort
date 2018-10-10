@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,18 +34,22 @@
 #include <CppUTest/TestHarness.h>
 #include <CppUTestExt/MockSupport.h>
 
+using namespace snort;
 using namespace HttpEnums;
 
+namespace snort
+{
 // Stubs whose sole purpose is to make the test code link
 void ParseWarning(WarningGroup, const char*, ...) {}
 void ParseError(const char*, ...) {}
 
+void Value::get_bits(std::bitset<256ul>&) const {}
+int DetectionEngine::queue_event(unsigned int, unsigned int, Actions::Type) { return 0; }
+}
+
 void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
 void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*, FILE*) { }
 void show_stats(SimpleStats*, const char*) { }
-
-void Value::get_bits(std::bitset<256ul>&) const {}
-int DetectionEngine::queue_event(unsigned int, unsigned int, RuleType) { return 0; }
 
 int32_t str_to_code(const uint8_t*, const int32_t, const StrCode []) { return 0; }
 int32_t substr_to_code(const uint8_t*, const int32_t, const StrCode []) { return 0; }

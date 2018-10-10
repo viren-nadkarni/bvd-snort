@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,6 +29,7 @@
 #endif
 
 #include "detection/detection_engine.h"
+#include "detection/ips_context.h"
 #include "detection/signature.h"
 #include "events/event.h"
 #include "flow/flow_key.h"
@@ -47,6 +48,7 @@
 #include "protocols/vlan.h"
 #include "utils/stats.h"
 
+using namespace snort;
 using namespace std;
 
 #define LOG_BUFFER (4*K_BYTES)
@@ -122,16 +124,19 @@ static void ff_dir(Args& a)
 static void ff_dst_addr(Args& a)
 {
     if ( a.pkt->has_ip() or a.pkt->is_data() )
-        TextLog_Puts(csv_log, a.pkt->ptrs.ip_api.get_dst()->ntoa());
+    {
+        SfIpString ip_str;
+        TextLog_Puts(csv_log, a.pkt->ptrs.ip_api.get_dst()->ntop(ip_str));
+    }
 }
 
 static void ff_dst_ap(Args& a)
 {
-    const char* addr = "";
+    SfIpString addr = "";
     unsigned port = 0;
 
     if ( a.pkt->has_ip() or a.pkt->is_data() )
-        addr = a.pkt->ptrs.ip_api.get_dst()->ntoa();
+        a.pkt->ptrs.ip_api.get_dst()->ntop(addr);
 
     if ( a.pkt->proto_bits & (PROTO_BIT__TCP|PROTO_BIT__UDP) )
         port = a.pkt->ptrs.dp;
@@ -266,9 +271,9 @@ static void ff_pkt_len(Args& a)
         TextLog_Print(csv_log, "%u", a.pkt->dsize);
 }
 
-static void ff_pkt_num(Args&)
+static void ff_pkt_num(Args& a)
 {
-    TextLog_Print(csv_log, STDu64, get_packet_number());
+    TextLog_Print(csv_log, STDu64, a.pkt->context->packet_number);
 }
 
 static void ff_priority(Args& a)
@@ -313,16 +318,19 @@ static void ff_sid(Args& a)
 static void ff_src_addr(Args& a)
 {
     if ( a.pkt->has_ip() or a.pkt->is_data() )
-        TextLog_Puts(csv_log, a.pkt->ptrs.ip_api.get_src()->ntoa());
+    {
+        SfIpString ip_str;
+        TextLog_Puts(csv_log, a.pkt->ptrs.ip_api.get_src()->ntop(ip_str));
+    }
 }
 
 static void ff_src_ap(Args& a)
 {
-    const char* addr = "";
+    SfIpString addr = "";
     unsigned port = 0;
 
     if ( a.pkt->has_ip() or a.pkt->is_data() )
-        addr = a.pkt->ptrs.ip_api.get_src()->ntoa();
+        a.pkt->ptrs.ip_api.get_src()->ntop(addr);
 
     if ( a.pkt->proto_bits & (PROTO_BIT__TCP|PROTO_BIT__UDP) )
         port = a.pkt->ptrs.sp;
@@ -338,13 +346,13 @@ static void ff_src_port(Args& a)
 
 static void ff_target(Args& a)
 {
-    const char* addr;
+    SfIpString addr = "";
 
     if ( a.event.sig_info->target == TARGET_SRC )
-        addr = a.pkt->ptrs.ip_api.get_src()->ntoa();
+        a.pkt->ptrs.ip_api.get_src()->ntop(addr);
 
     else if ( a.event.sig_info->target == TARGET_DST )
-        addr = a.pkt->ptrs.ip_api.get_dst()->ntoa();
+        a.pkt->ptrs.ip_api.get_dst()->ntop(addr);
 
     else
         return;

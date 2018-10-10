@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,9 +27,10 @@
 
 #include "dce_smb_transaction.h"
 
-#include "main/snort_debug.h"
-
+#include "dce_smb_module.h"
 #include "dce_smb_transaction_utils.h"
+
+using namespace snort;
 
 #define DCE2_SMB_TRANS__NONE    0x00
 #define DCE2_SMB_TRANS__DATA    0x01
@@ -216,7 +217,7 @@ static DCE2_Ret DCE2_SmbTransactionReq(DCE2_SmbSsnData* ssd,
         // Only two parameters but more seems okay
         if (param_len >= 2)
         {
-            if ((alignedNtohs((const uint16_t*)param_ptr) & PIPE_STATE_MESSAGE_MODE))
+            if ((snort::alignedNtohs((const uint16_t*)param_ptr) & PIPE_STATE_MESSAGE_MODE))
                 ttracker->pipe_byte_mode = false;
             else
                 ttracker->pipe_byte_mode = true;
@@ -224,10 +225,6 @@ static DCE2_Ret DCE2_SmbTransactionReq(DCE2_SmbSsnData* ssd,
             // Won't get a response
             if (DCE2_SsnIsWindowsPolicy(&ssd->sd) && ttracker->one_way)
             {
-                DebugFormat(DEBUG_DCE_SMB,
-                    "Setting pipe to %s mode\n",
-                    ttracker->pipe_byte_mode ? "byte" : "message");
-
                 ssd->cur_rtracker->ftracker->fp_byte_mode = ttracker->pipe_byte_mode;
             }
         }
@@ -436,12 +433,6 @@ static DCE2_Ret DCE2_SmbUpdateTransSecondary(DCE2_SmbSsnData* ssd,
     ttracker->dsent += dcnt;
     ttracker->psent += pcnt;
 
-    DebugFormat(DEBUG_DCE_SMB, "Data displacement: %u, "
-        "Data count: %u, Total data count: %u\n"
-        "Parameter displacement: %u, "
-        "Parameter count: %u, Total parameter count: %u\n",
-        ddisp, dcnt, tdcnt, pdisp, pcnt, tpcnt);
-
     if (data_params & DCE2_SMB_TRANS__DATA)
     {
         DCE2_MOVE(nb_ptr, nb_len, ((const uint8_t*)smb_hdr + doff) - nb_ptr);
@@ -525,12 +516,6 @@ static DCE2_Ret DCE2_SmbUpdateTransRequest(DCE2_SmbSsnData* ssd,
         pcnt = SmbTransactionReqParamCnt((const SmbTransactionReq*)nb_ptr);
         poff = SmbTransactionReqParamOff((const SmbTransactionReq*)nb_ptr);
 
-        DebugFormat(DEBUG_DCE_SMB,
-            "Transaction subcommand: %s (0x%04X)\n",
-            (sub_com < TRANS_SUBCOM_MAX)
-            ? smb_transaction_sub_command_strings[sub_com]
-            : "Unknown", sub_com);
-
         ssd->cur_rtracker->ftracker = DCE2_SmbGetFileTracker(ssd, fid);
         if (ssd->cur_rtracker->ftracker == nullptr)
             return DCE2_RET__IGNORE;
@@ -541,7 +526,7 @@ static DCE2_Ret DCE2_SmbUpdateTransRequest(DCE2_SmbSsnData* ssd,
             if (DCE2_SsnIsWindowsPolicy(&ssd->sd)
                 && ssd->cur_rtracker->ftracker->fp_byte_mode)
             {
-                DebugMessage(DEBUG_DCE_SMB, "Pipe is in byte "
+                trace_log(dce_smb, "Pipe is in byte "
                     "mode - TRANS_TRANSACT_NMPIPE won't work\n");
                 return DCE2_RET__ERROR;
             }
@@ -598,7 +583,7 @@ static DCE2_Ret DCE2_SmbUpdateTransRequest(DCE2_SmbSsnData* ssd,
             && (DCE2_SmbTransactionGetName(nb_ptr, nb_len,
             byte_count, SmbUnicode(smb_hdr)) != DCE2_RET__SUCCESS))
         {
-            DebugMessage(DEBUG_DCE_SMB, "Failed to validate "
+            trace_log(dce_smb, "Failed to validate "
                 "pipe name for Samba.\n");
             return DCE2_RET__ERROR;
         }
@@ -613,12 +598,6 @@ static DCE2_Ret DCE2_SmbUpdateTransRequest(DCE2_SmbSsnData* ssd,
         tpcnt = SmbTransaction2ReqTotalParamCnt((const SmbTransaction2Req*)nb_ptr);
         pcnt = SmbTransaction2ReqParamCnt((const SmbTransaction2Req*)nb_ptr);
         poff = SmbTransaction2ReqParamOff((const SmbTransaction2Req*)nb_ptr);
-
-        DebugFormat(DEBUG_DCE_SMB,
-            "Transaction2 subcommand: %s (0x%04X)\n",
-            (sub_com < TRANS2_SUBCOM_MAX)
-            ? smb_transaction2_sub_command_strings[sub_com]
-            : "Unknown", sub_com);
 
         switch (sub_com)
         {
@@ -671,12 +650,6 @@ static DCE2_Ret DCE2_SmbUpdateTransRequest(DCE2_SmbSsnData* ssd,
         pcnt = SmbNtTransactReqParamCnt((const SmbNtTransactReq*)nb_ptr);
         poff = SmbNtTransactReqParamOff((const SmbNtTransactReq*)nb_ptr);
 
-        DebugFormat(DEBUG_DCE_SMB,
-            "Nt Transact subcommand: %s (0x%04X)\n",
-            (sub_com < NT_TRANSACT_SUBCOM_MAX)
-            ? smb_nt_transact_sub_command_strings[sub_com]
-            : "Unknown", sub_com);
-
         switch (sub_com)
         {
         case NT_TRANSACT_CREATE:
@@ -717,10 +690,6 @@ static DCE2_Ret DCE2_SmbUpdateTransRequest(DCE2_SmbSsnData* ssd,
     ttracker->dsent = dcnt;
     ttracker->tpcnt = tpcnt;
     ttracker->psent = pcnt;
-
-    DebugFormat(DEBUG_DCE_SMB, "Data count: %u, "
-        "Total data count: %u, Param count: %u, "
-        "Total param count: %u\n", dcnt, tdcnt, pcnt, tpcnt);
 
     // Testing shows that Transacts aren't processed until
     // all of the data and parameters are received, so overlapping
@@ -811,12 +780,6 @@ static DCE2_Ret DCE2_SmbUpdateTransResponse(DCE2_SmbSsnData* ssd,
         poff = SmbTransactionRespParamOff((const SmbTransactionResp*)nb_ptr);
         pdisp = SmbTransactionRespParamDisp((const SmbTransactionResp*)nb_ptr);
 
-        DebugFormat(DEBUG_DCE_SMB,
-            "Transaction subcommand: %s (0x%04X)\n",
-            (sub_com < TRANS_SUBCOM_MAX)
-            ? smb_transaction_sub_command_strings[sub_com]
-            : "Unknown", sub_com);
-
         switch (sub_com)
         {
         case TRANS_TRANSACT_NMPIPE:
@@ -843,12 +806,6 @@ static DCE2_Ret DCE2_SmbUpdateTransResponse(DCE2_SmbSsnData* ssd,
         doff = SmbTransaction2RespDataOff((const SmbTransaction2Resp*)nb_ptr);
         ddisp = SmbTransaction2RespDataDisp((const SmbTransaction2Resp*)nb_ptr);
 
-        DebugFormat(DEBUG_DCE_SMB,
-            "Transaction2 subcommand: %s (0x%04X)\n",
-            (sub_com < TRANS2_SUBCOM_MAX)
-            ? smb_transaction2_sub_command_strings[sub_com]
-            : "Unknown", sub_com);
-
         switch (sub_com)
         {
         case TRANS2_OPEN2:
@@ -873,12 +830,6 @@ static DCE2_Ret DCE2_SmbUpdateTransResponse(DCE2_SmbSsnData* ssd,
         dcnt = SmbNtTransactRespDataCnt((const SmbNtTransactResp*)nb_ptr);
         doff = SmbNtTransactRespDataOff((const SmbNtTransactResp*)nb_ptr);
         ddisp = SmbNtTransactRespDataDisp((const SmbNtTransactResp*)nb_ptr);
-
-        DebugFormat(DEBUG_DCE_SMB,
-            "Nt Transact subcommand: %s (0x%04X)\n",
-            (sub_com < NT_TRANSACT_SUBCOM_MAX)
-            ? smb_nt_transact_sub_command_strings[sub_com]
-            : "Unknown", sub_com);
 
         switch (sub_com)
         {
@@ -929,12 +880,6 @@ static DCE2_Ret DCE2_SmbUpdateTransResponse(DCE2_SmbSsnData* ssd,
 
     ttracker->dsent += dcnt;
     ttracker->psent += pcnt;
-
-    DebugFormat(DEBUG_DCE_SMB, "Data displacement: %u, "
-        "Data count: %u, Total data count: %u\n"
-        "Parameter displacement: %u, "
-        "Parameter count: %u, Total parameter count: %u\n",
-        ddisp, dcnt, tdcnt, pdisp, pcnt, tpcnt);
 
     if (data_params & DCE2_SMB_TRANS__DATA)
     {
@@ -1077,7 +1022,7 @@ static DCE2_Ret DCE2_SmbTrans2SetFileInfoReq(DCE2_SmbSsnData* ssd,
         || (ftracker->ff_bytes_processed != 0))
         return DCE2_RET__IGNORE;
 
-    ssd->cur_rtracker->file_size = alignedNtohq((const uint64_t*)data_ptr);
+    ssd->cur_rtracker->file_size = snort::alignedNtohq((const uint64_t*)data_ptr);
     ssd->cur_rtracker->ftracker = ftracker;
 
     return DCE2_RET__SUCCESS;
@@ -1117,7 +1062,7 @@ DCE2_Ret DCE2_SmbTransaction(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
     if (DCE2_ComInfoIsRequest(com_info)
         && !DCE2_SmbIsTransactionComplete(ttracker))
     {
-        DebugMessage(DEBUG_DCE_SMB, "Got new transaction request "
+        trace_log(dce_smb, "Got new transaction request "
             "that matches an in progress transaction - not inspecting.\n");
         return DCE2_RET__ERROR;
     }
@@ -1126,7 +1071,7 @@ DCE2_Ret DCE2_SmbTransaction(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
     if (DCE2_ComInfoIsRequest(com_info)
         && (DCE2_ComInfoWordCount(com_info) != 16))
     {
-        DebugMessage(DEBUG_DCE_SMB, "\\PIPE\\LANMAN request - not inspecting\n");
+        trace_log(dce_smb, "\\PIPE\\LANMAN request - not inspecting\n");
         return DCE2_RET__IGNORE;
     }
 
@@ -1139,9 +1084,6 @@ DCE2_Ret DCE2_SmbTransaction(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
     if (DCE2_ComInfoIsResponse(com_info)
         && (com_size == sizeof(SmbTransactionInterimResp)))
     {
-        DebugMessage(DEBUG_DCE_SMB,
-            "  Server Transaction interim response.\n");
-
         return DCE2_RET__SUCCESS;
     }
 
@@ -1187,14 +1129,11 @@ DCE2_Ret DCE2_SmbTransaction(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
             {
                 const uint8_t* data_ptr = DCE2_BufferData(ttracker->dbuf);
                 uint32_t data_len = DCE2_BufferLength(ttracker->dbuf);
-                Packet* rpkt = DCE2_SmbGetRpkt(ssd, &data_ptr,
+                snort::Packet* rpkt = DCE2_SmbGetRpkt(ssd, &data_ptr,
                     &data_len, DCE2_RPKT_TYPE__SMB_TRANS);
 
                 if (rpkt == nullptr)
                     return DCE2_RET__ERROR;
-
-                DebugMessage(DEBUG_DCE_SMB, "Reassembled Transaction response\n");
-                DCE2_PrintPktData(rpkt->data, rpkt->dsize);
 
                 status = DCE2_SmbProcessResponseData(ssd, data_ptr, data_len);
 
@@ -1215,8 +1154,6 @@ DCE2_Ret DCE2_SmbTransaction(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
             break;
 
         case TRANS_SET_NMPIPE_STATE:
-            DebugFormat(DEBUG_DCE_SMB, "Setting pipe "
-                "to %s mode\n", ttracker->pipe_byte_mode ? "byte" : "message");
             ssd->cur_rtracker->ftracker->fp_byte_mode = ttracker->pipe_byte_mode;
             break;
 
@@ -1246,7 +1183,7 @@ DCE2_Ret DCE2_SmbTransaction2(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
     if (DCE2_ComInfoIsRequest(com_info)
         && !DCE2_SmbIsTransactionComplete(ttracker))
     {
-        DebugMessage(DEBUG_DCE_SMB, "Got new transaction request "
+        trace_log(dce_smb, "Got new transaction request "
             "that matches an in progress transaction - not inspecting.\n");
         return DCE2_RET__ERROR;
     }
@@ -1504,7 +1441,7 @@ DCE2_Ret DCE2_SmbNtTransact(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_hdr,
     if (DCE2_ComInfoIsRequest(com_info)
         && !DCE2_SmbIsTransactionComplete(ttracker))
     {
-        DebugMessage(DEBUG_DCE_SMB, "Got new transaction request "
+        trace_log(dce_smb, "Got new transaction request "
             "that matches an in progress transaction - not inspecting.\n");
         return DCE2_RET__ERROR;
     }
@@ -1646,13 +1583,10 @@ DCE2_Ret DCE2_SmbTransactionSecondary(DCE2_SmbSsnData* ssd, const SmbNtHdr* smb_
     {
         const uint8_t* data_ptr = DCE2_BufferData(ttracker->dbuf);
         uint32_t data_len = DCE2_BufferLength(ttracker->dbuf);
-        Packet* rpkt = DCE2_SmbGetRpkt(ssd, &data_ptr, &data_len, DCE2_RPKT_TYPE__SMB_TRANS);
+        snort::Packet* rpkt = DCE2_SmbGetRpkt(ssd, &data_ptr, &data_len, DCE2_RPKT_TYPE__SMB_TRANS);
 
         if (rpkt == nullptr)
-            return DCE2_RET__ERROR;
-
-        DebugMessage(DEBUG_DCE_SMB, "Reassembled Transaction request\n");
-        DCE2_PrintPktData(rpkt->data, rpkt->dsize);
+            return DCE2_RET__ERROR;    
 
         status = DCE2_SmbTransactionReq(ssd, ttracker, data_ptr, data_len,
             DCE2_BufferData(ttracker->pbuf), DCE2_BufferLength(ttracker->pbuf));

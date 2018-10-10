@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,9 @@
 
 #include "gtp.h"
 
+using namespace snort;
+
+Trace TRACE_NAME(gtp_inspect);
 THREAD_LOCAL ProfileStats gtp_inspect_prof;
 
 #define GTP_EVENT_BAD_MSG_LEN_STR        "message length is invalid"
@@ -107,7 +110,7 @@ static const Parameter gtp_info_params[] =
 static const Parameter gtp_params[] =
 {
     { "version", Parameter::PT_INT, "0:2", "2",
-      "gtp version" },
+      "GTP version" },
 
     { "messages", Parameter::PT_LIST, gtp_msg_params, nullptr,
       "message dictionary" },
@@ -119,10 +122,10 @@ static const Parameter gtp_params[] =
 };
 
 GtpInspectModule::GtpInspectModule() :
-    Module(GTP_NAME, GTP_HELP, gtp_params, true)
+    Module(GTP_NAME, GTP_HELP, gtp_params, true, &TRACE_NAME(gtp_inspect))
 { }
 
-bool GtpInspectModule::set(const char*, Value& v, SnortConfig*)
+bool GtpInspectModule::set(const char* fqn, Value& v, SnortConfig* c)
 {
     if ( v.is("version") )
         stuff.version = v.get_long();
@@ -137,7 +140,7 @@ bool GtpInspectModule::set(const char*, Value& v, SnortConfig*)
         stuff.name = v.get_string();
 
     else
-        return false;
+        return Module::set(fqn, v, c);
 
     return true;
 }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -38,7 +38,7 @@ struct EventNode
 {
     const struct OptTreeNode* otn;
     const struct RuleTreeNode* rtn;
-    RuleType type;
+    snort::Actions::Type type;
 };
 
 EventQueueConfig* EventQueueConfigNew();

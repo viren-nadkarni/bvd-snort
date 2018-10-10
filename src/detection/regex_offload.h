@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,7 +34,11 @@
 #include <mutex>
 #include <thread>
 
+namespace snort
+{
+class Flow;
 struct Packet;
+}
 struct RegexRequest;
 
 class RegexOffload
@@ -45,16 +49,20 @@ public:
 
     void stop();
 
+    unsigned available()
+    { return idle.size(); }
+
     unsigned count()
     { return busy.size(); }
 
-    void put(unsigned id, Packet*);
+    void put(unsigned id, snort::Packet*);
     bool get(unsigned& id);
 
-    bool on_hold(class Flow*);
+    bool on_hold(snort::Flow*);
 
 private:
     static void worker(RegexRequest*);
+    static void tterm();
 
 private:
     std::list<RegexRequest*> busy;

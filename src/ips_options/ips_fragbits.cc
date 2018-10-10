@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -48,12 +48,16 @@
 #include "config.h"
 #endif
 
+#include <cassert>
+
 #include "framework/ips_option.h"
 #include "framework/module.h"
 #include "hash/hashfcn.h"
 #include "log/messages.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
+
+using namespace snort;
 
 static THREAD_LOCAL ProfileStats fragBitsPerfStats;
 
@@ -208,18 +212,8 @@ bool FragBitsData::check_not(const uint16_t packet_fragbits)
 // parse fragbits and populate the information into this class
 void FragBitsData::parse_fragbits(const char* data)
 {
-    std::string bit_string;
-
-    // if its null the bit_string will stay empty
-    if(data)
-    {
-        bit_string = data;
-    }
-    else if ( bit_string.empty() )
-    {
-        ParseError("no arguments to the fragbits keyword");
-        return;
-    }
+    assert(data);
+    std::string bit_string = data;
 
     unsigned long len = bit_string.length();
 

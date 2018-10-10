@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,6 +25,8 @@
 #include "codecs/codec_module.h"
 #include "framework/codec.h"
 #include "protocols/arp.h"
+
+using namespace snort;
 
 #define CD_ARP_NAME "arp"
 #define CD_ARP_HELP "support for address resolution protocol"
@@ -53,7 +55,6 @@ public:
 
     void get_protocol_ids(std::vector<ProtocolId>& v) override;
     bool decode(const RawData&, CodecData&, DecodeData&) override;
-    void format(bool reverse, uint8_t* raw_pkt, DecodeData& snort) override;
 };
 } // anonymous namespace
 
@@ -63,7 +64,7 @@ void ArpCodec::get_protocol_ids(std::vector<ProtocolId>& v)
     v.push_back(ProtocolId::ETHERTYPE_REVARP);
 }
 
-bool ArpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
+bool ArpCodec::decode(const RawData& raw, CodecData& codec, DecodeData&)
 {
     if (raw.len < arp::ETHERARP_HDR_LEN)
     {
@@ -73,14 +74,8 @@ bool ArpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
 
     codec.proto_bits |= PROTO_BIT__ARP;
     codec.lyr_len = arp::ETHERARP_HDR_LEN;
-    snort.set_pkt_type(PktType::ARP);
 
     return true;
-}
-
-void ArpCodec::format(bool /*reverse*/, uint8_t* /*raw_pkt*/, DecodeData& snort)
-{
-    snort.set_pkt_type(PktType::ARP);
 }
 
 //-------------------------------------------------------------------------

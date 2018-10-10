@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,8 +30,11 @@
 #include "managers/codec_manager.h"
 #include "protocols/packet.h"
 
-struct Packet;
 struct TextLog;
+
+namespace snort
+{
+struct Packet;
 
 enum class TcpResponse
 {
@@ -54,6 +57,9 @@ enum class UnreachResponse
 class SO_PUBLIC PacketManager
 {
 public:
+    static void thread_init();
+    static void thread_term();
+
     // decode this packet and set all relevant packet fields.
     static void decode(Packet*, const struct _daq_pkthdr*, const uint8_t*, bool cooked = false);
 
@@ -151,6 +157,6 @@ private:
     static std::array<PegCount, s_stats.size()> g_stats;
     static const std::array<const char*, stat_offset> stat_names;
 };
-
+}
 #endif
 

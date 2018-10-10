@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,6 +33,8 @@
 #define MAX_DEPTH                     65535
 #define MIN_DEPTH                     (-1)
 
+namespace snort
+{
 class SO_PUBLIC DecodeConfig
 {
 public:
@@ -66,6 +68,6 @@ private:
     int64_t file_depth = MIN_DEPTH;
     bool decode_enabled = true;
 };
-
+}
 #endif
 

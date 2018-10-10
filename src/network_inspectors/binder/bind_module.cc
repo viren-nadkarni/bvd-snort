@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,7 @@
 #include "parser/parse_ip.h"
 #include "protocols/packet.h"
 
+using namespace snort;
 using namespace std;
 
 #define FILE_KEY ".file"
@@ -168,7 +169,7 @@ static void set_ip_var(sfip_var_t*& var, const char* val)
 {
     if ( var )
         sfvar_free(var);
-    var = sfip_var_from_string(val);
+    var = sfip_var_from_string(val, "binder");
 }
 
 bool BinderModule::set(const char* fqn, Value& v, SnortConfig*)
@@ -207,12 +208,12 @@ bool BinderModule::set(const char* fqn, Value& v, SnortConfig*)
 
     else if ( v.is("proto") )
     {
-        const PktType mask[] =
+        const unsigned mask[] =
         {
-            PktType::ANY, PktType::IP, PktType::ICMP, PktType::TCP, PktType::UDP,
-            PktType::PDU, PktType::FILE
+            PROTO_BIT__ANY_TYPE, PROTO_BIT__IP, PROTO_BIT__ICMP,
+            PROTO_BIT__TCP, PROTO_BIT__UDP, PROTO_BIT__PDU, PROTO_BIT__FILE
         };
-        work->when.protos = (unsigned)mask[v.get_long()];
+        work->when.protos = mask[v.get_long()];
     }
     else if ( v.is("ports") )
     {
@@ -280,6 +281,7 @@ bool BinderModule::begin(const char* fqn, int idx, SnortConfig*)
     {
         work = new Binding;
         unsplit_nets = false;
+        unsplit_ports = false;
         use_name_count = 0;
         use_type_count = 0;
     }

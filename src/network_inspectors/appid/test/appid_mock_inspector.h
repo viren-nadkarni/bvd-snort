@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -18,38 +18,59 @@
 
 // appid_mock_inspector.h author davis mcpherson <davmcphe@cisco.com>
 
+#ifndef APPID_MOCK_INSPECTOR_H
+#define APPID_MOCK_INSPECTOR_H
+
 typedef uint64_t Trace;
 class Value;
 
+namespace snort
+{
 Inspector::Inspector()
 {
     set_api(nullptr);
 }
 
-Inspector::~Inspector() { }
+Inspector::~Inspector() = default;
 bool Inspector::likes(Packet*) { return true; }
 bool Inspector::get_buf(const char*, Packet*, InspectionBuffer&) { return true; }
 class StreamSplitter* Inspector::get_splitter(bool) { return nullptr; }
 
-class AppIdModule
-{
-public:
-    AppIdModule() {}
-    ~AppIdModule() {}
+Module::Module(char const*, char const*) {}
+bool Module::set(const char*, Value&, SnortConfig*) { return true; }
+void Module::sum_stats(bool) {}
+void Module::show_interval_stats(std::vector<unsigned int, std::allocator<unsigned int> >&, FILE*) {}
+void Module::show_stats() {}
+void Module::reset_stats() {}
+PegCount Module::get_global_count(char const*) const { return 0; }
 
-};
+}
 
-class AppIdInspector : public Inspector
+AppIdModule::AppIdModule(): snort::Module("appid_mock", "appid_mock_help") {}
+AppIdModule::~AppIdModule() {}
+void AppIdModule::sum_stats(bool) {}
+void AppIdModule::show_dynamic_stats() {}
+bool AppIdModule::begin(char const*, int, snort::SnortConfig*) { return true; }
+bool AppIdModule::end(char const*, int, snort::SnortConfig*) { return true; }
+bool AppIdModule::set(char const*, snort::Value&, snort::SnortConfig*) { return true; }
+const snort::Command* AppIdModule::get_commands() const { return nullptr; }
+const PegInfo* AppIdModule::get_pegs() const { return nullptr; }
+PegCount* AppIdModule::get_counts() const { return nullptr; }
+snort::ProfileStats* AppIdModule::get_profile() const { return nullptr; }
+
+class AppIdInspector : public snort::Inspector
 {
 public:
     AppIdInspector(AppIdModule& ) { }
-    ~AppIdInspector() { }
-    void eval(Packet*) { }
-    bool configure(SnortConfig*) { return true; }
-    void show(SnortConfig*) { }
-    void tinit() { }
-    void tterm() { }
+    ~AppIdInspector() override = default;
+    void eval(snort::Packet*) override { }
+    bool configure(snort::SnortConfig*) override { return true; }
+    void show(snort::SnortConfig*) override { }
+    void tinit() override { }
+    void tterm() override { }
 };
 
 AppIdModule appid_mod;
 AppIdInspector appid_inspector( appid_mod );
+
+#endif

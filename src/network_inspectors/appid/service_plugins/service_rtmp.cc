@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -94,7 +94,6 @@ RtmpServiceDetector::RtmpServiceDetector(ServiceDiscovery* sd)
 
     handler->register_detector(name, this, proto);
 }
-
 
 static void rtmp_free(void* ss)    /* AppIdFreeFCN */
 {
@@ -616,7 +615,7 @@ int RtmpServiceDetector::validate(AppIdDiscoveryArgs& args)
     }
 
     /* Give up if it's taking us too long to figure out this thing. */
-    if (args.asd->session_packet_count >= args.asd->config->mod_config->rtmp_max_packets)
+    if (args.asd.session_packet_count >= args.asd.config->mod_config->rtmp_max_packets)
     {
         goto fail;
     }
@@ -633,35 +632,29 @@ fail:
     return APPID_NOMATCH;
 
 success:
-    if (ss->swfUrl != nullptr)
+    AppIdHttpSession* hsession = args.asd.get_http_session();
+    if ( ss->swfUrl )
     {
-        if (!args.asd->hsession)
-            args.asd->hsession = new AppIdHttpSession(args.asd);
-
-        if (args.asd->hsession->url == nullptr)
+        if ( !hsession->get_field(MISC_URL_FID) )
         {
-            args.asd->hsession->url = ss->swfUrl;
-            args.asd->scan_flags |= SCAN_HTTP_HOST_URL_FLAG;
+            hsession->set_field(MISC_URL_FID, new std::string(ss->swfUrl), args.change_bits);
+            args.asd.scan_flags |= SCAN_HTTP_HOST_URL_FLAG;
         }
-        else
-            snort_free(ss->swfUrl);
 
+        snort_free(ss->swfUrl);
         ss->swfUrl = nullptr;
     }
 
-    if (ss->pageUrl != nullptr)
+    if ( ss->pageUrl )
     {
-        if (!args.asd->hsession)
-            args.asd->hsession = new AppIdHttpSession(args.asd);
+        if ( !hsession->get_field(REQ_REFERER_FID) &&
+            !args.asd.config->mod_config->referred_appId_disabled )
+            hsession->set_field(REQ_REFERER_FID, new std::string(ss->pageUrl), args.change_bits);
 
-        if (!args.asd->config->mod_config->referred_appId_disabled &&
-            (args.asd->hsession->referer == nullptr))
-            args.asd->hsession->referer = ss->pageUrl;
-        else
-            snort_free(ss->pageUrl);
-
+        snort_free(ss->pageUrl);
         ss->pageUrl = nullptr;
     }
-    return add_service(args.asd, args.pkt, args.dir, APP_ID_RTMP);
+
+    return add_service(args.change_bits, args.asd, args.pkt, args.dir, APP_ID_RTMP);
 }
 

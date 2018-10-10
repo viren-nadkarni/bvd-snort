@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -63,8 +63,6 @@ RexecServiceDetector::RexecServiceDetector(ServiceDiscovery* sd)
     proto = IpProtocol::TCP;
     detectorType = DETECTOR_TYPE_DECODER;
 
-    app_id = AppInfoManager::get_instance().add_appid_protocol_reference("rexec");
-
     appid_registry =
     {
         { APP_ID_EXEC, APPINFO_FLAG_SERVICE_ADDITIONAL }
@@ -105,6 +103,8 @@ int RexecServiceDetector::validate(AppIdDiscoveryArgs& args)
     uint32_t port = 0;
     const uint8_t* data = args.data;
     uint16_t size = args.size;
+    //FIXIT-M - Avoid thread locals
+    static THREAD_LOCAL SnortProtocolId rexec_snort_protocol_id = UNKNOWN_PROTOCOL_ID;
 
     ServiceREXECData* rd = (ServiceREXECData*)data_get(args.asd);
     if (!rd)
@@ -119,6 +119,9 @@ int RexecServiceDetector::validate(AppIdDiscoveryArgs& args)
     switch (rd->state)
     {
     case REXEC_STATE_PORT:
+        if(rexec_snort_protocol_id == UNKNOWN_PROTOCOL_ID)
+            rexec_snort_protocol_id = snort::SnortConfig::get_conf()->proto_ref->find("rexec");
+
         if (args.dir != APP_ID_FROM_INITIATOR)
             goto bail;
         if (size > REXEC_MAX_PORT_PACKET)
@@ -137,13 +140,13 @@ int RexecServiceDetector::validate(AppIdDiscoveryArgs& args)
             goto bail;
         if (port && args.pkt)
         {
-            const SfIp* sip;
-            const SfIp* dip;
+            const snort::SfIp* sip;
+            const snort::SfIp* dip;
 
             dip = args.pkt->ptrs.ip_api.get_dst();
             sip = args.pkt->ptrs.ip_api.get_src();
             AppIdSession* pf = AppIdSession::create_future_session(args.pkt, dip, 0, sip, (uint16_t)port,
-                IpProtocol::TCP, app_id, APPID_EARLY_SESSION_FLAG_FW_RULE, handler->get_inspector());
+                IpProtocol::TCP, rexec_snort_protocol_id, APPID_EARLY_SESSION_FLAG_FW_RULE, handler->get_inspector());
             if (pf)
             {
                 ServiceREXECData* tmp_rd = (ServiceREXECData*)snort_calloc(
@@ -151,7 +154,7 @@ int RexecServiceDetector::validate(AppIdDiscoveryArgs& args)
                 tmp_rd->state = REXEC_STATE_STDERR_CONNECT_SYN;
                 tmp_rd->parent = rd;
 
-                data_add(pf, tmp_rd, &rexec_free_state);
+                data_add(*pf, tmp_rd, &rexec_free_state);
                 if (pf->add_flow_data_id((uint16_t)port, this))
                 {
                     pf->service_disco_state = APPID_DISCO_STATE_FINISHED;
@@ -163,7 +166,7 @@ int RexecServiceDetector::validate(AppIdDiscoveryArgs& args)
                 rd->state = REXEC_STATE_SERVER_CONNECT;
                 pf->service_disco_state = APPID_DISCO_STATE_STATEFUL;
                 pf->scan_flags |= SCAN_HOST_PORT_FLAG;
-                initialize_expected_session(args.asd, pf, REXEC_EXPECTED_SESSION_FLAGS, APP_ID_FROM_RESPONDER);
+                initialize_expected_session(args.asd, *pf, REXEC_EXPECTED_SESSION_FLAGS, APP_ID_FROM_RESPONDER);
                 pf->service_disco_state = APPID_DISCO_STATE_STATEFUL;
             }
             else
@@ -255,7 +258,7 @@ int RexecServiceDetector::validate(AppIdDiscoveryArgs& args)
         if (rd->parent && rd->parent->state == REXEC_STATE_SERVER_CONNECT)
         {
             rd->parent->state = REXEC_STATE_USERNAME;
-            args.asd->clear_session_flags(APPID_SESSION_REXEC_STDERR);
+            args.asd.clear_session_flags(APPID_SESSION_REXEC_STDERR);
         }
         goto bail;
     default:
@@ -263,24 +266,24 @@ int RexecServiceDetector::validate(AppIdDiscoveryArgs& args)
     }
 
 inprocess:
-    if (!args.asd->is_service_detected())
+    if (!args.asd.is_service_detected())
         service_inprocess(args.asd, args.pkt, args.dir);
     return APPID_INPROCESS;
 
 success:
-    if (!args.asd->is_service_detected())
-        return add_service(args.asd, args.pkt, args.dir, APP_ID_EXEC);
+    if (!args.asd.is_service_detected())
+        return add_service(args.change_bits, args.asd, args.pkt, args.dir, APP_ID_EXEC);
 
 bail:
-    if (!args.asd->is_service_detected())
+    if (!args.asd.is_service_detected())
         incompatible_data(args.asd, args.pkt, args.dir);
-    args.asd->clear_session_flags(APPID_SESSION_CONTINUE);
+    args.asd.clear_session_flags(APPID_SESSION_CONTINUE);
     return APPID_NOT_COMPATIBLE;
 
 fail:
-    if (!args.asd->is_service_detected())
+    if (!args.asd.is_service_detected())
         fail_service(args.asd, args.pkt, args.dir);
-    args.asd->clear_session_flags(APPID_SESSION_CONTINUE);
+    args.asd.clear_session_flags(APPID_SESSION_CONTINUE);
     return APPID_NOMATCH;
 }
 

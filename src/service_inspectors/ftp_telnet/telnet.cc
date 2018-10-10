@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -34,6 +34,8 @@
 #include "ftpp_ui_config.h"
 #include "pp_telnet.h"
 #include "telnet_module.h"
+
+using namespace snort;
 
 THREAD_LOCAL ProfileStats telnetPerfStats;
 THREAD_LOCAL TelnetStats tnstats;
@@ -82,14 +84,14 @@ static int SnortTelnet(TELNET_PROTO_CONF* telnet_config, TELNET_SESSION* Telnets
 
         if ( ret == FTPP_SUCCESS || ret == FTPP_NORMALIZED )
         {
-            ProfileExclude exclude(telnetPerfStats);
+            NoProfile exclude(telnetPerfStats);
             do_detection(p);
         }
     }
 
     else
     {
-        ProfileExclude exclude(telnetPerfStats);
+        NoProfile exclude(telnetPerfStats);
         do_detection(p);
     }
 
@@ -313,7 +315,7 @@ const InspectApi tn_api =
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU,
+    PROTO_BIT__PDU,
     nullptr, // buffers
     "telnet",
     tn_init,

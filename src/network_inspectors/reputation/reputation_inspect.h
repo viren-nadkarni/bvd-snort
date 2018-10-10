@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,26 +21,16 @@
 
 #include "flow/flow.h"
 
-// Per-session data block containing current state
-// of the Reputation preprocessor for the session.
-
-struct ReputationData
-{
-    bool disabled = false;
-};
-
-class ReputationFlowData : public FlowData
+class ReputationFlowData : public snort::FlowData
 {
 public:
-    ReputationFlowData() : FlowData(inspector_id){}
-
+    ReputationFlowData() : snort::FlowData(inspector_id){}
 
     static void init()
-    { inspector_id = FlowData::create_flow_data_id(); }
+    { inspector_id = snort::FlowData::create_flow_data_id(); }
 
-public:
     static unsigned inspector_id;
-    ReputationData session;
+    unsigned checked_reputation_id = 0;
 };
 
 #endif

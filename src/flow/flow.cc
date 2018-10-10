@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,12 +26,15 @@
 #include "detection/detection_engine.h"
 #include "flow/ha.h"
 #include "flow/session.h"
+#include "framework/data_bus.h"
 #include "ips_options/ips_flowbits.h"
 #include "protocols/packet.h"
 #include "sfip/sf_ip.h"
 #include "utils/bitop.h"
 #include "utils/stats.h"
 #include "utils/util.h"
+
+using namespace snort;
 
 unsigned FlowData::flow_data_id = 0;
 
@@ -61,7 +64,6 @@ void Flow::init(PktType type)
 {
     pkt_type = type;
     bitop = nullptr;
-    flow_flags = 0;
 
     if ( HighAvailabilityManager::active() )
     {
@@ -70,6 +72,7 @@ void Flow::init(PktType type)
     }
     mpls_client.length = 0;
     mpls_server.length = 0;
+    offloads_pending = 0;
 }
 
 void Flow::term()
@@ -167,6 +170,8 @@ void Flow::reset(bool do_cleanup)
     constexpr size_t offset = offsetof(Flow, flow_data);
     // FIXIT-L need a struct to zero here to make future proof
     memset((uint8_t*)this+offset, 0, sizeof(Flow)-offset);
+
+    de.get_context()->clear_callbacks();
 }
 
 void Flow::restart(bool dump_flow_data)
@@ -240,6 +245,7 @@ FlowData* Flow::get_flow_data(unsigned id) const
     return nullptr;
 }
 
+// FIXIT-L: implement doubly linked list with STL to cut down on code we maintain
 void Flow::free_flow_data(FlowData* fd)
 {
     if ( fd == flow_data )
@@ -325,7 +331,7 @@ void Flow::set_direction(Packet* p)
     {
         if (ip_api->get_src()->fast_eq4(client_ip))
         {
-            if ( !(p->proto_bits & (PROTO_BIT__TCP | PROTO_BIT__UDP)) )
+            if ( p->type() != PktType::TCP and p->type() != PktType::UDP )
                 p->packet_flags |= PKT_FROM_CLIENT;
 
             else if (p->ptrs.sp == client_port)
@@ -336,7 +342,7 @@ void Flow::set_direction(Packet* p)
         }
         else if (ip_api->get_dst()->fast_eq4(client_ip))
         {
-            if ( !(p->proto_bits & (PROTO_BIT__TCP | PROTO_BIT__UDP)) )
+            if ( p->type() != PktType::TCP and p->type() != PktType::UDP )
                 p->packet_flags |= PKT_FROM_SERVER;
 
             else if (p->ptrs.dp == client_port)
@@ -350,7 +356,7 @@ void Flow::set_direction(Packet* p)
     {
         if (ip_api->get_src()->fast_eq6(client_ip))
         {
-            if ( !(p->proto_bits & (PROTO_BIT__TCP | PROTO_BIT__UDP)) )
+            if ( p->type() != PktType::TCP and p->type() != PktType::UDP )
                 p->packet_flags |= PKT_FROM_CLIENT;
 
             else if (p->ptrs.sp == client_port)
@@ -361,7 +367,7 @@ void Flow::set_direction(Packet* p)
         }
         else if (ip_api->get_dst()->fast_eq6(client_ip))
         {
-            if ( !(p->proto_bits & (PROTO_BIT__TCP | PROTO_BIT__UDP)) )
+            if ( p->type() != PktType::TCP and p->type() != PktType::UDP )
                 p->packet_flags |= PKT_FROM_SERVER;
 
             else if (p->ptrs.dp == client_port)
@@ -466,3 +472,10 @@ bool Flow::is_pdu_inorder(uint8_t dir)
             && (session->missing_in_reassembled(dir) == SSN_MISSING_NONE)
             && !(ssn_state.session_flags & SSNFLAG_MIDSTREAM));
 }
+
+void Flow::set_service(Packet* pkt, const char* new_service)
+{   
+    service = new_service;
+    DataBus::publish(FLOW_SERVICE_CHANGE_EVENT, pkt);
+}   
+

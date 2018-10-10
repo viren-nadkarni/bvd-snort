@@ -46,7 +46,9 @@ Optional:
   flatbuffers serialization format
 
 * hyperscan >= 4.4.0 from https://github.com/01org/hyperscan to build new
-  the regex and sd_pattern rule options and hyperscan search engine
+  the regex and sd_pattern rule options and hyperscan search engine.
+  Hyperscan is large so it recommended to follow their instructions for
+  building it as a shared library.
 
 * iconv from https://ftp.gnu.org/pub/gnu/libiconv/ for converting
   UTF16-LE filenames to UTF8 (usually included in glibc)
@@ -80,13 +82,7 @@ Optional:
 
 * Now do one of the following:
 
-a. To build with autotools, simply do the usual from the top level directory:
-
-    ./configure --prefix=$my_path
-    make -j 8
-    make install
-
-b. To build with cmake and make, run configure_cmake.sh.  It will
+a. To build with cmake and make, run configure_cmake.sh.  It will
    automatically create and populate a new subdirectory named 'build'.
 
     ./configure_cmake.sh --prefix=$my_path
@@ -95,11 +91,11 @@ b. To build with cmake and make, run configure_cmake.sh.  It will
     make install
     ln -s $my_path/conf $my_path/etc
 
-c. You can also specify a cmake project generator:
+b. You can also specify a cmake project generator:
 
     ./configure_cmake.sh --generator=Xcode --prefix=$my_path
 
-d. Or use ccmake directly to configure and generate from an arbitrary build
+c. Or use ccmake directly to configure and generate from an arbitrary build
    directory like one of these:
 
     ccmake -G Xcode /path/to/Snort++/tree
@@ -267,34 +263,32 @@ include::errors.txt[]
 
 === Gotchas
 
-* A nil key in a table will not caught.  Neither will a nil value in a
+* A nil key in a table will not be caught.  Neither will a nil value in a
   table.  Neither of the following will cause errors, nor will they 
-  actually set http_server.post_depth:
+  actually set http_inspect.request_depth:
 
-    http_server = { post_depth }
-    http_server = { post_depth = undefined_symbol }
+    http_inspect = { request_depth }
+    http_inspect = { request_depth = undefined_symbol }
 
 * It is not an error to set a value multiple times.  The actual value
   applied may not be the last in the table either.  It is best to avoid
   such cases.
 
-    http_server =
+    http_inspect =
     {
-        post_depth = 1234,
-        post_depth = 4321
+        request_depth = 1234,
+        request_depth = 4321
     }
 
 * Snort can't tell you the exact filename or line number of a semantic
   error but it will tell you the fully qualified name.
 
+
+=== Known Issues
+
 * The dump DAQ will not work with multiple threads unless you use --daq-var
-  file=/dev/null.  This will be fixed in at some point to use the Snort log
+  output=none.  This will be fixed at some point to use the Snort log
   directory, etc.
-
-* configure will use clang++ by default if it is installed.  To compile
-  with g++ instead:
-
-    export CXX=g++
 
 * If you build with hyperscan on OS X and see:
 
@@ -306,4 +300,9 @@ include::errors.txt[]
     install_name_tool -change @rpath/libhs.4.0.dylib \
         /path-to/libhs.4.0.dylib src/snort
 
+* Snort built with tcmalloc support (--enable-tcmalloc) on Ubuntu 17.04/18.04
+  crashes immediately.
 
+  Workaround:
+  Uninstall gperftools 2.5 provided by the distribution and install gperftools
+  2.7 before building Snort.

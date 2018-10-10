@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -75,14 +75,14 @@ struct FragTracker
 class IpSession : public Session
 {
 public:
-    IpSession(Flow*);
+    IpSession(snort::Flow*);
 
-    bool setup(Packet*) override;
-    int process(Packet*) override;
+    bool setup(snort::Packet*) override;
+    int process(snort::Packet*) override;
     void clear() override;
 
-    bool add_alert(Packet*, uint32_t gid, uint32_t sid) override;
-    bool check_alerted(Packet*, uint32_t gid, uint32_t sid) override;
+    bool add_alert(snort::Packet*, uint32_t gid, uint32_t sid) override;
+    bool check_alerted(snort::Packet*, uint32_t gid, uint32_t sid) override;
 
 public:
     FragTracker tracker;

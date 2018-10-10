@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,7 +28,10 @@
 
 #include "dce_udp.h"
 
+using namespace snort;
 using namespace std;
+
+Trace TRACE_NAME(dce_udp);
 
 static const Parameter s_params[] =
 {
@@ -76,7 +79,7 @@ static const PegInfo dce2_udp_pegs[] =
     { CountType::END, nullptr, nullptr }
 };
 
-Dce2UdpModule::Dce2UdpModule() : Module(DCE2_UDP_NAME, DCE2_UDP_HELP, s_params)
+Dce2UdpModule::Dce2UdpModule() : Module(DCE2_UDP_NAME, DCE2_UDP_HELP, s_params, false, &TRACE_NAME(dce_udp))
 {
 }
 
@@ -143,12 +146,12 @@ ProfileStats* Dce2UdpModule::get_profile(
     return nullptr;
 }
 
-bool Dce2UdpModule::set(const char*, Value& v, SnortConfig*)
+bool Dce2UdpModule::set(const char* fqn, Value& v, SnortConfig* c)
 {
     if (dce2_set_common_config(v,config.common))
         return true;
     else
-        return false;
+        return Module::set(fqn, v, c);
 }
 
 void Dce2UdpModule::get_data(dce2UdpProtoConf& dce2_udp_config)

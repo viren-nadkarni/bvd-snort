@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,11 +25,11 @@
 class IcmpSession : public Session
 {
 public:
-    IcmpSession(Flow*);
+    IcmpSession(snort::Flow*);
 
-    bool setup(Packet*) override;
-    void update_direction(char dir, const SfIp*, uint16_t port) override;
-    int process(Packet*) override;
+    bool setup(snort::Packet*) override;
+    void update_direction(char dir, const snort::SfIp*, uint16_t port) override;
+    int process(snort::Packet*) override;
     void clear() override;
 
 public:

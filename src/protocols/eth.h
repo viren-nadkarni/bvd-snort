@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,8 @@
 #define ETHERNET_HEADER_LEN 14
 #define ETHERNET_MTU        1500
 
+namespace snort
+{
 namespace eth
 {
 constexpr uint16_t MTU_LEN = 1500;
@@ -47,6 +49,7 @@ struct EtherHdr
     { return ether_type; }
 };
 } // namespace eth
+} // namespace snort
 
 #endif
 

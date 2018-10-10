@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,17 +26,8 @@
 #include "stream/tcp/tcp_defs.h"
 #include "time/packet_time.h"
 
-#define STREAM_CONFIG_STATEFUL_INSPECTION      0x00000001
-#define STREAM_CONFIG_LOG_STREAMS              0x00000004
-#define STREAM_CONFIG_REASS_CLIENT             0x00000008
-#define STREAM_CONFIG_REASS_SERVER             0x00000010
-#define STREAM_CONFIG_ASYNC                    0x00000020
-#define STREAM_CONFIG_SHOW_PACKETS             0x00000040
-#define STREAM_CONFIG_MIDSTREAM_DROP_NOALERT   0x00000080
-#define STREAM_CONFIG_IGNORE_ANY               0x00000100
-#define STREAM_CONFIG_STATIC_FLUSHPOINTS       0x00000200
-#define STREAM_CONFIG_IPS                      0x00000400
-#define STREAM_CONFIG_NO_ASYNC_REASSEMBLY      0x00000800
+#define STREAM_CONFIG_SHOW_PACKETS             0x00000001
+#define STREAM_CONFIG_NO_ASYNC_REASSEMBLY      0x00000002
 
 #define STREAM_DEFAULT_SSN_TIMEOUT  30
 
@@ -50,7 +41,7 @@ public:
         return hs_timeout >= 0;
     }
 
-    bool midstream_allowed(Packet* p)
+    bool midstream_allowed(snort::Packet* p)
     {
         if ( ( hs_timeout < 0 ) || ( p->pkth->ts.tv_sec - packet_first_time() < hs_timeout ) )
             return true;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,10 +28,12 @@
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
+void AppIdHttpSession::set_http_change_bits(AppidChangeBits&, HttpFieldIds) {}
+
 class MockServiceDetector : public ServiceDetector
 {
 public:
-    int validate(AppIdDiscoveryArgs&) { return 0; }
+    int validate(AppIdDiscoveryArgs&) override { return 0; }
 };
 
 AppIdSession* parent = nullptr;
@@ -51,14 +53,14 @@ static inline void cleanup()
 
 TEST_GROUP(appid_expected_flags)
 {
-    void setup()
+    void setup() override
     {
         MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
         parent = new AppIdSession(IpProtocol::TCP, nullptr, 1492, appid_inspector);
         expected = new AppIdSession(IpProtocol::TCP, nullptr, 1492, appid_inspector);
     }
 
-    void teardown()
+    void teardown() override
     {
         delete parent;
         delete expected;
@@ -70,7 +72,7 @@ TEST(appid_expected_flags, test1)
 {
     // Test 1 - expected flow same direction as parent, initiator monitored
     parent->set_session_flags(APPID_SESSION_INITIATOR_CHECKED | APPID_SESSION_INITIATOR_MONITORED);
-    test_detector.initialize_expected_session(parent, expected, 0, APP_ID_FROM_INITIATOR);
+    test_detector.initialize_expected_session(*parent, *expected, 0, APP_ID_FROM_INITIATOR);
 
     CHECK(expected->get_session_flags(allFlags) ==
         (APPID_SESSION_INITIATOR_CHECKED | APPID_SESSION_INITIATOR_MONITORED));
@@ -82,7 +84,7 @@ TEST(appid_expected_flags, test2)
 {
     // Test 2 - expected flow same direction as parent, responder monitored
     parent->set_session_flags(APPID_SESSION_RESPONDER_CHECKED | APPID_SESSION_RESPONDER_MONITORED);
-    test_detector.initialize_expected_session(parent, expected, 0, APP_ID_FROM_INITIATOR);
+    test_detector.initialize_expected_session(*parent, *expected, 0, APP_ID_FROM_INITIATOR);
 
     CHECK(expected->get_session_flags(allFlags) ==
         (APPID_SESSION_RESPONDER_CHECKED | APPID_SESSION_RESPONDER_MONITORED));
@@ -94,7 +96,7 @@ TEST(appid_expected_flags, test3)
 {
     // Test 3 - expected flow same direction as parent, all flags set
     parent->set_session_flags(allFlags);
-    test_detector.initialize_expected_session(parent, expected, 0, APP_ID_FROM_INITIATOR);
+    test_detector.initialize_expected_session(*parent, *expected, 0, APP_ID_FROM_INITIATOR);
 
     CHECK(expected->get_session_flags(allFlags) == allFlags);
 
@@ -105,7 +107,7 @@ TEST(appid_expected_flags, test4)
 {
     // Test 4 - expected flow opposite direction as parent, initiator monitored
     parent->set_session_flags(APPID_SESSION_INITIATOR_CHECKED | APPID_SESSION_INITIATOR_MONITORED);
-    test_detector.initialize_expected_session(parent, expected, 0, APP_ID_FROM_RESPONDER);
+    test_detector.initialize_expected_session(*parent, *expected, 0, APP_ID_FROM_RESPONDER);
 
     CHECK(expected->get_session_flags(allFlags) ==
         (APPID_SESSION_RESPONDER_CHECKED | APPID_SESSION_RESPONDER_MONITORED));
@@ -117,7 +119,7 @@ TEST(appid_expected_flags, test5)
 {
     // Test 5 - expected flow opposite direction as parent, responder monitored
     parent->set_session_flags(APPID_SESSION_RESPONDER_CHECKED | APPID_SESSION_RESPONDER_MONITORED);
-    test_detector.initialize_expected_session(parent, expected, 0, APP_ID_FROM_RESPONDER);
+    test_detector.initialize_expected_session(*parent, *expected, 0, APP_ID_FROM_RESPONDER);
 
     CHECK(expected->get_session_flags(allFlags) ==
         (APPID_SESSION_INITIATOR_CHECKED | APPID_SESSION_INITIATOR_MONITORED));
@@ -129,7 +131,7 @@ TEST(appid_expected_flags, test6)
 {
     // Test 6 - expected flow opposite direction as parent, all flags set
     parent->set_session_flags(allFlags);
-    test_detector.initialize_expected_session(parent, expected, 0, APP_ID_FROM_RESPONDER);
+    test_detector.initialize_expected_session(*parent, *expected, 0, APP_ID_FROM_RESPONDER);
 
     CHECK(expected->get_session_flags(allFlags) == allFlags);
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,7 +32,10 @@
 #include "stream/stream_splitter.h"
 
 #include "sip_module.h"
+#include "sip_splitter.h"
 #include "sip_utils.h"
+
+using namespace snort;
 
 THREAD_LOCAL ProfileStats sipPerfStats;
 
@@ -192,17 +195,6 @@ static inline int SIP_Process(Packet* p, SIPData* sessp, SIP_PROTO_CONF* config)
     pRopts->body_data = sipMsg.body_data;
     pRopts->status_code = sipMsg.status_code;
 
-    DebugFormat(DEBUG_SIP, "SIP message header length: %d\n",
-        sipMsg.headerLen);
-    DebugFormat(DEBUG_SIP, "Parsed method: %.*s, Flag: 0x%x\n",
-        sipMsg.methodLen, sipMsg.method, sipMsg.methodFlag);
-    DebugFormat(DEBUG_SIP, "Parsed status code:  %d\n",
-        sipMsg.status_code);
-    DebugFormat(DEBUG_SIP, "Parsed header address: %p.\n",
-        sipMsg.header);
-    DebugFormat(DEBUG_SIP, "Parsed body address: %p.\n",
-        sipMsg.body_data);
-
     sip_freeMsg(&sipMsg);
     return status;
 }
@@ -257,10 +249,8 @@ public:
     void eval(Packet*) override;
     bool get_buf(InspectionBuffer::Type, Packet*, InspectionBuffer&) override;
 
-    // FIXIT-M implement a sip aware splitter
-    // this will work for single segment PDUs only
     class StreamSplitter* get_splitter(bool to_server) override
-    { return new LogSplitter(to_server); }
+    { return new SipSplitter(to_server); }
 
 private:
     SIP_PROTO_CONF* config;
@@ -377,7 +367,7 @@ const InspectApi sip_api =
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU | (uint16_t)PktType::UDP,
+    PROTO_BIT__UDP | PROTO_BIT__PDU,
     nullptr, // buffers
     "sip",
     sip_init,

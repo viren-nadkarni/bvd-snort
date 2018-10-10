@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2009-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,13 +25,12 @@
 #include <cstring>
 
 #include "catch/snort_catch.h"
-#include "main/snort_types.h"
 
 #include "sf_cidr.h"
 
-//---------------------------------------------------------------
+using namespace snort;
 
-SNORT_FORCED_INCLUSION_DEFINITION(sfip_test);
+//---------------------------------------------------------------
 
 static int s_debug = 0;
 

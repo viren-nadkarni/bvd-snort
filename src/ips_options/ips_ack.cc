@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,8 @@
 #include "profiler/profiler_defs.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
+
+using namespace snort;
 
 #define s_name "ack"
 
@@ -98,7 +100,7 @@ IpsOption::EvalStatus TcpAckOption::eval(Cursor&, Packet* p)
 static const Parameter s_params[] =
 {
     { "~range", Parameter::PT_INTERVAL, RANGE, nullptr,
-      "check if tcp ack value is 'value | min<>max | <max | >min'" },
+      "check if TCP ack value is 'value | min<>max | <max | >min'" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };

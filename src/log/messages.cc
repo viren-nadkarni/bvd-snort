@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -40,6 +40,11 @@ static int already_fatal = 0;
 static unsigned parse_errors = 0;
 static unsigned parse_warnings = 0;
 
+void reset_parse_errors()
+{
+    parse_errors = 0;
+}
+
 unsigned get_parse_errors()
 {
     unsigned tmp = parse_errors;
@@ -61,11 +66,13 @@ static void log_message(FILE* file, const char* type, const char* msg)
     get_parse_location(file_name, file_line);
 
     if ( file_line )
-        LogMessage(file, "%s: %s:%d %s\n", type, file_name, file_line, msg);
+        snort::LogMessage(file, "%s: %s:%d %s\n", type, file_name, file_line, msg);
     else
-        LogMessage(file, "%s: %s\n", type, msg);
+        snort::LogMessage(file, "%s: %s\n", type, msg);
 }
 
+namespace snort
+{
 void ParseMessage(const char* format, ...)
 {
     char buf[STD_BUF+1];
@@ -81,7 +88,7 @@ void ParseMessage(const char* format, ...)
 
 void ParseWarning(WarningGroup wg, const char* format, ...)
 {
-    if ( !(SnortConfig::get_conf()->warning_flags & (1 << wg)) )
+    if ( !(snort::SnortConfig::get_conf()->warning_flags & (1 << wg)) )
         return;
 
     char buf[STD_BUF+1];
@@ -135,12 +142,12 @@ void ParseError(const char* format, ...)
 
 static void WriteLogMessage(FILE* fh, bool prefer_fh, const char* format, va_list& ap)
 {
-    if ( SnortConfig::get_conf() && !prefer_fh )
+    if ( snort::SnortConfig::get_conf() && !prefer_fh )
     {
-        if ( SnortConfig::log_quiet() )
+        if ( snort::SnortConfig::log_quiet() )
             return;
 
-        if ( SnortConfig::log_syslog() )
+        if ( snort::SnortConfig::log_syslog() )
         {
             char buf[STD_BUF+1];
             vsnprintf(buf, STD_BUF, format, ap);
@@ -196,12 +203,12 @@ void WarningMessage(const char* format,...)
 {
     va_list ap;
 
-    if ( SnortConfig::get_conf() and SnortConfig::log_quiet() )
+    if ( snort::SnortConfig::get_conf() and snort::SnortConfig::log_quiet() )
         return;
 
     va_start(ap, format);
 
-    if ( SnortConfig::get_conf() and SnortConfig::log_syslog() )
+    if ( snort::SnortConfig::get_conf() and snort::SnortConfig::log_syslog() )
     {
         char buf[STD_BUF+1];
         vsnprintf(buf, STD_BUF, format, ap);
@@ -232,7 +239,7 @@ void ErrorMessage(const char* format,...)
 
     va_start(ap, format);
 
-    if ( SnortConfig::get_conf() and SnortConfig::log_syslog() )
+    if ( snort::SnortConfig::get_conf() and snort::SnortConfig::log_syslog() )
     {
         char buf[STD_BUF+1];
         vsnprintf(buf, STD_BUF, format, ap);
@@ -276,7 +283,7 @@ void ErrorMessage(const char* format,...)
 
     buf[STD_BUF] = '\0';
 
-    if ( SnortConfig::get_conf() and SnortConfig::log_syslog() )
+    if ( snort::SnortConfig::get_conf() and snort::SnortConfig::log_syslog() )
     {
         syslog(LOG_CONS | LOG_DAEMON | LOG_ERR, "FATAL ERROR: %s", buf);
     }
@@ -311,4 +318,5 @@ NORETURN_ASSERT void log_safec_error(const char* msg, void*, int e)
 
     assert(false);
 }
+} //namespace snort
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,31 +29,31 @@
 #include "utils/util.h"
 #endif
 
+using namespace snort;
 using namespace std;
 
-BaseTracker::BaseTracker(PerfConfig* perf)
-    : PerfTracker(perf, perf->output == PERF_FILE, PERF_NAME "_base")
+BaseTracker::BaseTracker(PerfConfig* perf) : PerfTracker(perf, PERF_NAME "_base")
 {
-    for (unsigned i = 0; i < config->modules.size(); i++)
+    for ( ModuleConfig& mod : config->modules )
     {
-        Module *m = config->modules.at(i);
-        IndexVec peg_map = config->mod_peg_idxs.at(i);
+        formatter->register_section(mod.ptr->get_name());
 
-        formatter->register_section(m->get_name());
-
-        for (auto const& peg : peg_map)
-            formatter->register_field(m->get_pegs()[peg].name, &(m->get_counts()[peg]));
+        for ( auto const& idx : mod.pegs )
+            formatter->register_field(mod.ptr->get_pegs()[idx].name, &(mod.ptr->get_counts()[idx]));
     }
     formatter->finalize_fields();
 }
 
 void BaseTracker::process(bool summary)
 {
+    for ( Module* mod : config->mods_to_prep )
+        mod->prep_counts();
+
     write();
 
-    for ( auto const& m : config->modules )
-        if (!summary)
-            m->sum_stats(false);
+    for ( const ModuleConfig& mod : config->modules )
+        if ( !summary )
+            mod.ptr->sum_stats(false);
 }
 
 #ifdef UNIT_TEST
@@ -113,14 +113,13 @@ TEST_CASE("module stats", "[BaseTracker]")
         {0, 0, 0}};
 
     PerfConfig config;
-    config.format = PERF_MOCK;
+    config.format = PerfFormat::MOCK;
 
     MockModule mod;
-    config.modules.push_back(&mod);
-    config.mod_peg_idxs.push_back(IndexVec());
-    config.mod_peg_idxs[0].push_back(0);
-    config.mod_peg_idxs[0].push_back(2);
-    config.mod_peg_idxs[0].push_back(4);
+    ModuleConfig mod_cfg;
+    mod_cfg.ptr = &mod;
+    mod_cfg.pegs = {0, 2, 4};
+    config.modules.push_back(mod_cfg);
 
     MockBaseTracker tracker(&config);
     MockFormatter *formatter = (MockFormatter*)tracker.output;

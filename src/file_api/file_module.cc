@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,6 +32,8 @@
 #include "main/snort_config.h"
 
 #include "file_stats.h"
+
+using namespace snort;
 
 static const Parameter file_magic_params[] =
 {
@@ -409,4 +411,9 @@ void FileIdModule::load_config(FileConfig*& dst)
         fc->get_file_policy().load();
         fc = nullptr;
     }
+}
+
+void FileIdModule::show_dynamic_stats()
+{
+    file_stats_print();
 }

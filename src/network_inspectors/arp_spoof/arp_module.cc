@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,6 +23,8 @@
 #endif
 
 #include "arp_module.h"
+
+using namespace snort;
 
 #define ARPSPOOF_UNICAST_ARP_REQUEST_STR \
     "unicast ARP request"
@@ -133,7 +135,7 @@ bool ArpSpoofModule::end(const char*, int idx, SnortConfig*)
 }
 
 const PegInfo* ArpSpoofModule::get_pegs() const
-{ return simple_pegs; }
+{ return snort::simple_pegs; }
 
 PegCount* ArpSpoofModule::get_counts() const
 { return (PegCount*)&asstats; }

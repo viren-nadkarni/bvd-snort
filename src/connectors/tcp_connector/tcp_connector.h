@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -45,34 +45,34 @@ public:
     uint16_t connector_msg_length;
 };
 
-class TcpConnectorMsgHandle : public ConnectorMsgHandle
+class TcpConnectorMsgHandle : public snort::ConnectorMsgHandle
 {
 public:
     TcpConnectorMsgHandle(const uint32_t length);
     ~TcpConnectorMsgHandle();
-    ConnectorMsg connector_msg;
+    snort::ConnectorMsg connector_msg;
 };
 
-class TcpConnectorCommon : public ConnectorCommon
+class TcpConnectorCommon : public snort::ConnectorCommon
 {
 public:
     TcpConnectorCommon(TcpConnectorConfig::TcpConnectorConfigSet*);
     ~TcpConnectorCommon();
 };
 
-class TcpConnector : public Connector
+class TcpConnector : public snort::Connector
 {
 public:
     typedef Ring<TcpConnectorMsgHandle*> ReceiveRing;
 
     TcpConnector(TcpConnectorConfig*, int sock_fd);
     ~TcpConnector() override;
-    ConnectorMsgHandle* alloc_message(const uint32_t, const uint8_t**) override;
-    void discard_message(ConnectorMsgHandle*) override;
-    bool transmit_message(ConnectorMsgHandle*) override;
-    ConnectorMsgHandle* receive_message(bool) override;
+    snort::ConnectorMsgHandle* alloc_message(const uint32_t, const uint8_t**) override;
+    void discard_message(snort::ConnectorMsgHandle*) override;
+    bool transmit_message(snort::ConnectorMsgHandle*) override;
+    snort::ConnectorMsgHandle* receive_message(bool) override;
 
-    ConnectorMsg* get_connector_msg(ConnectorMsgHandle* handle) override
+    snort::ConnectorMsg* get_connector_msg(snort::ConnectorMsgHandle* handle) override
     { return( &((TcpConnectorMsgHandle*)handle)->connector_msg ); }
     Direction get_connector_direction() override
     { return Connector::CONN_DUPLEX; }

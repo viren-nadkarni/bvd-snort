@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,6 +22,8 @@
 
 #include <arpa/inet.h>
 
+namespace snort
+{
 namespace udp
 {
 constexpr uint8_t UDP_HEADER_LEN = 8;
@@ -59,7 +61,8 @@ struct UDPHdr
     inline uint16_t raw_cksum() const
     { return uh_chk; }
 };
-} // namespace
+} // namespace udp
+} // namespace snort
 
 #endif
 

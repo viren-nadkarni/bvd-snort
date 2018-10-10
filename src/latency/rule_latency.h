@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,12 +22,15 @@
 #define RULE_LATENCY_H
 
 struct detection_option_tree_root_t;
+namespace snort
+{
 struct Packet;
+}
 
 class RuleLatency
 {
 public:
-    static void push(detection_option_tree_root_t*, Packet*);
+    static void push(detection_option_tree_root_t*, snort::Packet*);
     static void pop();
     static bool suspended();
 
@@ -36,7 +39,7 @@ public:
     class Context
     {
     public:
-        Context(detection_option_tree_root_t* root, Packet* p)
+        Context(detection_option_tree_root_t* root, snort::Packet* p)
         { RuleLatency::push(root, p); }
 
         ~Context()

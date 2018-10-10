@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -41,14 +41,19 @@
 #include <ctime>
 
 #include "perf_formatter.h"
-#include "perf_monitor.h"
+#include "perf_module.h"
+
+namespace snort
+{
+struct Packet;
+}
 
 class PerfTracker
 {
 public:
     virtual void reset() {}
 
-    virtual void update(Packet*) {}
+    virtual void update(snort::Packet*) {}
     virtual void process(bool /*summary*/) {} // FIXIT-M get rid of this step.
 
     virtual void update_time(time_t time) final { cur_time = time; }
@@ -67,7 +72,7 @@ protected:
     PerfConfig* config;
     PerfFormatter* formatter;
 
-    PerfTracker(PerfConfig*, bool file, const char* tracker_name);
+    PerfTracker(PerfConfig*, const char* tracker_name);
     virtual void write() final;
 
 private:

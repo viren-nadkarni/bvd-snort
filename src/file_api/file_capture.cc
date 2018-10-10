@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -40,6 +40,8 @@
 
 #include "file_mempool.h"
 #include "file_stats.h"
+
+using namespace snort;
 
 FileMemPool* FileCapture::file_mempool = nullptr;
 int64_t FileCapture::capture_block_size = 0;
@@ -192,7 +194,6 @@ inline FileCaptureBlock* FileCapture::create_file_buffer()
 
     if (fileBlock == nullptr)
     {
-        FILE_DEBUG_MSGS("Failed to get file capture memory!\n");
         file_counts.file_memcap_failures_total++;
         return nullptr;
     }
@@ -222,7 +223,6 @@ inline FileCaptureState FileCapture::save_to_file_buffer(const uint8_t* file_dat
 
     if ( data_size + (int64_t)capture_size > max_size)
     {
-        FILE_DEBUG_MSGS("Exceeding max file capture size!\n");
         file_counts.file_size_max++;
         capture_state = FILE_CAPTURE_MAX;
         return FILE_CAPTURE_MAX;

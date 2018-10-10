@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -49,8 +49,8 @@ struct PortTable
     int pt_poid;
 
     /* Compiled / merged port object hash table */
-    GHash* pt_mpo_hash;
-    GHash* pt_mpxo_hash;
+    snort::GHash* pt_mpo_hash;
+    snort::GHash* pt_mpxo_hash;
 
     /*
     * Final Port/Rule Groupings, one port object per port, or null

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,7 +22,6 @@
 #ifndef APP_INFO_TABLE_H
 #define APP_INFO_TABLE_H
 
-#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -31,7 +30,7 @@
 #include "flow/flow.h"
 #include "framework/counts.h"
 #include "main/thread.h"
-#include "protocols/packet.h"
+#include "target_based/snort_protocols.h"
 #include "utils/util.h"
 
 #define APP_PRIORITY_DEFAULT 2
@@ -75,7 +74,7 @@ public:
     uint32_t serviceId;
     uint32_t clientId;
     uint32_t payloadId;
-    int16_t snortId = SFTARGET_UNKNOWN_PROTOCOL;
+    SnortProtocolId snort_protocol_id = UNKNOWN_PROTOCOL_ID;
     uint32_t flags = 0;
     uint32_t priority = APP_PRIORITY_DEFAULT;
     ClientDetector* client_detector = nullptr;
@@ -90,7 +89,7 @@ typedef std::unordered_map<std::string, AppInfoTableEntry*> AppInfoNameTable;
 class AppInfoManager
 {
 public:
-    static AppInfoManager& get_instance()
+    static inline AppInfoManager& get_instance()
     {
         static AppInfoManager instance;
         return instance;
@@ -103,6 +102,8 @@ public:
     AppId get_appid_by_payload_id(uint32_t);
     void set_app_info_active(AppId);
     const char* get_app_name(AppId);
+    const char* get_app_name_key(AppId);
+    static char * strdup_to_lower(const char *app_name);
     int32_t get_appid_by_name(const char* app_name);
     bool configured();
 
@@ -139,16 +140,15 @@ public:
         return entry ? entry->priority : 0;
     }
 
-    void init_appid_info_table(AppIdModuleConfig*);
+    void init_appid_info_table(AppIdModuleConfig*, snort::SnortConfig*);
     void cleanup_appid_info_table();
     void dump_app_info_table();
-    int16_t add_appid_protocol_reference(const char* protocol);
+    SnortProtocolId add_appid_protocol_reference(const char* protocol, snort::SnortConfig*);
 
 private:
-    AppInfoManager() = default;
+    inline AppInfoManager() = default;
     void load_appid_config(AppIdModuleConfig*, const char* path);
     AppInfoTableEntry* get_app_info_entry(AppId appId, const AppInfoTable&);
-    std::mutex app_info_tables_rw_mutex;
 };
 
 #endif

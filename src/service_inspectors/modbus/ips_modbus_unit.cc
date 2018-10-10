@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,8 @@
 #include "profiler/profiler.h"
 
 #include "modbus.h"
+
+using namespace snort;
 
 static const char* s_name = "modbus_unit";
 
@@ -99,13 +101,13 @@ IpsOption::EvalStatus ModbusUnitOption::eval(Cursor&, Packet* p)
 static const Parameter s_params[] =
 {
     { "~", Parameter::PT_INT, "0:255", nullptr,
-      "modbus unit ID" },
+      "Modbus unit ID" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
 #define s_help \
-    "rule option to check modbus unit ID"
+    "rule option to check Modbus unit ID"
 
 class ModbusUnitModule : public Module
 {

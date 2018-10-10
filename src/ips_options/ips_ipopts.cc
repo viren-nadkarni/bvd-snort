@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -29,6 +29,8 @@
 #include "protocols/ipv4_options.h"
 #include "protocols/packet.h"
 
+using namespace snort;
+
 #define s_name "ipopts"
 
 static THREAD_LOCAL ProfileStats ipOptionPerfStats;
@@ -36,7 +38,7 @@ static THREAD_LOCAL ProfileStats ipOptionPerfStats;
 struct IpOptionData
 {
     ip::IPOptionCodes ip_option;
-    u_char any_flag;
+    uint8_t any_flag;
 };
 
 class IpOptOption : public IpsOption
@@ -109,7 +111,6 @@ IpsOption::EvalStatus IpOptOption::eval(Cursor&, Packet* p)
 
     if ((config.any_flag == 1) && (option_len > 0))
     {
-        DebugMessage(DEBUG_IPS_OPTION, "Matched any ip options!\n");
         return MATCH;
     }
 
@@ -117,10 +118,6 @@ IpsOption::EvalStatus IpOptOption::eval(Cursor&, Packet* p)
 
     for ( const ip::IpOptions& opt : iter)
     {
-        DebugFormat(DEBUG_IPS_OPTION, "testing pkt(%d):rule(%d)\n",
-            static_cast<int>(config.ip_option),
-            static_cast<int>(opt.code));
-
         if (config.ip_option == opt.code)
             return MATCH;
 

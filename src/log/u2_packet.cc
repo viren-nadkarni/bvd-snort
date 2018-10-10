@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,7 +32,7 @@
 #include "protocols/protocol_ids.h"
 #include "utils/util.h"
 
-SNORT_FORCED_INCLUSION_DEFINITION(u2_pseudo_header);
+using namespace snort;
 
 static const uint8_t u2_ttl = 64;
 

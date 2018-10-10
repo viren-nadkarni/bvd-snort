@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -97,6 +97,8 @@
 #include "utils/util.h"
 #include "hashfcn.h"
 
+using namespace snort;
+
 /*
  * Implements XHash as specialized hash container
  */
@@ -124,6 +126,8 @@ static int xhash_nearest_powerof2(int nrows)
     return nrows;
 }
 
+namespace snort
+{
 /*
  * Create a new hash table
  *
@@ -1023,6 +1027,7 @@ void xhash_set_keyops(XHash* h, hash_func hash_fcn, keycmp_func keycmp_fcn)
     assert(h and hash_fcn and keycmp_fcn);
     hashfcn_set_keyops(h->hashfcn, hash_fcn, keycmp_fcn);
 }
+} // namespace snort
 
 /*
  * -----------------------------------------------------------------------------------------
@@ -1053,7 +1058,7 @@ int anrfree(void* key, void* data)
 
     /* Decide if we can free this node. */
 
-    //bx++; if(bx == 4 )bx=0;       /* for testing */
+    bx++; if(bx == 4 )bx=0;       /* for testing */
 
     /* if we are allowing the node to die, kill it */
     if ( !bx )

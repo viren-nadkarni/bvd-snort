@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -72,8 +72,6 @@ bool File::convert(std::istringstream& data_stream)
     while(util::get_string(data_stream, key_value_pair, ";"))
     {
         std::istringstream arg_stream(key_value_pair);
-        std::vector<std::string> word_list;
-
         util::trim(key_value_pair);
 
         size_t pos = key_value_pair.find_first_of(':');

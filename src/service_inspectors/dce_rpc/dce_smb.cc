@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,7 @@
 #include "utils/util.h"
 #include "packet_io/active.h"
 
+#include "dce_context_data.h"
 #include "dce_smb_commands.h"
 #include "dce_smb_module.h"
 #include "dce_smb_paf.h"
@@ -40,27 +41,27 @@
 THREAD_LOCAL dce2SmbStats dce2_smb_stats;
 
 // used here
-THREAD_LOCAL ProfileStats dce2_smb_pstat_main;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_session;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_new_session;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_req;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_main;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_session;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_new_session;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_req;
 
 // used elsewhere
-THREAD_LOCAL ProfileStats dce2_smb_pstat_detect;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_log;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_co_seg;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_co_frag;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_co_reass;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_co_ctx;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_seg;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_uid;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_tid;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_fid;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_file;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_file_detect;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_file_api;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_fingerprint;
-THREAD_LOCAL ProfileStats dce2_smb_pstat_smb_negotiate;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_detect;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_log;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_co_seg;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_co_frag;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_co_reass;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_co_ctx;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_seg;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_uid;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_tid;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_fid;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_file;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_file_detect;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_file_api;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_fingerprint;
+THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_smb_negotiate;
 
 //-------------------------------------------------------------------------
 // debug stuff
@@ -335,15 +336,16 @@ const char* get_smb_com_string(uint8_t b)
 // class stuff
 //-------------------------------------------------------------------------
 
-class Dce2Smb : public Inspector
+class Dce2Smb : public snort::Inspector
 {
 public:
     Dce2Smb(dce2SmbProtoConf&);
     ~Dce2Smb() override;
 
-    void show(SnortConfig*) override;
-    void eval(Packet*) override;
-    StreamSplitter* get_splitter(bool c2s) override
+    void show(snort::SnortConfig*) override;
+    void eval(snort::Packet*) override;
+    void clear(snort::Packet*) override;
+    snort::StreamSplitter* get_splitter(bool c2s) override
     {
         return new Dce2SmbSplitter(c2s);
     }
@@ -358,7 +360,7 @@ Dce2Smb::Dce2Smb(dce2SmbProtoConf& pc)
     if ((config.smb_file_inspection == DCE2_SMB_FILE_INSPECTION_ONLY)
         || (config.smb_file_inspection == DCE2_SMB_FILE_INSPECTION_ON))
     {
-        Active::set_enabled();
+        snort::Active::set_enabled();
     }
 }
 
@@ -370,25 +372,21 @@ Dce2Smb::~Dce2Smb()
     }
 }
 
-void Dce2Smb::show(SnortConfig*)
+void Dce2Smb::show(snort::SnortConfig*)
 {
     print_dce2_smb_conf(config);
 }
 
-void Dce2Smb::eval(Packet* p)
+void Dce2Smb::eval(snort::Packet* p)
 {
     DCE2_SmbSsnData* dce2_smb_sess;
-    Profile profile(dce2_smb_pstat_main);
+    snort::Profile profile(dce2_smb_pstat_main);
 
     assert(p->has_tcp_data());
     assert(p->flow);
 
-    if (p->flow->get_session_flags() & SSNFLAG_MIDSTREAM)
-    {
-        DebugMessage(DEBUG_DCE_SMB,
-            "Midstream - not inspecting.\n");
+    if ( p->test_session_flags(SSNFLAG_MIDSTREAM) )
         return;
-    }
 
     dce2_smb_sess = dce2_handle_smb_session(p, &config);
 
@@ -397,17 +395,24 @@ void Dce2Smb::eval(Packet* p)
         p->packet_flags |= PKT_ALLOW_MULTIPLE_DETECT;
         dce2_detected = 0;
 
-        p->endianness = (Endianness*)new DceEndianness();
+        p->endianness = new DceEndianness();
 
         DCE2_SmbProcess(dce2_smb_sess);
 
         if (!dce2_detected)
             DCE2_Detect(&dce2_smb_sess->sd);
 
-        DCE2_ResetRopts(&dce2_smb_sess->sd.ropts);
-
         delete p->endianness;
         p->endianness = nullptr;
+    }
+}
+
+void Dce2Smb::clear(snort::Packet* p)
+{
+    DCE2_SmbSsnData* dce2_smb_sess = get_dce2_smb_session_data(p->flow);
+    if ( dce2_smb_sess )
+    {
+        DCE2_ResetRopts(&dce2_smb_sess->sd, p);
     }
 }
 
@@ -415,12 +420,12 @@ void Dce2Smb::eval(Packet* p)
 // api stuff
 //-------------------------------------------------------------------------
 
-static Module* mod_ctor()
+static snort::Module* mod_ctor()
 {
     return new Dce2SmbModule;
 }
 
-static void mod_dtor(Module* m)
+static void mod_dtor(snort::Module* m)
 {
     delete m;
 }
@@ -430,9 +435,10 @@ static void dce2_smb_init()
     Dce2SmbFlowData::init();
     DCE2_SmbInitGlobals();
     DCE2_SmbInitDeletePdu();
+    DceContextData::init(DCE2_TRANS_TYPE__SMB);
 }
 
-static Inspector* dce2_smb_ctor(Module* m)
+static snort::Inspector* dce2_smb_ctor(snort::Module* m)
 {
     Dce2SmbModule* mod = (Dce2SmbModule*)m;
     dce2SmbProtoConf config;
@@ -440,16 +446,16 @@ static Inspector* dce2_smb_ctor(Module* m)
     return new Dce2Smb(config);
 }
 
-static void dce2_smb_dtor(Inspector* p)
+static void dce2_smb_dtor(snort::Inspector* p)
 {
     delete p;
 }
 
-const InspectApi dce2_smb_api =
+const snort::InspectApi dce2_smb_api =
 {
     {
         PT_INSPECTOR,
-        sizeof(InspectApi),
+        sizeof(snort::InspectApi),
         INSAPI_VERSION,
         0,
         API_RESERVED,
@@ -459,8 +465,8 @@ const InspectApi dce2_smb_api =
         mod_ctor,
         mod_dtor
     },
-    IT_SERVICE,
-    (uint16_t)PktType::PDU,
+    snort::IT_SERVICE,
+    PROTO_BIT__PDU,
     nullptr,  // buffers
     "netbios-ssn",
     dce2_smb_init,

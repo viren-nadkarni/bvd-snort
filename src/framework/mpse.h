@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,6 +31,8 @@
 #include "main/thread.h"
 #include "search_engines/search_common.h"
 
+namespace snort
+{
 // this is the current version of the api
 #define SEAPI_VERSION ((BASE_API_VERSION << 16) | 0)
 
@@ -117,6 +119,6 @@ struct MpseApi
     MpseExeFunc init;
     MpseExeFunc print;
 };
-
+}
 #endif
 

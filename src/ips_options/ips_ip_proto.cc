@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,8 @@
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "utils/util_cstring.h"
+
+using namespace snort;
 
 #define s_name "ip_proto"
 
@@ -110,7 +112,6 @@ IpsOption::EvalStatus IpProtoOption::eval(Cursor&, Packet* p)
 
     if (!p->has_ip())
     {
-        DebugMessage(DEBUG_IPS_OPTION,"Not IP\n");
         return NO_MATCH;
     }
 

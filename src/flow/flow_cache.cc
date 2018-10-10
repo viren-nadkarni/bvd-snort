@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,12 +28,13 @@
 #include "hash/zhash.h"
 #include "helpers/flag_context.h"
 #include "ips_options/ips_flowbits.h"
-#include "main/snort_debug.h"
 #include "packet_io/active.h"
 #include "time/packet_time.h"
 #include "utils/stats.h"
 
 #include "flow_key.h"
+
+using namespace snort;
 
 #define SESSION_CACHE_FLAG_PURGING  0x01
 
@@ -195,7 +196,6 @@ unsigned FlowCache::prune_stale(uint32_t thetime, const Flow* save_me)
         if ( flow->last_data_seen + config.pruning_timeout >= thetime )
             break;
 
-        DebugMessage(DEBUG_STREAM, "pruning stale flow\n");
         flow->ssn_state.session_flags |= SSNFLAG_TIMEDOUT;
         release(flow, PruneReason::IDLE);
         ++pruned;
@@ -242,13 +242,17 @@ unsigned FlowCache::prune_excess(const Flow* save_me)
     unsigned pruned = 0;
     unsigned blocks = 0;
 
+    // initially skip offloads but if that doesn't work the hash table is iterated from the
+    // beginning again. prune offloads at that point.
+    unsigned ignore_offloads = hash_table->get_count();
+
     while ( hash_table->get_count() > max_cap and hash_table->get_count() > blocks )
     {
         auto flow = static_cast<Flow*>(hash_table->first());
         assert(flow); // holds true because hash_table->get_count() > 0
 
         if ( (save_me and flow == save_me) or flow->was_blocked() or
-            flow->is_offloaded() )
+            (flow->is_offloaded() and ignore_offloads) )
         {
             // check for non-null save_me above to silence analyzer
             // "called C++ object pointer is null" here
@@ -260,15 +264,15 @@ unsigned FlowCache::prune_excess(const Flow* save_me)
             if ( !hash_table->touch() )
                 break;
         }
-
         else
         {
             flow->ssn_state.session_flags |= SSNFLAG_PRUNED;
             release(flow, PruneReason::EXCESS);
             ++pruned;
         }
+        if ( ignore_offloads > 0 )
+            --ignore_offloads;
     }
-
     return pruned;
 }
 
@@ -284,15 +288,6 @@ bool FlowCache::prune_one(PruneReason reason, bool do_cleanup)
 
     flow->ssn_state.session_flags |= SSNFLAG_PRUNED;
     release(flow, reason, do_cleanup);
-
-#ifdef DEBUG_MSGS
-    const char* s =
-        (reason == PruneReason::MEMCAP) ? "memcap" :
-        (reason == PruneReason::PREEMPTIVE) ? "preemptive" :
-        "other";
-
-    DebugFormat(DEBUG_MEMORY, "prune one for reason %s\n", s);
-#endif
 
     return true;
 }
@@ -319,7 +314,6 @@ unsigned FlowCache::timeout(unsigned num_flows, time_t thetime)
             continue;
         }
 
-        DebugMessage(DEBUG_STREAM, "retiring stale flow\n");
         flow->ssn_state.session_flags |= SSNFLAG_TIMEDOUT;
         release(flow, PruneReason::IDLE);
 

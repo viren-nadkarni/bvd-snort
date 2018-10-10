@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,7 +24,12 @@
 #include "ftpdata_splitter.h"
 
 #include "file_api/file_flows.h"
+#include "flow/session.h"
+#include "stream/stream.h"
+
 #include "ftpp_si.h"
+
+using namespace snort;
 
 void FtpDataSplitter::restart_scan()
 {
@@ -43,10 +48,28 @@ StreamSplitter::Status FtpDataSplitter::scan(Flow* flow, const uint8_t*, uint32_
 {
     if ( len )
     {
-        if ( len != last_seg_size )
+        if(expected_seg_size == 0)
         {
+            // FIXIT-M: Can we do better than this guess if no MSS is specified?
+            //          Malware detection won't work if expected_seg_size
+            //          doesn't match the payload lengths on packets before
+            //          the last packet.
+            expected_seg_size = 1448;
+
+            if(flow->session and flow->pkt_type == PktType::TCP)
+            {
+                expected_seg_size = Stream::get_mss(flow, to_server());
+                uint8_t tcp_options_len = Stream::get_tcp_options_len(flow, to_server());
+                if(expected_seg_size > tcp_options_len)
+                    expected_seg_size -= tcp_options_len;
+            }
+        }
+
+        if ( len != expected_seg_size )
+        {
+            // Treat this as the last packet of the FTP data transfer.
             set_ftp_flush_flag(flow);
-            last_seg_size = len;
+            expected_seg_size = len;
             restart_scan();
             *fp = len;
             return FLUSH;
@@ -59,7 +82,6 @@ StreamSplitter::Status FtpDataSplitter::scan(Flow* flow, const uint8_t*, uint32_
 
         if ( segs >= 2 && bytes >= min )
         {
-            set_ftp_flush_flag(flow);
             restart_scan();
             *fp = len;
             return FLUSH;

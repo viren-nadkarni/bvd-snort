@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -31,6 +31,8 @@
 #include "utils/util.h"
 
 #include "checksum.h"
+
+using namespace snort;
 
 #define CD_ICMP6_NAME "icmp6"
 #define CD_ICMP6_HELP "support for Internet control message protocol v6"
@@ -130,7 +132,7 @@ bool Icmp6Codec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
         COPY4(ph6.dip, snort.ip_api.get_dst()->get_ip6_ptr());
         ph6.zero = 0;
         ph6.protocol = codec.ip6_csum_proto;
-        ph6.len = htons((u_short)raw.len);
+        ph6.len = htons((unsigned short)raw.len);
 
         uint16_t csum = checksum::icmp_cksum((const uint16_t*)(icmp6h), raw.len, &ph6);
 

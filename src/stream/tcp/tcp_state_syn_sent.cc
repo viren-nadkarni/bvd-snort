@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -64,7 +64,7 @@ bool TcpStateSynSent::syn_ack_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& 
 
 bool TcpStateSynSent::ack_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    Flow* flow = tsd.get_flow();
+    snort::Flow* flow = tsd.get_flow();
 
     // FIXIT-H verify ack being sent is valid...
     trk.update_tracker_ack_sent(tsd);
@@ -73,7 +73,6 @@ bool TcpStateSynSent::ack_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
     trk.session->update_timestamp_tracking(tsd);
     trk.session->update_perf_base_state(TcpStreamTracker::TCP_ESTABLISHED);
     trk.set_tcp_state(TcpStreamTracker::TCP_ESTABLISHED);
-    trk.r_nxt_ack = tsd.get_seg_ack();
     return true;
 }
 
@@ -86,7 +85,7 @@ bool TcpStateSynSent::ack_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 
 bool TcpStateSynSent::data_seg_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    Flow* flow = tsd.get_flow();
+    snort::Flow* flow = tsd.get_flow();
 
     // FIXIT-H verify ack being sent is valid...
     trk.update_tracker_ack_sent(tsd);

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,6 +34,8 @@
 #include "catch/snort_catch.h"
 #include "stream/libtcp/stream_tcp_unit_test.h"
 #endif
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // stream_reassemble
@@ -112,7 +114,7 @@ IpsOption::EvalStatus ReassembleOption::eval(Cursor&, Packet* pkt)
         return NO_MATCH;
 
     {
-        Profile profile(streamReassembleRuleOptionPerfStats);
+        DeepProfile profile(streamReassembleRuleOptionPerfStats);
         Flow* lwssn = (Flow*)pkt->flow;
         TcpSession* tcpssn = (TcpSession*)lwssn->session;
 
@@ -120,13 +122,13 @@ IpsOption::EvalStatus ReassembleOption::eval(Cursor&, Packet* pkt)
         {
             if ( srod.direction & SSN_DIR_FROM_SERVER )
             {
-                tcpssn->server->flush_policy = STREAM_FLPOLICY_IGNORE;
+                tcpssn->server.flush_policy = STREAM_FLPOLICY_IGNORE;
                 Stream::set_splitter(lwssn, true);
             }
 
             if ( srod.direction & SSN_DIR_FROM_CLIENT )
             {
-                tcpssn->client->flush_policy = STREAM_FLPOLICY_IGNORE;
+                tcpssn->client.flush_policy = STREAM_FLPOLICY_IGNORE;
                 Stream::set_splitter(lwssn, false);
             }
         }
@@ -136,13 +138,13 @@ IpsOption::EvalStatus ReassembleOption::eval(Cursor&, Packet* pkt)
             // FIXIT-M PAF need to check for ips / on-data
             if ( srod.direction & SSN_DIR_FROM_SERVER )
             {
-                tcpssn->server->flush_policy = STREAM_FLPOLICY_ON_ACK;
+                tcpssn->server.flush_policy = STREAM_FLPOLICY_ON_ACK;
                 Stream::set_splitter(lwssn, true, new AtomSplitter(true));
             }
 
             if ( srod.direction & SSN_DIR_FROM_CLIENT )
             {
-                tcpssn->client->flush_policy = STREAM_FLPOLICY_ON_ACK;
+                tcpssn->client.flush_policy = STREAM_FLPOLICY_ON_ACK;
                 Stream::set_splitter(lwssn, false, new AtomSplitter(false));
             }
         }

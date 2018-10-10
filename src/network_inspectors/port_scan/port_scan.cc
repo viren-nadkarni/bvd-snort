@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -33,6 +33,8 @@
 
 #include "ps_inspect.h"
 #include "ps_module.h"
+
+using namespace snort;
 
 THREAD_LOCAL SimpleStats spstats;
 THREAD_LOCAL ProfileStats psPerfStats;
@@ -80,10 +82,10 @@ static void make_open_port_info(Packet* p, PS_PROTO* proto)
     char a1[INET6_ADDRSTRLEN];
     ip1->ntop(a1, sizeof(a1));
 
-    buf.len = safe_snprintf((char*)buf.data, sizeof(buf.data),
+    buf.len += safe_snprintf((char*)buf.data+buf.len, sizeof(buf.data)-buf.len,
         "Scanned IP: %s\n"
         "Port Count: %d\n"
-        "Ports:",
+        "Open Ports:",
         a1,
         proto->open_ports_cnt);
 
@@ -95,23 +97,30 @@ static void make_open_port_info(Packet* p, PS_PROTO* proto)
     buf.len += safe_snprintf((char*)buf.data + buf.len, sizeof(buf.data) - buf.len, "\n");
 }
 
+#if 0
+// FIXIT-L add open port for port sweeps
 static void make_open_port_info(Packet* p, uint16_t port)
 {
     DataBuffer& buf = DetectionEngine::get_alt_buffer(p);
-
-    const char* addr = p->ptrs.ip_api.get_src()->ntoa();
+    
+    SfIpString ip_str;
 
     buf.len = safe_snprintf((char*)buf.data, sizeof(buf.data),
         "Scanned IP: %s\n"
         "Open Port: %hu\n",
-        addr, port);
+        p->ptrs.ip_api.get_src()->ntop(ip_str), port);
 }
+#endif
 
 static void PortscanAlertTcp(Packet* p, PS_PROTO* proto)
 {
     assert(proto);
-    bool portsweep = false;
 
+    if ( proto->open_ports_cnt and proto->alerts != PS_ALERT_PORTSWEEP and
+        proto->alerts != PS_ALERT_PORTSWEEP_FILTERED )
+    {
+        make_open_port_info(p, proto);
+    }
     switch (proto->alerts)
     {
     case PS_ALERT_ONE_TO_ONE:
@@ -124,7 +133,6 @@ static void PortscanAlertTcp(Packet* p, PS_PROTO* proto)
 
     case PS_ALERT_PORTSWEEP:
         DetectionEngine::queue_event(GID_PORT_SCAN, PSNG_TCP_PORTSWEEP);
-        portsweep = true;
         break;
 
     case PS_ALERT_DISTRIBUTED:
@@ -141,7 +149,6 @@ static void PortscanAlertTcp(Packet* p, PS_PROTO* proto)
 
     case PS_ALERT_PORTSWEEP_FILTERED:
         DetectionEngine::queue_event(GID_PORT_SCAN, PSNG_TCP_PORTSWEEP_FILTERED);
-        portsweep = true;
         break;
 
     case PS_ALERT_DISTRIBUTED_FILTERED:
@@ -150,13 +157,6 @@ static void PortscanAlertTcp(Packet* p, PS_PROTO* proto)
 
     default:
         return;
-    }
-
-    //  Only log open ports for portsweeps after the alert has been generated.
-    if (proto->open_ports_cnt and !portsweep)
-    {
-        make_open_port_info(p, proto);
-        DetectionEngine::queue_event(GID_PORT_SCAN, PSNG_OPEN_PORT);
     }
 }
 
@@ -268,42 +268,34 @@ static void PortscanAlertIcmp(Packet*, PS_PROTO* proto)
 static void PortscanAlert(PS_PKT* ps_pkt, PS_PROTO* proto, int proto_type)
 {
     Packet* p = ps_pkt->pkt;
+    make_port_scan_info(p, proto);
 
-    if (proto->alerts == PS_ALERT_OPEN_PORT)
+    switch (proto_type)
     {
-        make_open_port_info(p, p->ptrs.sp);
-        DetectionEngine::queue_event(GID_PORT_SCAN, PSNG_OPEN_PORT);
-    }
-    else
-    {
-        make_port_scan_info(p, proto);
+    case PS_PROTO_TCP:
+        PortscanAlertTcp(p, proto);
+        break;
 
-        switch (proto_type)
-        {
-        case PS_PROTO_TCP:
-            PortscanAlertTcp(p, proto);
-            break;
+    case PS_PROTO_UDP:
+        PortscanAlertUdp(p, proto);
+        break;
 
-        case PS_PROTO_UDP:
-            PortscanAlertUdp(p, proto);
-            break;
+    case PS_PROTO_ICMP:
+        PortscanAlertIcmp(p, proto);
+        break;
 
-        case PS_PROTO_ICMP:
-            PortscanAlertIcmp(p, proto);
-            break;
-
-        case PS_PROTO_IP:
-            PortscanAlertIp(p, proto);
-            break;
-        }
+    case PS_PROTO_IP:
+        PortscanAlertIp(p, proto);
+        break;
     }
 }
 
 static void PrintIPPortSet(IP_PORT* p)
 {
-    char ip_str[80], output_str[80];
+    char output_str[80];
 
-    SnortSnprintf(ip_str, sizeof(ip_str), "%s", p->ip.get_addr()->ntoa());
+    SfIpString ip_str;
+    p->ip.get_addr()->ntop(ip_str);
 
     if (p->notflag)
         SnortSnprintf(output_str, sizeof(output_str), "        !%s", ip_str);
@@ -501,7 +493,7 @@ static const InspectApi sp_api =
         mod_dtor
     },
     IT_PROBE,
-    (uint16_t)PktType::ANY_IP,
+    PROTO_BIT__ANY_IP,
     nullptr, // buffers
     nullptr, // service
     nullptr, // pinit

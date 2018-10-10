@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,8 +30,12 @@
 #include <string>
 
 class AnalyzerCommand;
-class SFDAQInstance;
 class Swapper;
+
+namespace snort
+{
+class SFDAQInstance;
+}
 
 class Analyzer
 {
@@ -82,7 +86,7 @@ private:
     bool exit_requested;
 
     std::string source;
-    SFDAQInstance* daq_instance;
+    snort::SFDAQInstance* daq_instance;
 
     std::mutex pending_work_queue_mutex;
 };

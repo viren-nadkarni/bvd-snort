@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -41,7 +41,7 @@ void PrintAllInterfaces()
     int j = 1;
 
     if (pcap_findalldevs(&alldevs, errorbuf) == -1)
-        FatalError("Could not get device list: %s.", errorbuf);
+        snort::FatalError("Could not get device list: %s.", errorbuf);
 
     printf("Index\tDevice\tPhysical Address\tIP Address\tDescription\n");
     printf("-----\t------\t----------------\t----------\t-----------\n");
@@ -57,9 +57,11 @@ void PrintAllInterfaces()
             struct sockaddr_in* saddr = (struct sockaddr_in*)dev->addresses->addr;
             if ((saddr->sin_family == AF_INET) || (saddr->sin_family == AF_INET6))
             {
-                SfIp dev_ip;
+                snort::SfIp dev_ip;
                 dev_ip.set(&saddr->sin_addr, saddr->sin_family);
-                printf("\t%s", dev_ip.ntoa());
+
+                snort::SfIpString ip;
+                printf("\t%s", dev_ip.ntop(ip));
             }
             else
                 printf("\tdisabled");

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,6 +34,8 @@
 #include "catch/snort_catch.h"
 #endif
 
+using namespace snort;
+
 #define s_time_table_title "module profile"
 
 namespace time_stats
@@ -65,14 +67,14 @@ struct View
     { return stats.checks; }
 
     hr_duration avg_check() const
-    { return checks() ? hr_duration(elapsed().count() / checks()) : 0_ticks; }
+    { return checks() ? hr_duration(TO_TICKS(elapsed()) / checks()) : 0_ticks; }
 
     double pct_of(const TimeProfilerStats& o) const
     {
         if ( o.elapsed <= 0_ticks )
             return 0.0;
 
-        return double(elapsed().count()) / double(o.elapsed.count()) * 100.0;
+        return double(TO_TICKS(elapsed())) / double(TO_TICKS(o.elapsed)) * 100.0;
     }
 
     double pct_caller() const
@@ -127,10 +129,10 @@ static void print_fn(StatsTable& t, const View& v)
     t << v.checks();
 
     // total time
-    t << clock_usecs(duration_cast<microseconds>(v.elapsed()).count());
+    t << clock_usecs(TO_USECS(v.elapsed()));
 
     // avg/check
-    t << clock_usecs(duration_cast<microseconds>(v.avg_check()).count());
+    t << clock_usecs(TO_USECS(v.avg_check()));
 }
 
 } // namespace time_stats

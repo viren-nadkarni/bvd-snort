@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -41,10 +41,9 @@
 #include "pp_ftp.h"
 #include "telnet.h"
 
-int16_t ftp_data_app_id = SFTARGET_UNKNOWN_PROTOCOL;
+using namespace snort;
 
-#define client_key "ftp_client"
-#define server_key "ftp_server"
+SnortProtocolId ftp_data_snort_protocol_id = UNKNOWN_PROTOCOL_ID;
 
 #define client_help "FTP inspector client module"
 #define server_help "FTP inspector server module"
@@ -80,29 +79,12 @@ static int SnortFTP(
 
     if (iInspectMode == FTPP_SI_SERVER_MODE)
     {
-        DebugFormat(DEBUG_FTPTELNET,
-            "Server packet: %.*s\n", p->dsize, p->data);
-
         // FIXIT-L breaks target-based non-standard ports
         //if ( !ScPafEnabled() )
         Stream::flush_client(p);
     }
-    else
-    {
-        if ( !InspectClientPacket(p) )
-        {
-            DebugMessage(DEBUG_FTPTELNET,
-                "Client packet will be reassembled\n");
-            return FTPP_SUCCESS;
-        }
-        else
-        {
-            DebugFormat(DEBUG_FTPTELNET,
-                "Client packet: rebuilt %s: %.*s\n",
-                (p->packet_flags & PKT_REBUILT_STREAM) ? "yes" : "no",
-                p->dsize, p->data);
-        }
-    }
+    else if ( !InspectClientPacket(p) )
+        return FTPP_SUCCESS;
 
     int ret = initialize_ftp(FTPsession, p, iInspectMode);
     if ( ret )
@@ -111,7 +93,7 @@ static int SnortFTP(
     ret = check_ftp(FTPsession, p, iInspectMode);
     if ( ret == FTPP_SUCCESS )
     {
-        ProfileExclude exclude(ftpPerfStats);
+        NoProfile exclude(ftpPerfStats);
 
         // FIXIT-L ideally do_detection will look at the cmd & param buffers
         // or the rsp & msg buffers.  We should call it from inside check_ftp
@@ -342,6 +324,7 @@ FtpServer::~FtpServer ()
 
 bool FtpServer::configure(SnortConfig* sc)
 {
+    ftp_data_snort_protocol_id = sc->proto_ref->add("ftp-data");
     return !FTPCheckConfigs(sc, ftp_server);
 }
 
@@ -373,7 +356,7 @@ FTP_CLIENT_PROTO_CONF* get_ftp_client(Packet* p)
     FtpClient* client = (FtpClient*)p->flow->data;
     if ( !client )
     {
-        client = (FtpClient*)InspectorManager::get_inspector(client_key);
+        client = (FtpClient*)InspectorManager::get_inspector(FTP_CLIENT_NAME);
         assert(client);
         p->flow->set_data(client);
     }
@@ -427,13 +410,13 @@ static const InspectApi fc_api =
         0,
         API_RESERVED,
         API_OPTIONS,
-        client_key,
+        FTP_CLIENT_NAME,
         client_help,
         fc_mod_ctor,
         mod_dtor
     },
     IT_PASSIVE,
-    (uint16_t)PktType::NONE,
+    PROTO_BIT__NONE,
     nullptr, // buffers
     "ftp",
     nullptr, // init,
@@ -453,7 +436,6 @@ static Module* fs_mod_ctor()
 
 static void fs_init()
 {
-    ftp_data_app_id = SnortConfig::get_conf()->proto_ref->add("ftp-data");
     FtpFlowData::init();
 }
 
@@ -483,13 +465,13 @@ static const InspectApi fs_api =
         0,
         API_RESERVED,
         API_OPTIONS,
-        server_key,
+        FTP_SERVER_NAME,
         server_help,
         fs_mod_ctor,
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU,
+    PROTO_BIT__PDU,
     nullptr, // buffers
     "ftp",
     fs_init,

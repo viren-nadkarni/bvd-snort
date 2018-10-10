@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -271,7 +271,7 @@ DCE2_Ret DCE2_Smb2InitFileTracker(DCE2_SmbFileTracker* ftracker,
     const bool is_ipc, const uint64_t fid);
 
 /* Check smb version based on smb header */
-DCE2_SmbVersion DCE2_Smb2Version(const Packet* p);
+DCE2_SmbVersion DCE2_Smb2Version(const snort::Packet* p);
 
 #endif  /* _DCE_SMB2_H_ */
 

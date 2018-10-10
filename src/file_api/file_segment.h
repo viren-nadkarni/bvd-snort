@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,7 +26,10 @@
 
 #include "file_api.h"
 
+namespace snort
+{
 class Flow;
+}
 class FileConfig;
 
 class FileSegment
@@ -44,25 +47,25 @@ public:
 class FileSegments
 {
 public:
-    FileSegments(FileContext*);
+    FileSegments(snort::FileContext*);
     ~FileSegments();
 
     void clear();
 
     // Process file segments with current_offset specified. If file segment is out of order,
     // it will be put into the file segments queue.
-    int process(Flow*, const uint8_t* file_data, uint64_t data_size, uint64_t offset,
-        FilePolicyBase*);
+    int process(snort::Flow*, const uint8_t* file_data, uint64_t data_size, uint64_t offset,
+        snort::FilePolicyBase*);
 
 private:
     FileSegment* head = nullptr;
     uint64_t current_offset;
-    FileContext* context = nullptr;
+    snort::FileContext* context = nullptr;
 
     void add(const uint8_t* file_data, uint64_t data_size, uint64_t offset);
     FilePosition get_file_position(uint64_t data_size, uint64_t file_size);
-    int process_one(Flow*, const uint8_t* file_data, int data_size, FilePolicyBase*);
-    int process_all(Flow*, FilePolicyBase*);
+    int process_one(snort::Flow*, const uint8_t* file_data, int data_size, snort::FilePolicyBase*);
+    int process_all(snort::Flow*, snort::FilePolicyBase*);
 };
 
 #endif

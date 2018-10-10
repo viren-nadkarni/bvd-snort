@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,6 +31,8 @@
 
 #include "dnp3_paf.h"
 #include "dnp3_reassembly.h"
+
+using namespace snort;
 
 THREAD_LOCAL Dnp3Stats dnp3_stats;
 THREAD_LOCAL ProfileStats dnp3_perf_stats;
@@ -316,7 +318,7 @@ const InspectApi dnp3_api =
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU | (uint16_t)PktType::UDP,
+    PROTO_BIT__UDP | PROTO_BIT__PDU,
     nullptr,  // buffers
     "dnp3",
     dnp3_init,

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -77,7 +77,7 @@ enum SIP_DialogState
 
 struct SIP_MediaData
 {
-    SfIp maddress;  // media IP
+    snort::SfIp maddress;  // media IP
     uint16_t mport;   // media port
     uint8_t numPort;   // number of media ports
     SIP_MediaData* nextM;
@@ -91,7 +91,7 @@ struct SIP_MediaSession
     int savedFlag;      // whether this data has been saved by a dialog,
                         // if savedFlag = 1, this session will be deleted after sip message is
                         // processed.
-    SfIp maddress_default;  // Default media IP
+    snort::SfIp maddress_default;  // Default media IP
     SIP_MediaDataList medias; // Media list in the session
     SIP_MediaSession* nextS; // Next media session
 };

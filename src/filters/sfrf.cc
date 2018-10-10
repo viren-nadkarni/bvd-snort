@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2009-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -35,6 +35,8 @@
 #include "utils/sflsq.h"
 #include "utils/util.h"
 
+using namespace snort;
+
 // Number of hash rows for gid 1 (rules)
 #define SFRF_GEN_ID_1_ROWS 4096
 // Number of hash rows for non-zero gid
@@ -60,7 +62,7 @@ typedef struct
      * whether dos threshold is tracking by source or destination IP address. For tracking
      * by rule, it is cleared out (all 0s).
      */
-    SfIp ip;
+    snort::SfIp ip;
     uint16_t padding;
 } tSFRFTrackingNodeKey;
 PADDING_GUARD_END
@@ -109,7 +111,7 @@ static int _checkSamplingPeriod(
     );
 
 static tSFRFTrackingNode* _getSFRFTrackingNode(
-    const SfIp*,
+    const snort::SfIp*,
     unsigned tid,
     time_t curTime
     );
@@ -118,8 +120,8 @@ static void _updateDependentThresholds(
     RateFilterConfig* config,
     unsigned gid,
     unsigned sid,
-    const SfIp* sip,
-    const SfIp* dip,
+    const snort::SfIp* sip,
+    const snort::SfIp* dip,
     time_t curTime
     );
 
@@ -213,15 +215,14 @@ static void SFRF_SidNodeFree(void* item)
  *
  * @return @retval  0 successfully added the thresholding object, !0 otherwise
 */
-int SFRF_ConfigAdd(
-    SnortConfig*, RateFilterConfig* rf_config, tSFRFConfigNode* cfgNode)
+int SFRF_ConfigAdd(snort::SnortConfig*, RateFilterConfig* rf_config, tSFRFConfigNode* cfgNode)
 {
     GHash* genHash;
     tSFRFSidNode* pSidNode;
     tSFRFConfigNode* pNewConfigNode;
     tSFRFGenHashKey key = { 0,0 };
 
-    PolicyId policy_id = get_network_policy()->policy_id;
+    PolicyId policy_id = snort::get_network_policy()->policy_id;
 
     // Auto init - memcap must be set 1st, which is not really a problem
     if ( rf_hash == nullptr )
@@ -352,7 +353,7 @@ int SFRF_ConfigAdd(
  */
 static int SFRF_TestObject(
     tSFRFConfigNode* cfgNode,
-    const SfIp* ip,
+    const snort::SfIp* ip,
     time_t curTime,
     SFRF_COUNT_OPERATION op
     )
@@ -405,7 +406,7 @@ static int SFRF_TestObject(
     // if the count were not incremented in such cases, the
     // threshold would never be exceeded.
     if ( !cfgNode->seconds && dynNode->count > cfgNode->count )
-        if ( cfgNode->newAction == RULE_TYPE__DROP )
+        if ( cfgNode->newAction == snort::Actions::DROP )
             dynNode->count--;
 
 #ifdef SFRF_DEBUG
@@ -418,7 +419,7 @@ static int SFRF_TestObject(
     return retValue;
 }
 
-static inline int SFRF_AppliesTo(tSFRFConfigNode* pCfg, const SfIp* ip)
+static inline int SFRF_AppliesTo(tSFRFConfigNode* pCfg, const snort::SfIp* ip)
 {
     return ( !pCfg->applyTo || sfvar_ip_in(pCfg->applyTo, ip) );
 }
@@ -442,8 +443,8 @@ int SFRF_TestThreshold(
     RateFilterConfig* config,
     unsigned gid,
     unsigned sid,
-    const SfIp* sip,
-    const SfIp* dip,
+    const snort::SfIp* sip,
+    const snort::SfIp* dip,
     time_t curTime,
     SFRF_COUNT_OPERATION op
     )
@@ -455,7 +456,7 @@ int SFRF_TestThreshold(
     int status = -1;
     tSFRFGenHashKey key;
 
-    PolicyId policy_id = get_network_policy()->policy_id;
+    PolicyId policy_id = snort::get_network_policy()->policy_id;
 
 #ifdef SFRF_DEBUG
     printf("--%d-%u-%u: %s() entering\n", 0, gid, sid, __func__);
@@ -537,7 +538,7 @@ int SFRF_TestThreshold(
 
         case SFRF_TRACK_BY_RULE:
         {
-            SfIp cleared;
+            snort::SfIp cleared;
             cleared.clear();
             newStatus = SFRF_TestObject(cfgNode, &cleared, curTime, op);
         }
@@ -744,20 +745,20 @@ static int _checkThreshold(
     fflush(stdout);
 #endif
 
-    return RULE_TYPE__MAX + cfgNode->newAction;
+    return snort::Actions::MAX + cfgNode->newAction;
 }
 
 static void _updateDependentThresholds(
     RateFilterConfig* config,
     unsigned gid,
     unsigned sid,
-    const SfIp* sip,
-    const SfIp* dip,
+    const snort::SfIp* sip,
+    const snort::SfIp* dip,
     time_t curTime
     )
 {
-    if ( gid == GENERATOR_INTERNAL &&
-        sid == INTERNAL_EVENT_SESSION_DEL )
+    if ( gid == GID_SESSION &&
+        sid == SESSION_EVENT_CLEAR )
     {
         // decrementing counters - this results in the following sequence:
         // 1. sfdos_thd_test_threshold(gid internal, sid DEL)
@@ -766,17 +767,13 @@ static void _updateDependentThresholds(
         // 4.    |       _updateDependentThresholds(gid internal, sid ADD)
         // 5.    continue with regularly scheduled programming (ie step 1)
 
-        SFRF_TestThreshold(config, gid, INTERNAL_EVENT_SESSION_ADD,
+        SFRF_TestThreshold(config, gid, SESSION_EVENT_SETUP,
             sip, dip, curTime, SFRF_COUNT_DECREMENT);
         return;
     }
 }
 
-static tSFRFTrackingNode* _getSFRFTrackingNode(
-    const SfIp* ip,
-    unsigned tid,
-    time_t curTime
-    )
+static tSFRFTrackingNode* _getSFRFTrackingNode(const snort::SfIp* ip, unsigned tid, time_t curTime)
 {
     tSFRFTrackingNode* dynNode = nullptr;
     tSFRFTrackingNodeKey key;
@@ -784,7 +781,7 @@ static tSFRFTrackingNode* _getSFRFTrackingNode(
     /* Setup key */
     key.ip = *(ip);
     key.tid = tid;
-    key.policyId = get_network_policy()->policy_id;
+    key.policyId = snort::get_network_policy()->policy_id;
     key.padding = 0;
 
     /*

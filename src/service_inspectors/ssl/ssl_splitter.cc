@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,6 +23,8 @@
 #include <arpa/inet.h>
 
 #include "protocols/ssl.h"
+
+using namespace snort;
 
 SslSplitter::SslSplitter(bool c2s) : StreamSplitter(c2s)
 {

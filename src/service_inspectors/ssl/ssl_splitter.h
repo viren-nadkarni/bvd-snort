@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -44,12 +44,12 @@ enum SslPafStates
     SSL_PAF_STATES_PAD_V2,  // sslv2, padding byte if needed 
 };
 
-class SslSplitter : public StreamSplitter
+class SslSplitter : public snort::StreamSplitter
 {
 public:
     SslSplitter(bool c2s);
 
-    Status scan(Flow*, const uint8_t* data, uint32_t len,
+    Status scan(snort::Flow*, const uint8_t* data, uint32_t len,
         uint32_t flags, uint32_t* fp) override;
 
     bool is_paf() override

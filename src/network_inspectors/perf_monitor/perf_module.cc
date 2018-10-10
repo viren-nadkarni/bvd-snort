@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,7 +30,10 @@
 
 #include "perf_module.h"
 
+#include "log/messages.h"
 #include "managers/module_manager.h"
+
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // perf attributes
@@ -99,6 +102,12 @@ PerfMonModule::PerfMonModule() :
     Module(PERF_NAME, PERF_HELP, s_params)
 { }
 
+PerfMonModule::~PerfMonModule()
+{
+    if (config)
+        delete config;
+}
+
 ProfileStats* PerfMonModule::get_profile() const
 { return &perfmonStats; }
 
@@ -108,66 +117,66 @@ bool PerfMonModule::set(const char*, Value& v, SnortConfig*)
     if ( v.is("base") )
     {
         if ( v.get_bool() )
-            config.perf_flags |= PERF_BASE;
+            config->perf_flags |= PERF_BASE;
         else
-            config.perf_flags &= ~PERF_BASE; //Clear since true by default
+            config->perf_flags &= ~PERF_BASE; //Clear since true by default
     }
     else if ( v.is("cpu") )
     {
         if ( v.get_bool() )
-            config.perf_flags |= PERF_CPU;
+            config->perf_flags |= PERF_CPU;
     }
     else if ( v.is("flow") )
     {
         if ( v.get_bool() )
-            config.perf_flags |= PERF_FLOW;
+            config->perf_flags |= PERF_FLOW;
     }
     else if ( v.is("flow_ip") )
     {
         if ( v.get_bool() )
-            config.perf_flags |= PERF_FLOWIP;
+            config->perf_flags |= PERF_FLOWIP;
     }
     else if ( v.is("packets") )
     {
-        config.pkt_cnt = v.get_long();
+        config->pkt_cnt = v.get_long();
     }
     else if ( v.is("seconds") )
     {
-        config.sample_interval = v.get_long();
-        if ( config.sample_interval == 0 )
-            config.perf_flags |= PERF_SUMMARY;
+        config->sample_interval = v.get_long();
+        if ( config->sample_interval == 0 )
+            config->perf_flags |= PERF_SUMMARY;
     }
     else if ( v.is("flow_ip_memcap") )
     {
-        config.flowip_memcap = v.get_long();
+        config->flowip_memcap = v.get_long();
     }
     else if ( v.is("max_file_size") )
-        config.max_file_size = v.get_long() - ROLLOVER_THRESH;
+        config->max_file_size = v.get_long() - ROLLOVER_THRESH;
 
     else if ( v.is("flow_ports") )
     {
-        config.flow_max_port_to_track = v.get_long();
+        config->flow_max_port_to_track = v.get_long();
     }
     else if ( v.is("output") )
     {
-        config.output = (PerfOutput)v.get_long();
+        config->output = (PerfOutput)v.get_long();
     }
     else if ( v.is("format") )
     {
-        config.format = (PerfFormat)v.get_long();
+        config->format = (PerfFormat)v.get_long();
     }
     else if ( v.is("name") )
     {
-        mod_name = v.get_string();
+        config->modules.back().set_name(v.get_string());
     }
     else if ( v.is("pegs") )
     {
-        mod_pegs = v.get_string();
+        config->modules.back().set_peg_names(v);
     }
     else if ( v.is("summary") )
     {
         if ( v.get_bool() )
-            config.perf_flags |= PERF_SUMMARY;
+            config->perf_flags |= PERF_SUMMARY;
     }
     else if ( v.is("modules") )
     {
@@ -179,88 +188,126 @@ bool PerfMonModule::set(const char*, Value& v, SnortConfig*)
     return true;
 }
 
-bool PerfMonModule::begin(const char* fqn, int, SnortConfig*)
+bool PerfMonModule::begin(const char* fqn, int idx, SnortConfig*)
 {
-    if ( !strcmp(fqn, "perf_monitor.modules") )
+    if (strcmp(fqn, "perf_monitor") == 0)
     {
-        mod_name.clear();
-        mod_pegs.clear();
+        assert(config == nullptr);
+        config = new PerfConfig;
     }
-    else
-        memset(static_cast<PerfConfigBase*>(&config), 0, sizeof(config));
+    if ( idx != 0 && strcmp(fqn, "perf_monitor.modules") == 0 )
+        config->modules.push_back(ModuleConfig());
 
-    return true;
-}
-
-static bool add_module(PerfConfig& config, Module *mod, std::string& pegs)
-{
-    const PegInfo* peg_info;
-    std::string tok;
-    Value v(pegs.c_str());
-    unsigned t_count = 0;
-
-    if ( !mod )
-        return false;
-
-    config.modules.push_back(mod);
-    config.mod_peg_idxs.push_back(std::vector<unsigned>());
-
-    peg_info = mod->get_pegs();
-
-    for ( v.set_first_token(); v.get_next_token(tok); t_count++ )
-    {
-        bool found = false;
-
-        for ( int i = 0; peg_info[i].name; i++ )
-        {
-            if ( !strcmp(tok.c_str(), peg_info[i].name) )
-            {
-                config.mod_peg_idxs.back().push_back(i);
-                found = true;
-                break;
-            }
-        }
-        if ( !found )
-            return false;
-    }
-    if ( !t_count && peg_info )
-        for ( int i = 0; peg_info[i].name; i++ )
-            config.mod_peg_idxs.back().push_back(i);
     return true;
 }
 
 bool PerfMonModule::end(const char* fqn, int idx, SnortConfig*)
 {
-    if ( !idx )
-    {
-        if ( config.modules.empty() )
-        {
-            auto modules = ModuleManager::get_all_modules();
-            std::string empty;
-
-            for ( auto& mod : modules )
-            {
-                if ( !add_module(config, mod, empty) )
-                    return false;
-            }
-        }
-        return true;
-    }
-
-    if ( !strcmp(fqn, "perf_monitor.modules") && !mod_name.empty() )
-        return add_module(config, ModuleManager::get_module(mod_name.c_str()), mod_pegs);
+    if ( idx != 0 && strcmp(fqn, "perf_monitor.modules") == 0 )
+        return config->modules.back().confirm_parse();
 
     return true;
 }
 
-void PerfMonModule::get_config(PerfConfig& cfg)
-{
-    cfg = config;
+PerfConfig* PerfMonModule::get_config()
+{ 
+    PerfConfig* tmp = config;
+    config = nullptr;
+    return tmp; 
 }
 
 const PegInfo* PerfMonModule::get_pegs() const
-{ return simple_pegs; }
+{ return snort::simple_pegs; }
 
 PegCount* PerfMonModule::get_counts() const
 { return (PegCount*)&pmstats; }
 
+void ModuleConfig::set_name(std::string name)
+{ this->name = name; }
+
+void ModuleConfig::set_peg_names(Value& peg_names)
+{
+    std::string tok;
+    peg_names.set_first_token();
+
+    while ( peg_names.get_next_token(tok) )
+        this->peg_names[tok] = false;
+}
+
+bool ModuleConfig::confirm_parse()
+{
+    // asking for pegs without specifying the module name doesn't make sense
+    if ( name.empty() && !peg_names.empty() )
+        return false;
+
+    return true;
+}
+bool ModuleConfig::resolve()
+{
+    ptr = ModuleManager::get_module(name.c_str());
+    if ( ptr == nullptr )
+    {
+        ParseWarning(WARN_CONF, "Perf monitor is unable to find the %s module.\n", name.c_str());
+        return false;
+    }
+
+    const PegInfo* peg_info = ptr->get_pegs();
+    if ( !peg_info )
+        return true; // classifications does this. it's valid.
+
+    if ( peg_names.empty() )
+    {
+        for ( unsigned i = 0; peg_info[i].name != nullptr; i++ )
+            pegs.push_back(i);
+    }
+    else
+    {
+        for ( unsigned i = 0; peg_info[i].name != nullptr; i++ )
+        {
+            auto peg_ittr = peg_names.find(peg_info[i].name);
+
+            if ( peg_ittr != peg_names.end() )
+            {
+                peg_ittr->second = true;
+                pegs.push_back(i);
+            }
+        }
+
+        for ( auto &i : peg_names )
+        {
+            if ( !i.second )
+            {
+                ParseWarning(WARN_CONF, "Perf monitor is unable to find %s.%s count", name.c_str(), i.first.c_str());
+                return false;
+            }
+        }
+    }
+    name.clear();
+    peg_names.clear();
+    return true;
+}
+
+bool PerfConfig::resolve()
+{
+    if ( modules.empty() )
+    {
+        auto all_modules = ModuleManager::get_all_modules();       
+        for ( auto& mod : all_modules )
+        {
+            ModuleConfig cfg;
+            cfg.set_name(mod->get_name());
+            modules.push_back(cfg);
+        }
+    }
+
+    for ( auto& mod : modules )
+    {
+        if ( !mod.resolve() )
+            return false;
+
+        if ( mod.ptr->counts_need_prep() )
+            mods_to_prep.push_back(mod.ptr);
+    }
+
+    return true;
+}

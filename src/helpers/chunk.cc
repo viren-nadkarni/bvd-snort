@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -45,21 +45,21 @@ bool init_chunk(
 
     if ( luaL_loadbuffer(L, chunk.c_str(), chunk.size(), name) )
     {
-        ParseError("%s luajit failed to load chunk %s", name, lua_tostring(L, -1));
+        snort::ParseError("%s luajit failed to load chunk %s", name, lua_tostring(L, -1));
         return false;
     }
 
     // now exec the chunk to define functions etc in L
     if ( lua_pcall(L, 0, 0, 0) )
     {
-        ParseError("%s luajit failed to init chunk %s", name, lua_tostring(L, -1));
+        snort::ParseError("%s luajit failed to init chunk %s", name, lua_tostring(L, -1));
         return false;
     }
 
     // load the args table
     if ( luaL_dostring(L, args.c_str()) )
     {
-        ParseError("%s luajit failed to init args %s", name, lua_tostring(L, -1));
+        snort::ParseError("%s luajit failed to init args %s", name, lua_tostring(L, -1));
         return false;
     }
 
@@ -71,10 +71,10 @@ bool init_chunk(
         return true;
 
     if ( lua_pcall(L, 0, 1, 0) || lua_type(L, -1) == LUA_TSTRING )
-        ParseError("%s %s", name, lua_tostring(L, -1));
+        snort::ParseError("%s %s", name, lua_tostring(L, -1));
 
     else if ( !lua_toboolean(L, -1) )
-        ParseError("%s init() returned false", name);
+        snort::ParseError("%s init() returned false", name);
 
     else
         return true;

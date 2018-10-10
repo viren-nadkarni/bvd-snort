@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,15 +32,15 @@
 // file_id module
 //-------------------------------------------------------------------------
 
-class FileIdModule : public Module
+class FileIdModule : public snort::Module
 {
 public:
     FileIdModule();
     ~FileIdModule() override;
 
-    bool set(const char*, Value&, SnortConfig*) override;
-    bool begin(const char*, int, SnortConfig*) override;
-    bool end(const char*, int, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool end(const char*, int, snort::SnortConfig*) override;
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
@@ -51,6 +51,13 @@ public:
 
     Usage get_usage() const override
     { return GLOBAL; }
+
+    void show_dynamic_stats() override;
+
+    // FIXIT-L delete file_id gid when bogus rules are eliminated
+    // (this ensures those rules don't fire on every packet)
+    unsigned get_gid() const override
+    { return 146; }
 
 private:
     FileMagicRule rule;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,8 +25,9 @@
 
 #include "paf.h"
 
-#include "main/snort_debug.h"
 #include "protocols/packet.h"
+
+using namespace snort;
 
 //--------------------------------------------------------------------
 // private state
@@ -61,10 +62,6 @@ static uint32_t paf_flush (PAF_State* ps, PafAux& px, uint32_t* flags)
 {
     uint32_t at = 0;
     *flags &= ~(PKT_PDU_HEAD | PKT_PDU_TAIL);
-
-    DebugFormat(DEBUG_STREAM_PAF,
-        "%s: type=%d, fpt=%u, len=%u, tot=%u\n",
-        __func__, px.ft, ps->fpt, px.len, ps->tot);
 
     switch ( px.ft )
     {
@@ -159,10 +156,6 @@ static inline bool paf_eval (
     StreamSplitter* ss, PAF_State* ps, PafAux& px, Flow* ssn,
     uint32_t flags, const uint8_t* data, uint32_t len)
 {
-    DebugFormat(DEBUG_STREAM_PAF,
-        "%s: paf=%d, idx=%u, len=%u, fpt=%u\n",
-        __func__, ps->paf, px.idx, px.len, ps->fpt);
-
     uint16_t fuzz = 0; // FIXIT-L PAF add a little zippedy-do-dah
 
     switch ( ps->paf )
@@ -260,10 +253,6 @@ int32_t paf_check (
     const uint8_t* data, uint32_t len, uint32_t total,
     uint32_t seq, uint32_t* flags)
 {
-    DebugFormat(DEBUG_STREAM_PAF,
-        "%s: len=%u, amt=%u, seq=%u, cur=%u, pos=%u, fpt=%u, tot=%u, paf=%d\n",
-        __func__, len, total, seq, ps->seq, ps->pos, ps->fpt, ps->tot, ps->paf);
-
     PafAux px;
 
     if ( !paf_initialized(ps) )

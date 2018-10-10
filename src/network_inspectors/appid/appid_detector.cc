@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,11 +25,14 @@
 
 #include "appid_detector.h"
 
+#include "protocols/packet.h"
+
+#include "app_info_table.h"
 #include "appid_config.h"
 #include "appid_http_session.h"
-#include "app_info_table.h"
 #include "lua_detector_api.h"
-#include "protocols/packet.h"
+
+using namespace snort;
 
 int AppIdDetector::initialize()
 {
@@ -53,44 +56,74 @@ int AppIdDetector::initialize()
     return APPID_SUCCESS;
 }
 
-void* AppIdDetector::data_get(AppIdSession* asd)
+void* AppIdDetector::data_get(AppIdSession& asd)
 {
-    return asd->get_flow_data(flow_data_index);
+    return asd.get_flow_data(flow_data_index);
 }
 
-int AppIdDetector::data_add(AppIdSession* asd, void* data, AppIdFreeFCN fcn)
+int AppIdDetector::data_add(AppIdSession& asd, void* data, AppIdFreeFCN fcn)
 {
-    return asd->add_flow_data(data, flow_data_index, fcn);
+    return asd.add_flow_data(data, flow_data_index, fcn);
 }
 
-void AppIdDetector::add_info(AppIdSession* asd, const char* info)
+void AppIdDetector::add_info(AppIdSession& asd, const char* info, AppidChangeBits& change_bits)
 {
-    if (asd->hsession && !asd->hsession->url)
-        asd->hsession->url = snort_strdup(info);
+    AppIdHttpSession* hsession = asd.get_http_session();
+
+    if ( !hsession->get_field(MISC_URL_FID) )
+        hsession->set_field(MISC_URL_FID, new std::string(info), change_bits);
 }
 
-void AppIdDetector::add_user(AppIdSession* asd, const char* username, AppId appId, bool success)
+void AppIdDetector::add_user(AppIdSession& asd, const char* username, AppId appId, bool success)
 {
-    asd->client.update_user( appId, username);
+    asd.client.update_user(appId, username);
     if ( success )
-        asd->set_session_flags(APPID_SESSION_LOGIN_SUCCEEDED);
+        asd.set_session_flags(APPID_SESSION_LOGIN_SUCCEEDED);
     else
-        asd->clear_session_flags(APPID_SESSION_LOGIN_SUCCEEDED);
-
+        asd.clear_session_flags(APPID_SESSION_LOGIN_SUCCEEDED);
 }
 
-void AppIdDetector::add_payload(AppIdSession* asd, AppId payload_id)
+void AppIdDetector::add_payload(AppIdSession& asd, AppId payload_id)
 {
-    asd->payload.set_id(payload_id);
+    asd.payload.set_id(payload_id);
 }
 
-void AppIdDetector::add_app(AppIdSession* asd, AppId service_id, AppId client_id, const char* version)
+void AppIdDetector::add_app(AppIdSession& asd, AppId service_id, AppId client_id,
+    const char* version, AppidChangeBits& change_bits)
 {
-    if (version)
-        asd->client.set_version(version);
+    if ( version )
+        asd.client.set_version(version, change_bits);
 
-    asd->set_client_detected();
-    asd->client_inferred_service_id = service_id;
-    asd->client.set_id(client_id);
+    asd.set_client_detected();
+    asd.client_inferred_service_id = service_id;
+    asd.client.set_id(client_id);
+}
+
+const char* AppIdDetector::get_code_string(APPID_STATUS_CODE code) const
+{
+    switch (code)
+    {
+    case APPID_SUCCESS:
+        return "success";
+    case APPID_INPROCESS:
+        return "in-process";
+    case APPID_NEED_REASSEMBLY:
+        return "need-reassembly";
+    case APPID_NOT_COMPATIBLE:
+        return "not-compatible";
+    case APPID_INVALID_CLIENT:
+        return "invalid-client";
+    case APPID_REVERSED:
+        return "appid-reversed";
+    case APPID_NOMATCH:
+        return "no-match";
+    case APPID_ENULL:
+        return "error-null";
+    case APPID_EINVALID:
+        return "error-invalid";
+    case APPID_ENOMEM:
+        return "error-memory";
+    }
+    return "unknown-code";
 }
 

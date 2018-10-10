@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,7 +26,12 @@
 
 #include "pub_sub/http_events.h"
 
-class HttpEventHandler : public DataHandler
+namespace snort
+{
+class Flow;
+}
+
+class HttpEventHandler : public snort::DataHandler
 {
 public:
     enum HttpEventType
@@ -40,7 +45,7 @@ public:
         event_type = type;
     }
 
-    void handle(DataEvent&, Flow*) override;
+    void handle(snort::DataEvent&, snort::Flow*) override;
 
 private:
     HttpEventType event_type;

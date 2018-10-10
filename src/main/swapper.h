@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,14 +22,19 @@
 
 // used to make thread local, pointer-based config swaps by packet threads
 
+namespace snort
+{
 struct SnortConfig;
+}
+
 struct tTargetBasedConfig;
 
 class Swapper
 {
 public:
-    Swapper(SnortConfig*, tTargetBasedConfig*);
-    Swapper(SnortConfig*, SnortConfig*);
+    Swapper(snort::SnortConfig*, tTargetBasedConfig*);
+    Swapper(snort::SnortConfig*, snort::SnortConfig*);
+    Swapper(snort::SnortConfig*, snort::SnortConfig*, tTargetBasedConfig*, tTargetBasedConfig*);
     Swapper(tTargetBasedConfig*, tTargetBasedConfig*);
     ~Swapper();
 
@@ -39,8 +44,8 @@ public:
     static void set_reload_in_progress(bool rip) { reload_in_progress = rip; }
 
 private:
-    SnortConfig* old_conf;
-    SnortConfig* new_conf;
+    snort::SnortConfig* old_conf;
+    snort::SnortConfig* new_conf;
 
     tTargetBasedConfig* old_attribs;
     tTargetBasedConfig* new_attribs;

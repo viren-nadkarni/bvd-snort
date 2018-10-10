@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -26,7 +26,6 @@
 
 #include <mutex>
 
-#include "main/snort_debug.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
 #include "utils/util.h"
@@ -35,11 +34,14 @@
 #include "log_text.h"
 #include "messages.h"
 
+using namespace snort;
+
 #define DEFAULT_DAEMON_ALERT_FILE  "alert"
 
-/* Input is packet and an nine-byte (including NULL) character array.  Results
- * are put into the character array.
- */
+namespace snort
+{
+// Input is packet and an nine-byte (including NULL) character array.  Results
+// are put into the character array.
 void CreateTCPFlagString(const tcp::TCPHdr* const tcph, char* flagBuffer)
 {
     /* parse TCP flags */
@@ -52,6 +54,7 @@ void CreateTCPFlagString(const tcp::TCPHdr* const tcph, char* flagBuffer)
     *flagBuffer++ = (char)((tcph->th_flags & TH_SYN)  ? 'S' : '*');
     *flagBuffer++ = (char)((tcph->th_flags & TH_FIN)  ? 'F' : '*');
     *flagBuffer = '\0';
+}
 }
 
 /****************************************************************************
@@ -74,8 +77,6 @@ FILE* OpenAlertFile(const char* filearg)
 
     std::string name;
     const char* filename = get_instance_file(name, filearg);
-
-    DebugFormat(DEBUG_INIT,"Opening alert file: %s\n", filename);
 
     if ((file = fopen(filename, "a")) == nullptr)
     {
@@ -112,7 +113,6 @@ int RollAlertFile(const char* filearg)
 
     SnortSnprintf(newname, sizeof(newname)-1, "%s.%lu", oldname, (unsigned long)now);
 
-    DebugFormat(DEBUG_INIT,"Rolling alert file: %s\n", newname);
 
     if ( rename(oldname, newname) )
     {

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -31,6 +31,8 @@
 
 #include "modbus.h"
 #include "modbus_module.h"
+
+using namespace snort;
 
 #define MODBUS_MIN_HDR_LEN 2        // Enough for Unit ID + Function
 #define MODBUS_MAX_HDR_LEN 254      // Max PDU size is 260, 6 bytes already seen

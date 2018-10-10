@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,11 +24,16 @@
 
 #include "stream_module.h"
 
+#include "detection/rules.h"
+#include "main/snort_debug.h"
+
+using namespace snort;
 using namespace std;
 
 //-------------------------------------------------------------------------
 // stream module
 //-------------------------------------------------------------------------
+Trace TRACE_NAME(stream);
 
 #define CACHE_PARAMS(name, max, prune, idle, cleanup) \
 static const Parameter name[] = \
@@ -59,7 +64,7 @@ CACHE_PARAMS(file_params,    "128",  "30",  "180", "5");
 static const Parameter s_params[] =
 {
     { "footprint", Parameter::PT_INT, "0:", "0",
-      "use zero for production, non-zero for testing at given size (for tcp and user)" },
+      "use zero for production, non-zero for testing at given size (for TCP and user)" },
 
     { "ip_frags_only", Parameter::PT_BOOL, nullptr, "false",
       "don't process non-frag flows" },
@@ -74,8 +79,18 @@ static const Parameter s_params[] =
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
+// FIXIT-L setup and clear should extend to non-tcp flows as well
+static const RuleMap stream_rules[] =
+{
+    { SESSION_EVENT_SYN_RX, "TCP SYN received" },
+    { SESSION_EVENT_SETUP,  "TCP session established" },
+    { SESSION_EVENT_CLEAR,  "TCP session cleared" },
+
+    { 0, nullptr }
+};
+
 StreamModule::StreamModule() :
-    Module(MOD_NAME, MOD_HELP, s_params)
+    Module(MOD_NAME, MOD_HELP, s_params, false, &TRACE_NAME(stream))
 { }
 
 const PegInfo* StreamModule::get_pegs() const
@@ -86,6 +101,12 @@ PegCount* StreamModule::get_counts() const
 
 ProfileStats* StreamModule::get_profile() const
 { return &s5PerfStats; }
+
+unsigned StreamModule::get_gid() const
+{ return GID_SESSION; }
+
+const RuleMap* StreamModule::get_rules() const
+{ return stream_rules; }
 
 const StreamModuleConfig* StreamModule::get_data()
 {
@@ -100,7 +121,7 @@ bool StreamModule::begin(const char* fqn, int, SnortConfig*)
     return true;
 }
 
-bool StreamModule::set(const char* fqn, Value& v, SnortConfig*)
+bool StreamModule::set(const char* fqn, Value& v, SnortConfig* c)
 {
     FlowConfig* fc = nullptr;
 
@@ -133,7 +154,7 @@ bool StreamModule::set(const char* fqn, Value& v, SnortConfig*)
         fc = &config.file_cfg;
 
     else
-        return false;
+        return Module::set(fqn, v, c);
 
     if ( v.is("max_sessions") )
         fc->max_sessions = v.get_long();

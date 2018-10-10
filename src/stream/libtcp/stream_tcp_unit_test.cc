@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,6 +34,8 @@
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
 #include "stream/tcp/tcp_session.h"
+
+using namespace snort;
 
 // SYN PACKET
 // IP 192.168.0.89.9012 > p3nlh044.shr.prod.phx3.secureserver.net.http: Flags [S], seq 9050, win

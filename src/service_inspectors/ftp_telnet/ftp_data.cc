@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -31,11 +31,12 @@
 #include "stream/stream.h"
 #include "utils/util.h"
 
+#include "ft_main.h"
 #include "ftp_module.h"
 #include "ftpp_si.h"
 #include "ftpdata_splitter.h"
 
-#define s_name "ftp_data"
+using namespace snort;
 
 #define s_help \
     "FTP data channel handler"
@@ -132,12 +133,8 @@ static int SnortFTPData(Packet* p)
 
         if (!PROTO_IS_FTP(ftp_ssn))
         {
-            DebugMessage(DEBUG_FTPTELNET,
-                "FTP-DATA Invalid FTP_SESSION retrieved during lookup\n");
-
             if (data_ssn->data_chan)
                 p->flow->set_ignore_direction(SSN_DIR_BOTH);
-
 
             return -2;
         }
@@ -208,9 +205,8 @@ FtpDataFlowData::~FtpDataFlowData()
 
 void FtpDataFlowData::handle_expected(Packet* p)
 {
-    // FIXIT-M X This is an ugly, ugly hack, but it's the way Wizard is doing it
     if (!p->flow->service)
-        p->flow->service = fd_svc_name;
+        p->flow->set_service(p, fd_svc_name);
 }
 
 void FtpDataFlowData::handle_eof(Packet* p)
@@ -241,7 +237,7 @@ public:
 class FtpDataModule : public Module
 {
 public:
-    FtpDataModule() : Module(s_name, s_help) { }
+    FtpDataModule() : Module(FTP_DATA_NAME, s_help) { }
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
@@ -255,7 +251,7 @@ public:
 };
 
 const PegInfo* FtpDataModule::get_pegs() const
-{ return simple_pegs; }
+{ return snort::simple_pegs; }
 
 PegCount* FtpDataModule::get_counts() const
 { return (PegCount*)&fdstats; }
@@ -317,13 +313,13 @@ const InspectApi fd_api =
         0,
         API_RESERVED,
         API_OPTIONS,
-        s_name,
+        FTP_DATA_NAME,
         s_help,
         mod_ctor,
         mod_dtor
     },
     IT_SERVICE,
-    (uint16_t)PktType::PDU,
+    PROTO_BIT__PDU,
     nullptr, // buffers
     fd_svc_name,
     fd_init,

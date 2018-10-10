@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 // Copyright (C) 2001-2004 Jeff Nathan <jeff@snort.org>
 //
@@ -83,6 +83,8 @@
 
 #include "arp_module.h"
 
+using namespace snort;
+
 static const uint8_t bcast[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 THREAD_LOCAL ProfileStats arpPerfStats;
@@ -101,33 +103,6 @@ static IPMacEntry* LookupIPMacEntryByIP(
     }
     return nullptr;
 }
-
-#ifdef DEBUG_MSGS
-static void PrintIPMacEntryList(IPMacEntryList& ipmel)
-{
-    if ( ipmel.empty() )
-        return;
-
-    LogMessage("Arpspoof IPMacEntry List");
-    LogMessage("  Size: %zu\n", ipmel.size());
-
-    for ( auto p : ipmel )
-    {
-        SfIp in;
-        in.set(&p.ipv4_addr, AF_INET);
-        LogMessage("    %s -> ", in.ntoa());
-
-        for (int i = 0; i < 6; i++)
-        {
-            LogMessage("%02x", p.mac_addr[i]);
-            if (i != 5)
-                LogMessage(":");
-        }
-        LogMessage("\n");
-    }
-}
-
-#endif
 
 //-------------------------------------------------------------------------
 // class stuff
@@ -160,10 +135,6 @@ void ArpSpoof::show(SnortConfig*)
 {
     LogMessage("arpspoof configured\n");
 
-#ifdef DEBUG_MSGS
-    if ( Debug::enabled(DEBUG_INSPECTOR) )
-        PrintIPMacEntryList(config->ipmel);
-#endif
 }
 
 void ArpSpoof::eval(Packet* p)
@@ -171,7 +142,8 @@ void ArpSpoof::eval(Packet* p)
     Profile profile(arpPerfStats);
 
     // precondition - what we registered for
-    assert(p->type() == PktType::ARP);
+    assert(p->proto_bits & PROTO_BIT__ARP);
+
     const uint8_t* dst_mac_addr;
     const uint8_t* src_mac_addr;
 
@@ -183,7 +155,7 @@ void ArpSpoof::eval(Packet* p)
     }
     else
     {
-        const wlan::WifiHdr* wifih = layer::get_wifi_layer(p);
+        const snort::wlan::WifiHdr* wifih = snort::layer::get_wifi_layer(p);
         if (wifih == nullptr)
             return;
 
@@ -210,7 +182,7 @@ void ArpSpoof::eval(Packet* p)
          }
     }
 
-    const arp::EtherARP* ah = layer::get_arp_layer(p);
+    const snort::arp::EtherARP* ah = snort::layer::get_arp_layer(p);
 
     /* is the ARP protocol type IP and the ARP hardware type Ethernet? */
     if ((ntohs(ah->ea_hdr.ar_hrd) != 0x0001) ||
@@ -222,30 +194,26 @@ void ArpSpoof::eval(Packet* p)
     switch (ntohs(ah->ea_hdr.ar_op))
     {
     case ARPOP_REQUEST:
-        if (memcmp((const u_char*)dst_mac_addr, (const u_char*)bcast, 6) != 0)
+        if (memcmp((const uint8_t*)dst_mac_addr, (const uint8_t*)bcast, 6) != 0)
         {
             DetectionEngine::queue_event(GID_ARP_SPOOF, ARPSPOOF_UNICAST_ARP_REQUEST);
-            DebugMessage(DEBUG_INSPECTOR, "MODNAME: Unicast request\n");
         }
-        else if (memcmp((const u_char*)src_mac_addr,
-            (const u_char*)ah->arp_sha, 6) != 0)
+        else if (memcmp((const uint8_t*)src_mac_addr,
+            (const uint8_t*)ah->arp_sha, 6) != 0)
         {
             DetectionEngine::queue_event(GID_ARP_SPOOF, ARPSPOOF_ETHERFRAME_ARP_MISMATCH_SRC);
-            DebugMessage(DEBUG_INSPECTOR, "MODNAME: Ethernet/ARP mismatch request\n");
         }
         break;
     case ARPOP_REPLY:
-        if (memcmp((const u_char*)src_mac_addr,
-            (const u_char*)ah->arp_sha, 6) != 0)
+        if (memcmp((const uint8_t*)src_mac_addr,
+            (const uint8_t*)ah->arp_sha, 6) != 0)
         {
             DetectionEngine::queue_event(GID_ARP_SPOOF, ARPSPOOF_ETHERFRAME_ARP_MISMATCH_SRC);
-            DebugMessage(DEBUG_INSPECTOR, "MODNAME: Ethernet/ARP mismatch reply src\n");
         }
-        else if (memcmp((const u_char*)dst_mac_addr,
-            (const u_char*)ah->arp_tha, 6) != 0)
+        else if (memcmp((const uint8_t*)dst_mac_addr,
+            (const uint8_t*)ah->arp_tha, 6) != 0)
         {
             DetectionEngine::queue_event(GID_ARP_SPOOF, ARPSPOOF_ETHERFRAME_ARP_MISMATCH_DST);
-            DebugMessage(DEBUG_INSPECTOR, "MODNAME: Ethernet/ARP mismatch reply dst\n");
         }
         break;
     }
@@ -257,9 +225,6 @@ void ArpSpoof::eval(Packet* p)
     IPMacEntry* ipme = LookupIPMacEntryByIP(config->ipmel, ah->arp_spa32);
     if ( ipme )
     {
-        DebugFormat(DEBUG_INSPECTOR,
-            "MODNAME: LookupIPMacEntryByIP returned %p\n", (void*)ipme);
-
         auto cmp_ether_src = memcmp(src_mac_addr, ipme->mac_addr, 6);
         auto cmp_arp_sha = memcmp(ah->arp_sha, ipme->mac_addr, 6);
 
@@ -268,13 +233,7 @@ void ArpSpoof::eval(Packet* p)
         if ( cmp_ether_src || cmp_arp_sha )
         {
             DetectionEngine::queue_event(GID_ARP_SPOOF, ARPSPOOF_ARP_CACHE_OVERWRITE_ATTACK);
-            DebugMessage(DEBUG_INSPECTOR, "MODNAME: Attempted ARP cache overwrite attack\n");
         }
-    }
-    else
-    {
-        DebugMessage(DEBUG_INSPECTOR,
-            "MODNAME: LookupIPMacEntryByIp returned NULL\n");
     }
 }
 
@@ -311,7 +270,7 @@ static const InspectApi as_api =
         mod_dtor
     },
     IT_NETWORK,
-    (uint16_t)PktType::ARP,
+    PROTO_BIT__ARP,
     nullptr, // buffers
     nullptr, // service
     nullptr, // pinit

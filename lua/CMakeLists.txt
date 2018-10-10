@@ -1,10 +1,14 @@
 
 set (LUA_SCRIPTS
     file_magic.lua
-    snort.lua
+    inline.lua
     snort_defaults.lua
+    talos.lua
 )
 
-install (FILES ${LUA_SCRIPTS}
-    DESTINATION "etc/snort"
+configure_file(snort.lua.in
+    snort.lua)
+
+install (FILES ${LUA_SCRIPTS} ${CMAKE_CURRENT_BINARY_DIR}/snort.lua
+    DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/snort"
 )

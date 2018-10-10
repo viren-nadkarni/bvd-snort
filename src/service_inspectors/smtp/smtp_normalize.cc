@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -65,7 +65,7 @@
  * @retval   0          function succeeded without error
  * @retval  -1          there were errors
  */
-int SMTP_NormalizeCmd(Packet* p, const uint8_t* ptr, const uint8_t* eolm, const uint8_t* eol)
+int SMTP_NormalizeCmd(snort::Packet* p, const uint8_t* ptr, const uint8_t* eolm, const uint8_t* eol)
 {
     const uint8_t* tmp;
     const uint8_t* cmd_start;

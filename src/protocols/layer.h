@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,6 +23,8 @@
 #include "main/snort_types.h"
 #include "protocols/protocol_ids.h"
 
+namespace snort
+{
 struct Layer
 {
     const uint8_t* start;
@@ -179,6 +181,6 @@ SO_PUBLIC bool set_outer_ip_api(const Packet* const, ip::IpApi&, int8_t& curr_la
 SO_PUBLIC bool set_outer_ip_api(const Packet* const, ip::IpApi&,
     IpProtocol& next_ip_proto, int8_t& curr_layer);
 } // namespace layer
-
+} // namespace snort
 #endif
 

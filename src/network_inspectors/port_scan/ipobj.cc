@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,6 +28,8 @@
 #include "protocols/packet.h"
 #include "utils/util.h"
 #include "utils/util_cstring.h"
+
+using namespace snort;
 
 /*
    IP COLLECTION INTERFACE
@@ -165,7 +167,8 @@ int ipset_print(IPSET* ipc)
             p!=nullptr;
             p =(IP_PORT*)sflist_next(&cur_ip) )
         {
-            printf("CIDR BLOCK: %c%s", p->notflag ? '!' : ' ', p->ip.get_addr()->ntoa());
+            SfIpString ip_str;
+            printf("CIDR BLOCK: %c%s", p->notflag ? '!' : ' ', p->ip.get_addr()->ntop(ip_str));
             SF_LNODE* cur_port;
 
             for ( PORTRANGE* pr=(PORTRANGE*)sflist_first(&p->portset.port_list, &cur_port);

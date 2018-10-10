@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,7 @@
 #include "framework/parameter.h"
 #include "log/messages.h"
 #include "main.h"
+#include "main/snort_debug.h"
 #include "packet_io/sfdaq_config.h"
 #include "packet_io/trough.h"
 #include "parser/config_file.h"
@@ -44,6 +45,7 @@
 #include "snort_config.h"
 #include "thread_config.h"
 
+using namespace snort;
 using namespace std;
 
 //-------------------------------------------------------------------------
@@ -67,6 +69,14 @@ static const Parameter s_delete[] =
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
+static const Parameter s_module[] =
+{
+    { "module", Parameter::PT_STRING, nullptr, nullptr,
+      "name of the module to reload" },
+
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
 static const Command snort_cmds[] =
 {
     { "show_plugins", main_dump_plugins, nullptr, "show available plugins" },
@@ -75,6 +85,7 @@ static const Command snort_cmds[] =
     { "rotate_stats", main_rotate_stats, nullptr, "roll perfmonitor log files" },
     { "reload_config", main_reload_config, s_reload, "load new configuration" },
     { "reload_policy", main_reload_policy, s_reload, "reload part or all of the default policy" },
+    { "reload_module", main_reload_module, s_module, "reload module" },
     { "reload_daq", main_reload_daq, nullptr, "reload daq module" },
     { "reload_hosts", main_reload_hosts, s_reload, "load a new hosts table" },
 
@@ -176,7 +187,7 @@ static const Parameter s_params[] =
 
 #ifdef SHELL
     { "-j", Parameter::PT_PORT, nullptr, nullptr,
-      "<port> to listen for telnet connections" },
+      "<port> to listen for Telnet connections" },
 #endif
 
     { "-k", Parameter::PT_ENUM, "all|noip|notcp|noudp|noicmp|none", "all",
@@ -379,6 +390,11 @@ static const Parameter s_params[] =
     { "--pause", Parameter::PT_IMPLIED, nullptr, nullptr,
       "wait for resume/quit command before processing packets/terminating", },
 
+#ifdef REG_TEST
+    { "--pause-after-n", Parameter::PT_INT, "1:", nullptr,
+      "<count> pause after count packets, to be used with single packet thread only", },
+#endif
+
     { "--parsing-follows-files", Parameter::PT_IMPLIED, nullptr, nullptr,
       "parse relative paths from the perspective of the current configuration file" },
 
@@ -421,7 +437,7 @@ static const Parameter s_params[] =
     { "--rule-to-hex", Parameter::PT_IMPLIED, nullptr, nullptr,
       "output so rule header to stdout for text rule on stdin" },
 
-    { "--rule-to-text", Parameter::PT_IMPLIED, nullptr, nullptr,
+    { "--rule-to-text", Parameter::PT_STRING, "16", "[SnortFoo]",
       "output plain so rule header to stdout for text rule on stdin" },
 
     { "--run-prefix", Parameter::PT_STRING, nullptr, nullptr,
@@ -452,15 +468,21 @@ static const Parameter s_params[] =
     { "--stdin-rules", Parameter::PT_IMPLIED, nullptr, nullptr,
       "read rules from stdin until EOF or a line starting with END is read", },
 
+    { "--talos", Parameter::PT_IMPLIED, nullptr, nullptr,
+      "enable Talos inline rule test mode (same as --tweaks talos -Q -q)", },
+
     { "--treat-drop-as-alert", Parameter::PT_IMPLIED, nullptr, nullptr,
       "converts drop, sdrop, and reject rules into alert rules during startup" },
 
     { "--treat-drop-as-ignore", Parameter::PT_IMPLIED, nullptr, nullptr,
       "use drop, sdrop, and reject rules to ignore session traffic when not inline" },
 
+    { "--tweaks", Parameter::PT_STRING, nullptr, nullptr,
+      "tune configuration" },
+
 #ifdef UNIT_TEST
     { "--catch-test", Parameter::PT_STRING, nullptr, nullptr,
-        "comma separated list of cat unit test tags or 'all'" },
+      "comma separated list of cat unit test tags or 'all'" },
 #endif
     { "--version", Parameter::PT_IMPLIED, nullptr, nullptr,
       "show version number (same as -V)" },
@@ -501,6 +523,9 @@ static const Parameter s_params[] =
     { "--x2s", Parameter::PT_STRING, nullptr, nullptr,
       "output ASCII string for given byte code (see also --x2c)" },
 
+    { "--trace", Parameter::PT_IMPLIED, nullptr, nullptr,
+      "turn on main loop debug trace" },
+
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
@@ -518,10 +543,12 @@ static const Parameter s_params[] =
     "command line configuration"
 #endif
 
+Trace TRACE_NAME(snort);
+
 class SnortModule : public Module
 {
 public:
-    SnortModule() : Module(s_name, s_help, s_params)
+    SnortModule() : Module(s_name, s_help, s_params, false, &TRACE_NAME(snort))
     { }
 
 #ifdef SHELL
@@ -536,7 +563,7 @@ public:
     { return proc_names; }
 
     PegCount* get_counts() const override
-    { return (PegCount*) &proc_stats; }
+    { return (PegCount*)&proc_stats; }
 
     bool global_stats() const override
     { return true; }
@@ -714,8 +741,13 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
         sc->daq_config->set_module_name(v.get_string());
 
     else if ( v.is("--daq-dir") )
-        sc->daq_config->add_module_dir(v.get_string());
+    {
+        stringstream ss { v.get_string() };
+        string path;
 
+        while ( getline(ss, path, ':') )
+            sc->daq_config->add_module_dir(path.c_str());
+    }
     else if ( v.is("--daq-list") )
         list_daqs(sc);
 
@@ -726,7 +758,6 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
         else
             sc->daq_config->set_variable(v.get_string(), instance_id);
     }
-
     else if ( v.is("--dirty-pig") )
         sc->set_dirty_pig(true);
 
@@ -817,6 +848,11 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
     else if ( v.is("--pause") )
         sc->run_flags |= RUN_FLAG__PAUSE;
 
+#ifdef REG_TEST
+    else if ( v.is("--pause-after-n") )
+        sc->pkt_pause_cnt = v.get_long();
+#endif
+
     else if ( v.is("--parsing-follows-files") )
         parsing_follows_files = true;
 
@@ -888,11 +924,20 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
     else if ( v.is("--stdin-rules") )
         sc->stdin_rules = true;
 
+    else if ( v.is("--talos") )
+    {
+        sc->set_tweaks("talos");
+        sc->run_flags |= RUN_FLAG__INLINE;
+        sc->set_quiet(true);
+    }
     else if ( v.is("--treat-drop-as-alert") )
         sc->set_treat_drop_as_alert(true);
 
     else if ( v.is("--treat-drop-as-ignore") )
         sc->set_treat_drop_as_ignore(true);
+
+    else if ( v.is("--tweaks") )
+        sc->set_tweaks(v.get_string());
 
 #ifdef UNIT_TEST
     else if ( v.is("--catch-test") )
@@ -936,6 +981,9 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
 
     else if ( v.is("--x2s") )
         x2s(v.get_string());
+
+    else if (v.is("--trace"))
+        Module::enable_trace();
 
     return true;
 }

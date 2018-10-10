@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,6 +31,8 @@
 #include "target_based/snort_protocols.h"
 
 #include "stream_file.h"
+
+using namespace snort;
 
 #define DECODE_PDU (DECODE_SOF | DECODE_EOF)
 
@@ -71,7 +73,7 @@ int FileSession::process(Packet* p)
 {
     Profile profile(file_ssn_stats);
 
-    p->flow->ssn_state.application_protocol = SNORT_PROTO_USER;
+    p->flow->ssn_state.snort_protocol_id = SNORT_PROTO_USER;
     StreamFileConfig* c = get_file_cfg(p->flow->ssn_server);
 
     FileFlows* file_flows = FileFlows::get_file_flows(p->flow);

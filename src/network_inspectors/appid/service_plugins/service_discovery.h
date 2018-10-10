@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,17 +24,24 @@
 
 #include "appid_discovery.h"
 
-#include <map>
+#include <unordered_map>
 #include <vector>
 
-#include "utils/sflsq.h"
 #include "flow/flow.h"
 #include "log/messages.h"
+#include "utils/sflsq.h"
+
+#include "appid_types.h"
 
 class AppIdConfig;
 class AppIdSession;
 class ServiceDetector;
 class ServiceDiscoveryState;
+
+namespace snort
+{
+struct Packet;
+}
 
 #define STATE_ID_INCONCLUSIVE_SERVICE_WEIGHT 3
 #define STATE_ID_INVALID_CLIENT_THRESHOLD    9
@@ -62,6 +69,7 @@ class ServiceDiscovery : public AppIdDiscovery
 {
 public:
     static ServiceDiscovery& get_instance(AppIdInspector* ins = nullptr);
+    static void release_instance();
 
     void finalize_service_patterns();
     int add_service_port(AppIdDetector*, const ServiceDetectorPort&) override;
@@ -70,22 +78,24 @@ public:
     ServiceDetector* get_next_tcp_detector(AppIdDetectorsIterator&);
     ServiceDetector* get_next_udp_detector(AppIdDetectorsIterator&);
 
-    bool do_service_discovery(AppIdSession&, Packet*, int);
-    int identify_service(AppIdSession*, Packet*, int dir);
-    int fail_service(AppIdSession*, const Packet*, int dir, ServiceDetector*);
-    int incompatible_data(AppIdSession*, const Packet*, int dir, ServiceDetector*);
+    bool do_service_discovery(AppIdSession&, snort::Packet*, AppidSessionDirection dir,
+        AppidChangeBits& change_bits);
+    int identify_service(AppIdSession&, snort::Packet*, AppidSessionDirection, AppidChangeBits&);
+    int fail_service(AppIdSession&, const snort::Packet*, AppidSessionDirection dir, ServiceDetector*, ServiceDiscoveryState* sds = nullptr);
+    int incompatible_data(AppIdSession&, const snort::Packet*, AppidSessionDirection dir, ServiceDetector*);
     static int add_ftp_service_state(AppIdSession&);
-
+    void release_thread_resources();
 private:
     ServiceDiscovery(AppIdInspector& ins);
     void initialize() override;
-    void get_next_service(const Packet*, const int dir, AppIdSession*, ServiceDiscoveryState*);
-    void get_port_based_services(IpProtocol, uint16_t port, AppIdSession*);
-    void match_services_by_pattern(AppIdSession*, const Packet*, IpProtocol);
-
-    std::map<uint16_t, std::vector<ServiceDetector*> > tcp_services;
-    std::map<uint16_t, std::vector<ServiceDetector*> > udp_services;
-    std::map<uint16_t, std::vector<ServiceDetector*> > udp_reversed_services;
+    void get_next_service(const snort::Packet*, const AppidSessionDirection dir, AppIdSession&);
+    void get_port_based_services(IpProtocol, uint16_t port, AppIdSession&);
+    void match_by_pattern(AppIdSession&, const snort::Packet*, IpProtocol);
+    static ServiceDiscovery* discovery_manager;
+    std::vector<AppIdDetector*> service_detector_list;
+    std::unordered_map<uint16_t, std::vector<ServiceDetector*> > tcp_services;
+    std::unordered_map<uint16_t, std::vector<ServiceDetector*> > udp_services;
+    std::unordered_map<uint16_t, std::vector<ServiceDetector*> > udp_reversed_services;
 };
 
 #endif

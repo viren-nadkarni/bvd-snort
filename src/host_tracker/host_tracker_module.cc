@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,8 @@
 
 #include "host_cache.h"
 
+using namespace snort;
+
 const PegInfo host_tracker_pegs[] =
 {
     { CountType::SUM, "service_adds", "host service adds" },
@@ -44,7 +46,7 @@ const Parameter HostTrackerModule::service_params[] =
       "service identifier" },
 
     { "proto", Parameter::PT_ENUM, "tcp | udp", "tcp",
-      "ip protocol" },
+      "IP protocol" },
 
     { "port", Parameter::PT_PORT, nullptr, nullptr,
       "port number" },
@@ -54,14 +56,14 @@ const Parameter HostTrackerModule::service_params[] =
 
 const Parameter HostTrackerModule::host_tracker_params[] =
 {
-    { "ip", Parameter::PT_ADDR, nullptr, "0.0.0.0/32",
+    { "IP", Parameter::PT_ADDR, nullptr, "0.0.0.0/32",
       "hosts address / cidr" },
 
     { "frag_policy", Parameter::PT_ENUM, IP_POLICIES, nullptr,
       "defragmentation policy" },
 
     { "tcp_policy", Parameter::PT_ENUM, TCP_POLICIES, nullptr,
-      "tcp reassembly policy" },
+      "TCP reassembly policy" },
 
     { "services", Parameter::PT_LIST, HostTrackerModule::service_params, nullptr,
       "list of service parameters" },
@@ -84,7 +86,7 @@ bool HostTrackerModule::set(const char*, Value& v, SnortConfig* sc)
         host->set_stream_policy(v.get_long() + 1);
 
     else if ( v.is("name") )
-        app.protocol = sc->proto_ref->add(v.get_string());
+        app.snort_protocol_id = sc->proto_ref->add(v.get_string());
 
     else if ( v.is("proto") )
         app.ipproto = sc->proto_ref->add(v.get_string());

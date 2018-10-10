@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,8 @@
 #include "ip_ha.h"
 #include "stream_ip.h"
 
+using namespace snort;
+
 const PegInfo ip_pegs[] =
 {
     SESSION_PEGS("ip"),
@@ -49,7 +51,6 @@ const PegInfo ip_pegs[] =
     { CountType::SUM, "trackers_completed", "datagram trackers completed" },
     { CountType::SUM, "nodes_inserted", "fragments added to tracker" },
     { CountType::SUM, "nodes_deleted", "fragments deleted from tracker" },
-    { CountType::NOW, "memory_used", "current memory usage in bytes" },
     { CountType::SUM, "reassembled_bytes", "total reassembled bytes" },
     { CountType::SUM, "fragmented_bytes", "total fragmented bytes" },
     { CountType::END, nullptr, nullptr }
@@ -86,25 +87,16 @@ static inline void UpdateSession(Packet* p, Flow* lws)
     {
         if ( p->is_from_client() )
         {
-            DebugMessage(DEBUG_STREAM_STATE,
-                "Stream: Updating on packet from client\n");
-
             lws->ssn_state.session_flags |= SSNFLAG_SEEN_CLIENT;
         }
         else
         {
-            DebugMessage(DEBUG_STREAM_STATE,
-                "Stream: Updating on packet from server\n");
-
             lws->ssn_state.session_flags |= SSNFLAG_SEEN_SERVER;
         }
 
         if ( (lws->ssn_state.session_flags & SSNFLAG_SEEN_CLIENT) &&
             (lws->ssn_state.session_flags & SSNFLAG_SEEN_SERVER) )
         {
-            DebugMessage(DEBUG_STREAM_STATE,
-                "Stream: session established!\n");
-
             lws->ssn_state.session_flags |= SSNFLAG_ESTABLISHED;
 
             lws->set_ttl(p, false);
@@ -141,8 +133,6 @@ void IpSession::clear()
 
 bool IpSession::setup(Packet* p)
 {
-    DebugMessage(DEBUG_STREAM, "Stream IP session created!\n");
-
     SESSION_STATS_ADD(ip_stats);
     memset(&tracker, 0, sizeof(tracker));
 

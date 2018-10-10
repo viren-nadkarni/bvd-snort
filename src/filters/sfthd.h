@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,8 +27,13 @@
 #include "sfip/sf_ip.h"
 #include "utils/cpp_macros.h"
 
+namespace snort
+{
 struct GHash;
 struct XHash;
+struct SnortConfig;
+}
+
 typedef struct sf_list SF_LIST;
 
 /*!
@@ -98,7 +103,7 @@ struct THD_IP_NODE_KEY
 {
     int thd_id;
     PolicyId policyId;
-    SfIp ip;
+    snort::SfIp ip;
     uint16_t padding;
 };
 
@@ -107,7 +112,7 @@ struct THD_IP_GNODE_KEY
     unsigned gen_id;
     unsigned sig_id;
     PolicyId policyId;
-    SfIp ip;
+    snort::SfIp ip;
     uint16_t padding;
 };
 PADDING_GUARD_END
@@ -181,14 +186,14 @@ struct tThdItemKey
  */
 struct THD_STRUCT
 {
-    XHash* ip_nodes;   /* Global hash of active IP's key=THD_IP_NODE_KEY, data=THD_IP_NODE */
-    XHash* ip_gnodes;  /* Global hash of active IP's key=THD_IP_GNODE_KEY, data=THD_IP_GNODE */
+    snort::XHash* ip_nodes;   /* Global hash of active IP's key=THD_IP_NODE_KEY, data=THD_IP_NODE */
+    snort::XHash* ip_gnodes;  /* Global hash of active IP's key=THD_IP_GNODE_KEY, data=THD_IP_GNODE */
 };
 
 struct ThresholdObjects
 {
     int count;  /* Total number of thresholding/suppression objects */
-    GHash* sfthd_array[THD_MAX_GENID];    /* Local Hash of THD_ITEM nodes,  lookup by key=sig_id
+    snort::GHash* sfthd_array[THD_MAX_GENID];    /* Local Hash of THD_ITEM nodes,  lookup by key=sig_id
                                               */
 
     /* Double array of THD_NODE pointers. First index is policyId and therefore variable length.
@@ -208,14 +213,14 @@ struct ThresholdObjects
 // lbytes = local threshold memcap
 // gbytes = global threshold memcap (0 to disable global)
 THD_STRUCT* sfthd_new(unsigned lbytes, unsigned gbytes);
-XHash* sfthd_local_new(unsigned bytes);
-XHash* sfthd_global_new(unsigned bytes);
+snort::XHash* sfthd_local_new(unsigned bytes);
+snort::XHash* sfthd_global_new(unsigned bytes);
 void sfthd_free(THD_STRUCT*);
 ThresholdObjects* sfthd_objs_new();
 void sfthd_objs_free(ThresholdObjects*);
 
-int sfthd_test_rule(XHash* rule_hash, THD_NODE* sfthd_node,
-    const SfIp* sip, const SfIp* dip, long curtime);
+int sfthd_test_rule(snort::XHash* rule_hash, THD_NODE* sfthd_node,
+    const snort::SfIp* sip, const snort::SfIp* dip, long curtime);
 
 THD_NODE* sfthd_create_rule_threshold(
     int id,
@@ -226,40 +231,20 @@ THD_NODE* sfthd_create_rule_threshold(
     );
 void sfthd_node_free(THD_NODE*);
 
-struct SnortConfig;
-int sfthd_create_threshold(
-    SnortConfig*,
-    ThresholdObjects*,
-    unsigned gen_id,
-    unsigned sig_id,
-    int tracking,
-    int type,
-    int priority,
-    int count,
-    int seconds,
-    sfip_var_t* ip_address
-    );
+int sfthd_create_threshold(snort::SnortConfig*, ThresholdObjects*, unsigned gen_id,
+    unsigned sig_id, int tracking, int type, int priority, int count,
+    int seconds, sfip_var_t* ip_address);
 
 //  1: don't log due to event_filter
 //  0: log
 // -1: don't log due to suppress
-int sfthd_test_threshold(
-    ThresholdObjects*,
-    THD_STRUCT*,
-    unsigned gen_id,
-    unsigned sig_id,
-    const SfIp* sip,
-    const SfIp* dip,
-    long curtime);
+int sfthd_test_threshold(ThresholdObjects*, THD_STRUCT*, unsigned gen_id, unsigned sig_id,
+    const snort::SfIp* sip, const snort::SfIp* dip, long curtime);
 
-XHash* sfthd_new_hash(unsigned, size_t, size_t);
+snort::XHash* sfthd_new_hash(unsigned, size_t, size_t);
 
-int sfthd_test_local(
-    XHash* local_hash,
-    THD_NODE* sfthd_node,
-    const SfIp* sip,
-    const SfIp* dip,
-    time_t curtime);
+int sfthd_test_local(snort::XHash* local_hash, THD_NODE* sfthd_node, const snort::SfIp* sip,
+    const snort::SfIp* dip, time_t curtime);
 
 #ifdef THD_DEBUG
 int sfthd_show_objects(THD_STRUCT* thd);

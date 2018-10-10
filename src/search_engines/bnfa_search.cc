@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -151,6 +151,8 @@
 #include "log/messages.h"
 #include "utils/stats.h"
 #include "utils/util.h"
+
+using namespace snort;
 
 /*
  * Used to initialize last state, states are limited to 0-16M
@@ -353,7 +355,7 @@ static int _bnfa_list_free_table(bnfa_struct_t* bnfa)
     return 0;
 }
 
-static void bnfaBuildMatchStateTrees(SnortConfig* sc, bnfa_struct_t* bnfa)
+static void bnfaBuildMatchStateTrees(snort::SnortConfig* sc, bnfa_struct_t* bnfa)
 {
     bnfa_match_node_t* mn;
     bnfa_match_node_t** MatchList = bnfa->bnfaMatchList;
@@ -1451,8 +1453,7 @@ static inline int _bnfaCompile(bnfa_struct_t* bnfa)
     return 0;
 }
 
-int bnfaCompile(
-    SnortConfig* sc, bnfa_struct_t* bnfa)
+int bnfaCompile(snort::SnortConfig* sc, bnfa_struct_t* bnfa)
 {
     if ( int rval = _bnfaCompile (bnfa) )
         return rval;

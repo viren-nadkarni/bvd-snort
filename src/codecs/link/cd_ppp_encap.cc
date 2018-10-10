@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,8 @@
 #endif
 
 #include "framework/codec.h"
-#include "main/snort_debug.h"
+
+using namespace snort;
 
 #define CD_PPPENCAP_NAME "ppp_encap"
 #define CD_PPPENCAP_HELP "support for point-to-point encapsulation"
@@ -52,8 +53,6 @@ void PppEncap::get_protocol_ids(std::vector<ProtocolId>& v)
 bool PppEncap::decode(const RawData& raw, CodecData& codec, DecodeData&)
 {
     uint16_t protocol;
-
-    DebugMessage(DEBUG_DECODE, "PPP Packet!\n");
 
     if (raw.len < 2)
         return false;
@@ -90,8 +89,12 @@ bool PppEncap::decode(const RawData& raw, CodecData& codec, DecodeData&)
             return false;
         }
 
-        // FIXIT-M X This is broken - it should not modify the packet data (which should be const).
-        ((IP4Hdr*)(raw.data + codec.lyr_len))->set_proto(IpProtocol::TCP);
+        {
+            // FIXIT-M X This is broken - it should not modify the packet data
+            // (which should be const).
+            const ip::IP4Hdr* iph = reinterpret_cast<const ip::IP4Hdr*>(raw.data + codec.lyr_len);
+            const_cast<ip::IP4Hdr*>(iph)->set_proto(IpProtocol::TCP);
+        }
     /* fall through */
 
     case PPP_IP:

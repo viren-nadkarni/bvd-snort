@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,9 +25,13 @@
 
 #include "service_tftp.h"
 
-#include "appid_inspector.h"
-#include "app_info_table.h"
 #include "protocols/packet.h"
+
+#include "app_info_table.h"
+#include "appid_debug.h"
+#include "appid_inspector.h"
+
+using namespace snort;
 
 #define TFTP_PORT   69
 #define TFTP_COUNT_THRESHOLD 1
@@ -70,8 +74,6 @@ TftpServiceDetector::TftpServiceDetector(ServiceDiscovery* sd)
     name = "tftp";
     proto = IpProtocol::UDP;
     detectorType = DETECTOR_TYPE_DECODER;
-
-    app_id = AppInfoManager::get_instance().add_appid_protocol_reference("tftp");
 
     appid_registry =
     {
@@ -125,32 +127,31 @@ int TftpServiceDetector::validate(AppIdDiscoveryArgs& args)
     int mode = 0;
     uint16_t block = 0;
     uint16_t tmp = 0;
+    const snort::SfIp* sip = nullptr;
+    const snort::SfIp* dip = nullptr;
     AppIdSession* pf = nullptr;
-    const SfIp* sip = nullptr;
-    const SfIp* dip = nullptr;
-    AppIdSession* asd = args.asd;
     const uint8_t* data = args.data;
-    Packet* pkt = args.pkt;
-    const int dir = args.dir;
     uint16_t size = args.size;
+    //FIXIT-M - Avoid thread locals
+    static THREAD_LOCAL SnortProtocolId tftp_snort_protocol_id = UNKNOWN_PROTOCOL_ID;
 
     if (!size)
         goto inprocess;
 
-    td = (ServiceTFTPData*)data_get(asd);
+    td = (ServiceTFTPData*)data_get(args.asd);
     if (!td)
     {
         td = (ServiceTFTPData*)snort_calloc(sizeof(ServiceTFTPData));
-        data_add(asd, td, &snort_free);
+        data_add(args.asd, td, &snort_free);
         td->state = TFTP_STATE_CONNECTION;
     }
-    if (args.session_logging_enabled)
-        LogMessage("AppIdDbg %s tftp state %d\n", args.session_logging_id, td->state);
+    if (appidDebug->is_active())
+        LogMessage("AppIdDbg %s TFTP state %d\n", appidDebug->get_debug_session(), td->state);
 
-    if (td->state == TFTP_STATE_CONNECTION && dir == APP_ID_FROM_RESPONDER)
+    if (td->state == TFTP_STATE_CONNECTION && args.dir == APP_ID_FROM_RESPONDER)
         goto fail;
     if ((td->state == TFTP_STATE_TRANSFER || td->state == TFTP_STATE_DATA) &&
-        dir == APP_ID_FROM_INITIATOR)
+        args.dir == APP_ID_FROM_INITIATOR)
     {
         goto inprocess;
     }
@@ -182,23 +183,27 @@ int TftpServiceDetector::validate(AppIdDiscoveryArgs& args)
         if (strcasecmp((const char*)data, "netascii") && strcasecmp((const char*)data, "octet"))
             goto bail;
 
+        if(tftp_snort_protocol_id == UNKNOWN_PROTOCOL_ID)
+            tftp_snort_protocol_id = snort::SnortConfig::get_conf()->proto_ref->find("tftp");
+
         tmp_td = (ServiceTFTPData*)snort_calloc(sizeof(ServiceTFTPData));
         tmp_td->state = TFTP_STATE_TRANSFER;
-        dip = pkt->ptrs.ip_api.get_dst();
-        sip = pkt->ptrs.ip_api.get_src();
-        pf = AppIdSession::create_future_session(pkt, dip, 0, sip, pkt->ptrs.sp, asd->protocol,
-            app_id, APPID_EARLY_SESSION_FLAG_FW_RULE, handler->get_inspector());
+        dip = args.pkt->ptrs.ip_api.get_dst();
+        sip = args.pkt->ptrs.ip_api.get_src();
+        pf = AppIdSession::create_future_session(args.pkt, dip, 0, sip,
+            args.pkt->ptrs.sp, args.asd.protocol, tftp_snort_protocol_id, APPID_EARLY_SESSION_FLAG_FW_RULE,
+            handler->get_inspector());
         if (pf)
         {
-            data_add(pf, tmp_td, &snort_free);
-            if (pf->add_flow_data_id(pkt->ptrs.dp, this))
+            data_add(*pf, tmp_td, &snort_free);
+            if (pf->add_flow_data_id(args.pkt->ptrs.dp, this))
             {
                 pf->set_session_flags(APPID_SESSION_SERVICE_DETECTED);
                 pf->clear_session_flags(APPID_SESSION_CONTINUE);
                 tmp_td->state = TFTP_STATE_ERROR;
                 return APPID_ENOMEM;
             }
-            initialize_expected_session(asd, pf, APPID_SESSION_EXPECTED_EVALUATE, APP_ID_FROM_RESPONDER);
+            initialize_expected_session(args.asd, *pf, APPID_SESSION_EXPECTED_EVALUATE, APP_ID_FROM_RESPONDER);
             pf->common.initiator_ip = *sip;
             pf->service_disco_state = APPID_DISCO_STATE_STATEFUL;
             pf->scan_flags |= SCAN_HOST_PORT_FLAG;
@@ -213,12 +218,12 @@ int TftpServiceDetector::validate(AppIdDiscoveryArgs& args)
     case TFTP_STATE_TRANSFER:
         if ((mode=tftp_verify_header(data, size, &block)) < 0)
         {
-            if (args.session_logging_enabled)
-                LogMessage("AppIdDbg %s tftp failed to verify\n", args.session_logging_id);
+            if (appidDebug->is_active())
+                LogMessage("AppIdDbg %s TFTP failed to verify\n", appidDebug->get_debug_session());
             goto fail;
         }
-        if (args.session_logging_enabled)
-            LogMessage("AppIdDbg %s tftp mode %d and block %u\n", args.session_logging_id,
+        if (appidDebug->is_active())
+            LogMessage("AppIdDbg %s TFTP mode %d and block %u\n", appidDebug->get_debug_session(),
                 mode, (unsigned)block);
         if (mode == TFTP_STATE_ACK)
         {
@@ -252,31 +257,31 @@ int TftpServiceDetector::validate(AppIdDiscoveryArgs& args)
     case TFTP_STATE_ACK:
         if ((mode=tftp_verify_header(data, size, &block)) < 0)
         {
-            if (dir == APP_ID_FROM_RESPONDER)
+            if (args.dir == APP_ID_FROM_RESPONDER)
                 goto fail;
             else
             {
-                if (args.session_logging_enabled)
-                    LogMessage("AppIdDbg %s tftp failed to verify\n", args.session_logging_id);
+                if (appidDebug->is_active())
+                    LogMessage("AppIdDbg %s TFTP failed to verify\n", appidDebug->get_debug_session());
                 goto bail;
             }
         }
-        if (args.session_logging_enabled)
-            LogMessage("AppIdDbg %s tftp mode %d\n", args.session_logging_id, mode);
+        if (appidDebug->is_active())
+            LogMessage("AppIdDbg %s TFTP mode %d\n", appidDebug->get_debug_session(), mode);
         if (mode == TFTP_STATE_ERROR)
         {
             td->state = TFTP_STATE_TRANSFER;
             break;
         }
-        if (dir == APP_ID_FROM_INITIATOR && mode != TFTP_STATE_DATA)
+        if (args.dir == APP_ID_FROM_INITIATOR && mode != TFTP_STATE_DATA)
         {
-            if (args.session_logging_enabled)
-                LogMessage("AppIdDbg %s tftp bad mode\n", args.session_logging_id);
+            if (appidDebug->is_active())
+                LogMessage("AppIdDbg %s TFTP bad mode\n", appidDebug->get_debug_session());
             goto bail;
         }
-        if (dir == APP_ID_FROM_RESPONDER && mode != TFTP_STATE_ACK)
+        if (args.dir == APP_ID_FROM_RESPONDER && mode != TFTP_STATE_ACK)
             goto fail;
-        if (dir == APP_ID_FROM_INITIATOR)
+        if (args.dir == APP_ID_FROM_INITIATOR)
         {
             if (size < sizeof(ServiceTFTPHeader) + TFTP_MAX_PACKET_SIZE)
                 td->last = 1;
@@ -315,20 +320,20 @@ int TftpServiceDetector::validate(AppIdDiscoveryArgs& args)
     }
 
 inprocess:
-    service_inprocess(asd, pkt, dir);
+    service_inprocess(args.asd, args.pkt, args.dir);
     return APPID_INPROCESS;
 
 success:
-    if (args.session_logging_enabled)
-        LogMessage("AppIdDbg %s tftp success\n", args.session_logging_id);
-    return add_service(asd, pkt, dir, APP_ID_TFTP);
+    if (appidDebug->is_active())
+        LogMessage("AppIdDbg %s TFTP success\n", appidDebug->get_debug_session());
+    return add_service(args.change_bits, args.asd, args.pkt, args.dir, APP_ID_TFTP);
 
 bail:
-    incompatible_data(asd, pkt, dir);
+    incompatible_data(args.asd, args.pkt, args.dir);
     return APPID_NOT_COMPATIBLE;
 
 fail:
-    fail_service(asd, pkt, dir);
+    fail_service(args.asd, args.pkt, args.dir);
     return APPID_NOMATCH;
 }
 

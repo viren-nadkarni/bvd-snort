@@ -192,12 +192,13 @@ ftp_command_specs =
     { command = 'SIZE', length = 512 },
 
     { command = 'ALLO', length = 200, format = '< int [ char R int ] >' },
-    { command = 'PORT', length = 400, format = '< host_port >' },
-
-    { command = 'EPSV', format = '< [ { char 12 | char A char L char L } ] >' },
+    { command = 'EPRT', length = 400, format = '< extd_host_port >' },
+    { command = 'EPSV', format = "< [ { '1' | '2' | 'ALL' } ] >" },
+    { command = 'LPRT', length = 400, format = '< long_host_port >' },
     { command = 'MACB', format = '< string >' },
     { command = 'MDTM', format = '< [ date nnnnnnnnnnnnnn[.n[n[n]]] ] string >' },
     { command = 'MODE', format = '< char ASBCZ >' },
+    { command = 'PORT', length = 400, format = '< host_port >' },
     { command = 'PROT', format = '< char CSEP >' },
     { command = 'STRU', format = '< char FRPO [ string ] >' },
     { command = 'TYPE', 
@@ -324,12 +325,15 @@ default_wizard =
 
         { service = 'dce_http_proxy', proto = 'tcp', client_first = true,
           to_server = { 'RPC_CONNECT' } },
- 
+
     },
     hexes =
     {
         { service = 'dnp3', proto = 'tcp', client_first = true, 
           to_server = { '|05 64|' }, to_client = { '|05 64|' } },
+
+        { service = 'http2', proto = 'tcp', client_first = true,
+          to_server = { '|50 52 49 20 2a 20 48 54 54 50 2f 32 2e 30 0d 0a 0d 0a 53 4d 0d 0a 0d 0a|' } },
 --[[
         { service = 'modbus', proto = 'tcp', client_first = true,
           to_server = { '??|0 0|' } },

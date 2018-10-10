@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,6 +29,8 @@
 #include "framework/base_api.h"
 #include "main/snort_types.h"
 
+namespace snort
+{
 // this is the current version of the api
 #define CONNECTOR_API_VERSION ((BASE_API_VERSION << 16) | 0)
 
@@ -111,6 +113,6 @@ struct ConnectorApi
     ConnectorNewFunc ctor;
     ConnectorDelFunc dtor;
 };
-
+}
 #endif
 

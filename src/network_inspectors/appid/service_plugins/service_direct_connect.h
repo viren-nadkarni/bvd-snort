@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -36,10 +36,10 @@ public:
     int validate(AppIdDiscoveryArgs&) override;
 
 private:
-    int tcp_validate(const uint8_t* data, uint16_t size, const int dir, AppIdSession*,
-        const Packet*, ServiceData*);
-    int udp_validate(const uint8_t* data, uint16_t size, const int dir, AppIdSession*,
-        const Packet*, ServiceData*);
+    int tcp_validate(const uint8_t* data, uint16_t size, const AppidSessionDirection dir, AppIdSession&,
+        const snort::Packet*, ServiceData*, AppidChangeBits&);
+    int udp_validate(const uint8_t* data, uint16_t size, const AppidSessionDirection dir, AppIdSession&,
+        const snort::Packet*, ServiceData*, AppidChangeBits&);
 };
 
 #endif

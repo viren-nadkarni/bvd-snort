@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -24,12 +24,15 @@
 #include "normalize.h"
 
 struct NormalizerConfig;
+namespace snort
+{
 struct Packet;
+}
 
 // all normalizers look like this:
 // the return is 1 if packet was changed, else 0
 typedef int (* NormalFunc)( // FIXIT-L why is this exposed?
-    struct NormalizerConfig*, Packet*, uint8_t layer, int changes);
+    struct NormalizerConfig*, snort::Packet*, uint8_t layer, int changes);
 
 extern const PegInfo norm_names[];
 
@@ -40,11 +43,11 @@ struct NormalizerConfig
 
     // these must be in the same order PROTO_IDs are defined!
     // if entry is NULL, proto doesn't have normalization or it is disabled
-    NormalFunc normalizers[PacketManager::max_protocols()];
+    NormalFunc normalizers[snort::PacketManager::max_protocols()];
 };
 
 int Norm_SetConfig(NormalizerConfig*);
-int Norm_Packet(NormalizerConfig*, Packet*);
+int Norm_Packet(NormalizerConfig*, snort::Packet*);
 
 inline void Norm_Enable(NormalizerConfig* nc, NormFlags nf)
 {

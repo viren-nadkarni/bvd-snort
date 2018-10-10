@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,11 +24,12 @@
 
 #include "file_connector.h"
 
-#include "main/snort_debug.h"
 #include "profiler/profiler_defs.h"
 #include "side_channel/side_channel.h"
 
 #include "file_connector_module.h"
+
+using namespace snort;
 
 /* Globals ****************************************************************/
 
@@ -37,8 +38,6 @@ THREAD_LOCAL ProfileStats file_connector_perfstats;
 
 FileConnectorMsgHandle::FileConnectorMsgHandle(const uint32_t length)
 {
-    DebugMessage(DEBUG_CONNECTORS,"FileConnectorMsgHandle::FileConnectorMsgHandle()\n");
-
     connector_msg.length = length;
     connector_msg.data = new uint8_t[length];
 }
@@ -67,18 +66,11 @@ FileConnectorCommon::~FileConnectorCommon()
 
 FileConnector::FileConnector(FileConnectorConfig* file_connector_config)
 {
-    DebugMessage(DEBUG_CONNECTORS,"FileConnector::FileConnector()\n");
     config = file_connector_config;
-}
-
-FileConnector::~FileConnector()
-{
-    DebugMessage(DEBUG_CONNECTORS,"FileConnector::~FileConnector()\n");
 }
 
 ConnectorMsgHandle* FileConnector::alloc_message(const uint32_t length, const uint8_t** data)
 {
-    DebugMessage(DEBUG_CONNECTORS,"FileConnector::alloc_message()\n");
     FileConnectorMsgHandle* msg = new FileConnectorMsgHandle(length);
 
     *data = (uint8_t*)msg->connector_msg.data;
@@ -88,14 +80,12 @@ ConnectorMsgHandle* FileConnector::alloc_message(const uint32_t length, const ui
 
 void FileConnector::discard_message(ConnectorMsgHandle* msg)
 {
-    DebugMessage(DEBUG_CONNECTORS,"FileConnector::discard_message()\n");
     FileConnectorMsgHandle* fmsg = (FileConnectorMsgHandle*)msg;
     delete fmsg;
 }
 
 bool FileConnector::transmit_message(ConnectorMsgHandle* msg)
 {
-    DebugMessage(DEBUG_CONNECTORS,"FileConnector::transmit_message()\n");
     FileConnectorMsgHandle* fmsg = (FileConnectorMsgHandle*)msg;
     const FileConnectorConfig* cfg = (const FileConnectorConfig*)config;
 
@@ -172,8 +162,10 @@ ConnectorMsgHandle* FileConnector::receive_message_text()
     char line_buffer[4*MAXIMUM_SC_MESSAGE_CONTENT];
     char message[MAXIMUM_SC_MESSAGE_CONTENT];
     char* current = line_buffer;
+    uint64_t time_seconds;
+    uint32_t time_u_seconds;
+    uint16_t port;
     int length = 0;
-    SCMsgHdr hdr;
 
     // Read the record
     file.getline(line_buffer, sizeof(line_buffer));
@@ -185,7 +177,8 @@ ConnectorMsgHandle* FileConnector::receive_message_text()
         return nullptr;
     }
 
-    sscanf(line_buffer, "%hu:%" SCNu64 ".%" SCNu32, &hdr.port, &hdr.time_seconds, &hdr.time_u_seconds);
+    // FIXIT-L Add sanity/retval checking for sscanfs below
+    sscanf(line_buffer, "%hu:%" SCNu64 ".%" SCNu32, &port, &time_seconds, &time_u_seconds);
 
     while ( (current = strchr(current,(int)',')) != nullptr )
     {
@@ -196,8 +189,12 @@ ConnectorMsgHandle* FileConnector::receive_message_text()
     // The message is valid, make a ConnectorMsg to contain it.
     FileConnectorMsgHandle* handle = new FileConnectorMsgHandle(length+sizeof(SCMsgHdr));
 
-    // Copy the header
-    memcpy(handle->connector_msg.data, &hdr, sizeof(SCMsgHdr));
+    // Populate the new message header
+    SCMsgHdr* hdr = (SCMsgHdr*) handle->connector_msg.data;
+    hdr->port = port;
+    hdr->sequence = 0;
+    hdr->time_seconds = time_seconds;
+    hdr->time_u_seconds = time_u_seconds;
     // Copy the connector message into the new ConnectorMsg
     memcpy((handle->connector_msg.data+sizeof(SCMsgHdr)), message, length);
 
@@ -208,8 +205,6 @@ ConnectorMsgHandle* FileConnector::receive_message_text()
 //  or it does not.
 ConnectorMsgHandle* FileConnector::receive_message(bool)
 {
-    DebugMessage(DEBUG_CONNECTORS,"FileConnector::receive_message()\n");
-
     if ( !file.is_open() )
         return nullptr;
     else
@@ -232,14 +227,12 @@ ConnectorMsgHandle* FileConnector::receive_message(bool)
 
 static Module* mod_ctor()
 {
-    DebugMessage(DEBUG_CONNECTORS,"file_connector:mod_ctor()\n");
     return new FileConnectorModule;
 }
 
 static void mod_dtor(Module* m)
 {
     delete m;
-    DebugMessage(DEBUG_CONNECTORS,"file_connector:mod_dtor(Module*)\n");
 }
 
 static Connector* file_connector_tinit_transmit(std::string filename,
@@ -252,9 +245,6 @@ static Connector* file_connector_tinit_transmit(std::string filename,
     (void)get_instance_file(pathname, filename.c_str());
     file_connector->file.open(pathname,
         (std::ios::out | (cfg->text_format ? (std::ios::openmode)0 : std::ios::binary)) );
-
-    DebugFormat(DEBUG_CONNECTORS,"file_connector:file_connector_tinit_transmit(): pathname: %s\n",
-        pathname.c_str());
 
     return file_connector;
 }
@@ -269,16 +259,12 @@ static Connector* file_connector_tinit_receive(std::string filename,
     (void)get_instance_file(pathname, filename.c_str());
     file_connector->file.open(pathname, (std::ios::in | std::ios::binary) );
 
-    DebugFormat(DEBUG_CONNECTORS,"file_connector:file_connector_tinit_receive(): pathname: %s\n",
-        pathname.c_str());
-
     return file_connector;
 }
 
 // Create a per-thread object
 static Connector* file_connector_tinit(ConnectorConfig* config)
 {
-    DebugMessage(DEBUG_CONNECTORS,"file_connector:file_connector_tinit()\n");
     FileConnectorConfig* cfg = (FileConnectorConfig*)config;
 
     std::string filename = FILE_CONNECTOR_NAME;
@@ -296,7 +282,6 @@ static Connector* file_connector_tinit(ConnectorConfig* config)
 
 static void file_connector_tterm(Connector* connector)
 {
-    DebugMessage(DEBUG_CONNECTORS,"file_connector:file_connector_tterm()\n");
     FileConnector* file_connector = (FileConnector*)connector;
 
     file_connector->file.close();
@@ -305,7 +290,6 @@ static void file_connector_tterm(Connector* connector)
 
 static ConnectorCommon* file_connector_ctor(Module* m)
 {
-    DebugMessage(DEBUG_CONNECTORS,"file_connector:file_connector_ctor(Module*)\n");
     FileConnectorModule* mod = (FileConnectorModule*)m;
     FileConnectorCommon* file_connector_common = new FileConnectorCommon(
         mod->get_and_clear_config());
@@ -315,7 +299,6 @@ static ConnectorCommon* file_connector_ctor(Module* m)
 
 static void file_connector_dtor(ConnectorCommon* c)
 {
-    DebugMessage(DEBUG_CONNECTORS,"file_connector:file_connector_dtor(ConnectorCommon*)\n");
     FileConnectorCommon* fc = (FileConnectorCommon*)c;
     delete fc;
 }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,21 +25,36 @@
 
 #include "host_tracker/host_cache.h"
 
+#include "main/snort_config.h"
+
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
-//  Fake AddProtocolReference to avoid bringing in a ton of dependencies.
-int16_t AddProtocolReference(const char* protocol)
+using namespace snort;
+
+namespace snort
 {
+SnortConfig s_conf;
+THREAD_LOCAL SnortConfig* snort_conf = &s_conf;
+SnortConfig::SnortConfig(const SnortConfig* const) { }
+SnortConfig::~SnortConfig() = default;
+SnortConfig* SnortConfig::get_conf()
+{ return snort_conf; }
+
+SnortProtocolId ProtocolReference::find(char const*) { return 0; }
+SnortProtocolId ProtocolReference::add(const char* protocol)
+{
+    if (!strcmp("servicename", protocol))
+        return 3;
     if (!strcmp("tcp", protocol))
         return 2;
     return 1;
 }
 
-// Ditto for snort_strdup()
 char* snort_strdup(const char* str)
 {
     return strdup(str);
+}
 }
 
 TEST_GROUP(host_cache)

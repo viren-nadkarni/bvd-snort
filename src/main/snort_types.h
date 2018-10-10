@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2007-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -69,15 +69,6 @@ typedef uint16_t Port;
     (__GNUC__ == 2 && __GNUC_MINOR__ < 5)
 #define __attribute__(x)    /* delete __attribute__ if non-gcc or gcc1 */
 #endif
-
-#define SNORT_FORCED_INCLUSION_SYMBOL( name ) \
-    __snort_include_##name
-
-#define SNORT_FORCED_INCLUSION_DEFINITION( name ) \
-    bool SNORT_FORCED_INCLUSION_SYMBOL( name )
-
-#define SNORT_FORCED_INCLUSION_EXTERN( name ) \
-    extern SNORT_FORCED_INCLUSION_DEFINITION( name )
 
 #endif
 

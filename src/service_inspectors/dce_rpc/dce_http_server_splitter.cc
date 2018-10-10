@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,12 +25,13 @@
 
 #include "dce_http_server_splitter.h"
 
-#include "dce_http_common.h"
 #include "dce_http_server_module.h"
 
 #ifdef UNIT_TEST
 #include "catch/snort_catch.h"
 #endif
+
+using namespace snort;
 
 // NOTE:  These strings must have a length of at least one character
 #define HTTP_SERVER_MARKER "ncacn_http/1.0"

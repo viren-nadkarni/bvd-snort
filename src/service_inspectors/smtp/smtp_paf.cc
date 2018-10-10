@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,11 +24,12 @@
 
 #include "detection/detection_engine.h"
 #include "events/event_queue.h"
-#include "main/snort_debug.h"
 #include "protocols/packet.h"
 #include "stream/stream.h"
 
 #include "smtp_module.h"
+
+using namespace snort;
 
 /* State tracker for MIME PAF */
 enum SmtpDataCMD
@@ -93,7 +94,6 @@ static inline StreamSplitter::Status smtp_paf_server(SmtpPafData* pfdata,
 
     if (pch != nullptr)
     {
-        DebugMessage(DEBUG_SMTP, "Find end of line!\n");
         *fp = (uint32_t)(pch - (const char*)data) + 1;
         return StreamSplitter::FLUSH;
     }
@@ -233,8 +233,6 @@ static inline bool process_command(SmtpPafData* pfdata,  uint8_t val)
         /* Continue finding the data length ...*/
         if (get_length(val, &pfdata->length) != SMTP_PAF_LENGTH_CONTINUE)
         {
-            DebugFormat(DEBUG_SMTP, "Find data length: %u\n",
-                pfdata->length);
             pfdata->cmd_info.cmd_state = SMTP_PAF_CMD_DATA_END_STATE;
         }
         break;
@@ -267,7 +265,6 @@ static inline bool process_data(SmtpPafData* pfdata,  uint8_t data)
 {
     if (flush_based_length(pfdata)|| check_data_end(&(pfdata->data_end_state), data))
     {
-        DebugMessage(DEBUG_SMTP, "End of data\n");
         /*Clean up states*/
         pfdata->smtp_state = SMTP_PAF_CMD_STATE;
         pfdata->end_of_data = true;
@@ -289,7 +286,6 @@ static inline StreamSplitter::Status smtp_paf_client(SmtpPafData* pfdata,
     uint32_t boundary_start = 0;
     bool alert_generated = false;
 
-    DebugFormat(DEBUG_SMTP, "From client: %s \n", data);
     for (i = 0; i < len; i++)
     {
         uint8_t ch = data[i];
@@ -298,7 +294,6 @@ static inline StreamSplitter::Status smtp_paf_client(SmtpPafData* pfdata,
         case SMTP_PAF_CMD_STATE:
             if (process_command(pfdata, ch))
             {
-                DebugFormat(DEBUG_SMTP, "Flush command: %s \n", data);
                 *fp = i + 1;
                 return StreamSplitter::FLUSH;
             }
@@ -324,7 +319,6 @@ static inline StreamSplitter::Status smtp_paf_client(SmtpPafData* pfdata,
             }
             else if (process_data(pfdata, ch))
             {
-                DebugMessage(DEBUG_SMTP, "Flush data!\n");
                 *fp = i + 1;
                 return StreamSplitter::FLUSH;
             }
@@ -383,12 +377,10 @@ StreamSplitter::Status SmtpSplitter::scan(
 
     if (flags & PKT_FROM_SERVER)
     {
-        DebugMessage(DEBUG_SMTP, "PAF: From server.\n");
         return smtp_paf_server(pfdata, data, len, fp);
     }
     else
     {
-        DebugMessage(DEBUG_SMTP, "PAF: From client.\n");
         return smtp_paf_client(pfdata, data, len, fp, max_auth_command_line_len);
     }
 }

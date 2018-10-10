@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2007-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -49,6 +49,8 @@
 #include "messages.h"
 #include "obfuscator.h"
 
+namespace snort
+{
 /*--------------------------------------------------------------------
  * utility functions
  *--------------------------------------------------------------------
@@ -88,7 +90,7 @@ bool LogAppID(TextLog* log, Packet* p)
 {
     if ( p->flow )
     {
-        const char* app_name = appid_api.get_application_name(p->flow, p->is_from_client());
+        const char* app_name = appid_api.get_application_name(*p->flow, p->is_from_client());
 
         if ( app_name )
         {
@@ -243,13 +245,13 @@ static void LogIpOptions(TextLog* log, const ip::IpOptionIterator& options)
     TextLog_NewLine(log);
 }
 
-void LogIpOptions(TextLog* log, const IP4Hdr* ip4h, uint16_t valid_ip4_len)
+void LogIpOptions(TextLog* log, const ip::IP4Hdr* ip4h, uint16_t valid_ip4_len)
 {
     const ip::IpOptionIterator options(ip4h, valid_ip4_len);
     LogIpOptions(log, options);
 }
 
-static void LogIpOptions(TextLog* log, const IP4Hdr* ip4h, const Packet* const p)
+static void LogIpOptions(TextLog* log, const ip::IP4Hdr* ip4h, const Packet* const p)
 {
     const ip::IpOptionIterator options(ip4h, p);
     LogIpOptions(log, options);
@@ -410,15 +412,14 @@ void LogIPHeader(TextLog* log, Packet* p)
 static void LogOuterIPHeader(TextLog* log, Packet* p)
 {
     uint8_t save_frag_flag = (p->ptrs.decode_flags & DECODE_FRAG);
-    uint16_t save_sp, save_dp;
     ip::IpApi save_ip_api = p->ptrs.ip_api;
 
     p->ptrs.decode_flags &= ~DECODE_FRAG;
 
     if (p->proto_bits & PROTO_BIT__TEREDO)
     {
-        save_sp = p->ptrs.sp;
-        save_dp = p->ptrs.dp;
+        uint16_t save_sp = p->ptrs.sp;
+        uint16_t save_dp = p->ptrs.dp;
 
         const udp::UDPHdr* udph = layer::get_outer_udp_lyr(p);
         p->ptrs.sp = ntohs(udph->uh_sport);
@@ -1354,8 +1355,7 @@ void LogPayload(TextLog* log, Packet* p)
         {
             LogCharData(log, p->data, p->dsize);
 
-            DataPointer file_data;
-            DetectionEngine::get_file_data(file_data);
+            DataPointer file_data = DetectionEngine::get_file_data(p->context);
 
             if ( file_data.len > 0 )
             {
@@ -1379,8 +1379,7 @@ void LogPayload(TextLog* log, Packet* p)
             {
                 LogNetData(log, p->data, p->dsize, p);
 
-                DataPointer file_data;
-                DetectionEngine::get_file_data(file_data);
+                DataPointer file_data = DetectionEngine::get_file_data(p->context);
 
                 if ( file_data.len > 0 )
                 {
@@ -1395,4 +1394,5 @@ void LogPayload(TextLog* log, Packet* p)
         LogNetData(log, p->pkt, p->pkth->caplen, p);
     }
 }
+} // namespace snort
 

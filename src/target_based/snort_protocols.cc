@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2006-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,19 +28,21 @@
 #include <algorithm>
 
 #include "log/messages.h"
-#include "main/snort_debug.h"
 #include "protocols/packet.h"
 #include "utils/util.h"
 #include "utils/util_cstring.h"
 
 #include "sftarget_data.h"
 
+using namespace snort;
 using namespace std;
 
-int16_t ProtocolReference::get_count()
-{ return protocol_number; }
+SnortProtocolId ProtocolReference::get_count()
+{
+    return protocol_number;
+}
 
-const char* ProtocolReference::get_name(uint16_t id)
+const char* ProtocolReference::get_name(SnortProtocolId id)
 {
     if ( id >= id_map.size() )
         id = 0;
@@ -50,18 +52,18 @@ const char* ProtocolReference::get_name(uint16_t id)
 
 struct Compare
 {
-    bool operator()(uint16_t a, uint16_t b)
+    bool operator()(SnortProtocolId a, SnortProtocolId b)
     { return map[a] < map[b]; }
 
     vector<string>& map;
 };
 
-const char* ProtocolReference::get_name_sorted(uint16_t id)
+const char* ProtocolReference::get_name_sorted(SnortProtocolId id)
 {
     if ( ind_map.size() < id_map.size() )
     {
         while ( ind_map.size() < id_map.size() )
-            ind_map.push_back((uint16_t)ind_map.size());
+            ind_map.push_back((SnortProtocolId)ind_map.size());
 
         Compare c { id_map };
         sort(ind_map.begin(), ind_map.end(), c);
@@ -72,52 +74,66 @@ const char* ProtocolReference::get_name_sorted(uint16_t id)
     return id_map[ind_map[id]].c_str();
 }
 
-int16_t ProtocolReference::add(const char* protocol)
+SnortProtocolId ProtocolReference::add(const char* protocol)
 {
     if (!protocol)
-        return SFTARGET_UNKNOWN_PROTOCOL;
+        return UNKNOWN_PROTOCOL_ID;
 
     auto protocol_ref = ref_table.find(protocol);
     if ( protocol_ref != ref_table.end() )
     {
-        DebugFormat(DEBUG_ATTRIBUTE, "Protocol Reference for %s exists as %d\n",
-            protocol, protocol_ref->second);
-
         return protocol_ref->second;
     }
 
-    int16_t ordinal = protocol_number++;
+    SnortProtocolId snort_protocol_id = protocol_number++;
     id_map.push_back(protocol);
-    ref_table[protocol] = ordinal;
+    ref_table[protocol] = snort_protocol_id;
 
-    return ordinal;
+    return snort_protocol_id;
 }
 
-int16_t ProtocolReference::find(const char* protocol)
+SnortProtocolId ProtocolReference::find(const char* protocol)
 {
     auto protocol_ref = ref_table.find(protocol);
     if ( protocol_ref != ref_table.end() )
     {
-        DebugFormat(DEBUG_ATTRIBUTE, "Protocol Reference for %s exists as %d\n",
-            protocol, protocol_ref->second);
-
         return protocol_ref->second;
     }
 
-    return SFTARGET_UNKNOWN_PROTOCOL;
+    return UNKNOWN_PROTOCOL_ID;
+}
+
+void ProtocolReference::init(ProtocolReference* old_proto_ref)
+{
+    if(!old_proto_ref)
+    {
+        bool ok = ( add("unknown") == UNKNOWN_PROTOCOL_ID );
+        ok = ( add("ip") == SNORT_PROTO_IP ) and ok;
+        ok = ( add("icmp") == SNORT_PROTO_ICMP ) and ok;
+        ok = ( add("tcp") == SNORT_PROTO_TCP ) and ok;
+        ok = ( add("udp") == SNORT_PROTO_UDP ) and ok;
+        ok = ( add("user") == SNORT_PROTO_USER ) and ok;
+        ok = ( add("file") == SNORT_PROTO_FILE ) and ok;
+        assert(ok);
+    }
+    else
+    {
+        // Copy old ProtocolReference ID/name pairs to new ProtocolReference
+        for(SnortProtocolId id = 0; id < old_proto_ref->get_count(); id++)
+        {
+            add(old_proto_ref->get_name(id));
+        }
+    }
 }
 
 ProtocolReference::ProtocolReference()
 {
-    id_map.push_back("unknown");
+    init(nullptr);
+}
 
-    bool ok = ( add("ip") == SNORT_PROTO_IP );
-    ok = ( add("icmp") == SNORT_PROTO_ICMP ) and ok;
-    ok = ( add("tcp") == SNORT_PROTO_TCP ) and ok;
-    ok = ( add("udp") == SNORT_PROTO_UDP ) and ok;
-    ok = ( add("user") == SNORT_PROTO_USER ) and ok;
-    ok = ( add("file") == SNORT_PROTO_FILE ) and ok;
-    assert(ok);
+ProtocolReference::ProtocolReference(ProtocolReference* old_proto_ref)
+{
+    init(old_proto_ref);
 }
 
 ProtocolReference::~ProtocolReference()

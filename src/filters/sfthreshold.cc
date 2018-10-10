@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -270,7 +270,7 @@ void sfthreshold_free()
 
 */
 int sfthreshold_create(
-    SnortConfig* sc, ThresholdConfig* thd_config, THDX_STRUCT* thdx)
+    snort::SnortConfig* sc, ThresholdConfig* thd_config, THDX_STRUCT* thdx)
 {
     if (thd_config == nullptr)
         return -1;
@@ -311,13 +311,11 @@ int sfthreshold_create(
     returns 0 - log
            !0 - don't log
 */
-int sfthreshold_test(
-    unsigned gen_id, unsigned sig_id,
-    const SfIp* sip, const SfIp* dip,
-    long curtime)
+int sfthreshold_test(unsigned gen_id, unsigned sig_id, const snort::SfIp* sip,
+    const snort::SfIp* dip, long curtime)
 {
-    if ((SnortConfig::get_conf()->threshold_config == nullptr) ||
-        !SnortConfig::get_conf()->threshold_config->enabled)
+    if ((snort::SnortConfig::get_conf()->threshold_config == nullptr) ||
+        !snort::SnortConfig::get_conf()->threshold_config->enabled)
     {
         return 0;
     }
@@ -325,7 +323,7 @@ int sfthreshold_test(
     if (!thd_checked)
     {
         thd_checked = 1;
-        thd_answer = sfthd_test_threshold(SnortConfig::get_conf()->threshold_config->thd_objs,
+        thd_answer = sfthd_test_threshold(snort::SnortConfig::get_conf()->threshold_config->thd_objs,
             thd_runtime, gen_id, sig_id, sip, dip, curtime);
     }
 

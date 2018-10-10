@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -51,19 +51,22 @@
 
 extern const PegInfo tcp_pegs[];
 
-extern THREAD_LOCAL ProfileStats s5TcpPerfStats;
-extern THREAD_LOCAL ProfileStats s5TcpNewSessPerfStats;
-extern THREAD_LOCAL ProfileStats s5TcpStatePerfStats;
-extern THREAD_LOCAL ProfileStats s5TcpDataPerfStats;
-extern THREAD_LOCAL ProfileStats s5TcpInsertPerfStats;
-extern THREAD_LOCAL ProfileStats s5TcpPAFPerfStats;
-extern THREAD_LOCAL ProfileStats s5TcpFlushPerfStats;
-extern THREAD_LOCAL ProfileStats s5TcpBuildPacketPerfStats;
-extern THREAD_LOCAL ProfileStats streamSizePerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5TcpPerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5TcpNewSessPerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5TcpStatePerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5TcpDataPerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5TcpInsertPerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5TcpPAFPerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5TcpFlushPerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5TcpBuildPacketPerfStats;
+extern THREAD_LOCAL snort::ProfileStats streamSizePerfStats;
 
 struct TcpStats
 {
     SESSION_STATS;
+    PegCount instantiated;
+    PegCount setups;
+    PegCount restarts;
     PegCount resyns;
     PegCount discards;
     PegCount events;
@@ -85,8 +88,8 @@ struct TcpStats
     PegCount exceeded_max_segs;
     PegCount exceeded_max_bytes;
     PegCount internalEvents;
-    PegCount s5tcp1;
-    PegCount s5tcp2;
+    PegCount client_cleanups;
+    PegCount server_cleanups;
     PegCount mem_in_use;
     PegCount sessions_initializing;
     PegCount sessions_established;
@@ -111,24 +114,27 @@ inline void inc_tcp_discards()
 #define MOD_NAME "stream_tcp"
 #define MOD_HELP "stream inspector for TCP flow tracking and stream normalization and reassembly"
 
+namespace snort
+{
 struct SnortConfig;
+}
 
-class StreamTcpModule : public Module
+class StreamTcpModule : public snort::Module
 {
 public:
     StreamTcpModule();
 
-    bool set(const char*, Value&, SnortConfig*) override;
-    bool begin(const char*, int, SnortConfig*) override;
-    bool end(const char*, int, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool end(const char*, int, snort::SnortConfig*) override;
 
-    const RuleMap* get_rules() const override;
+    const snort::RuleMap* get_rules() const override;
 
     unsigned get_gid() const override
     { return GID_STREAM_TCP; }
 
     TcpStreamConfig* get_data();
-    ProfileStats* get_profile(unsigned, const char*&, const char*&) const override;
+    snort::ProfileStats* get_profile(unsigned, const char*&, const char*&) const override;
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
 

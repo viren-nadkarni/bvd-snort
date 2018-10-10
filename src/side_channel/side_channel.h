@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -45,8 +45,8 @@ struct __attribute__((__packed__)) SCMsgHdr
 struct SCMessage
 {
     SideChannel* sc;
-    Connector* connector;
-    ConnectorMsgHandle* handle;
+    snort::Connector* connector;
+    snort::ConnectorMsgHandle* handle;
     SCMsgHdr* hdr;
     uint8_t* content;
     uint32_t content_length;
@@ -59,7 +59,6 @@ class SideChannel
 {
 public:
     SideChannel();
-    ~SideChannel();
 
     void register_receive_handler(const SCProcessMsgFunc& handler);
     void unregister_receive_handler();
@@ -70,10 +69,10 @@ public:
     bool transmit_message(SCMessage* msg);
     void set_message_port(SCMessage* msg, SCPort port);
     void set_default_port(SCPort port);
-    Connector::Direction get_direction();
+    snort::Connector::Direction get_direction();
 
-    Connector* connector_receive;
-    Connector* connector_transmit;
+    snort::Connector* connector_receive;
+    snort::Connector* connector_transmit;
 
 private:
     SCSequence sequence;

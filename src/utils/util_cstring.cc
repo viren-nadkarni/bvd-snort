@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -29,6 +29,8 @@
 #include <cstdio>
 #include <cstring>
 
+namespace snort
+{
 /* Guaranteed to be '\0' terminated even if truncation occurs.
  *
  * returns  SNORT_SNPRINTF_SUCCESS if successful
@@ -344,5 +346,7 @@ int safe_snprintf(char* s, size_t n, const char* format, ... )
         len = 0;
 
     return len;
+}
+
 }
 

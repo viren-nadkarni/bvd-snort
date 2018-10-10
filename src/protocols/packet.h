@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,15 @@
 #include "flow/flow.h"
 #include "framework/decode_data.h"
 #include "main/snort_types.h"
+#include "target_based/snort_protocols.h"
+
+
+namespace snort
+{
+class Endianness;
+class Flow;
+class IpsContext;
+class Obfuscator;
 
 /* packet status flags */
 #define PKT_REBUILT_FRAG     0x00000001  /* is a rebuilt fragment */
@@ -42,7 +51,7 @@
 
 #define PKT_PDU_HEAD         0x00000100  /* start of PDU */
 #define PKT_PDU_TAIL         0x00000200  /* end of PDU */
-#define PKT_HTTP_DECODE      0x00000400  /* this packet has normalized http */
+#define PKT_DETECT_LIMIT     0x00000400  /* alt_dsize is valid */
 
 #define PKT_ALLOW_MULTIPLE_DETECT 0x00000800  /* packet has either pipelined mime attachments
                                                  or pipeline http requests */
@@ -88,7 +97,6 @@ enum PseudoPacketType
 
 constexpr int32_t MAX_PORTS = 65536;
 constexpr uint16_t NUM_IP_PROTOS = 256;
-constexpr int16_t SFTARGET_UNKNOWN_PROTOCOL = -1;
 constexpr uint8_t TCP_OPTLENMAX = 40; /* (((2^4) - 1) * 4  - TCP_HEADER_LEN) */
 constexpr uint8_t DEFAULT_LAYERMAX = 40;
 
@@ -103,15 +111,15 @@ struct SO_PUBLIC Packet
     Packet(const Packet&) = delete;
     Packet& operator=(const Packet&) = delete;
 
-    class Flow* flow;   /* for session tracking */
-    class Endianness* endianness;
-    class Obfuscator* obfuscator;
+    Flow* flow;   /* for session tracking */
+    Endianness* endianness;
+    Obfuscator* obfuscator;
 
     uint32_t packet_flags;      /* special flags for the packet */
     uint32_t xtradata_mask;
+    uint32_t proto_bits;        /* protocols contained within this packet */
 
-    uint16_t proto_bits;        /* protocols contained within this packet */
-    uint16_t alt_dsize;         /* the dsize of a packet before munging (used for log)*/
+    uint16_t alt_dsize;         /* size for detection (iff PKT_DETECT_LIMIT) */
 
     uint8_t num_layers;         /* index into layers for next encap */
     // FIXIT-M Consider moving ip_proto_next below `pkth`.
@@ -120,7 +128,7 @@ struct SO_PUBLIC Packet
     // nothing after this point is zeroed ...
 
     // Everything beyond this point is set by PacketManager::decode()
-    class IpsContext* context;   // set by control
+    IpsContext* context;   // set by control
     const DAQ_PktHdr_t* pkth;    // packet meta data
     const uint8_t* pkt;          // raw packet data
 
@@ -188,6 +196,15 @@ struct SO_PUBLIC Packet
     inline PktType type() const
     { return ptrs.get_pkt_type(); } // defined in codec.h
 
+    void set_detect_limit(uint16_t n)
+    {
+        alt_dsize = n;
+        packet_flags |= PKT_DETECT_LIMIT;
+    }
+
+    uint16_t get_detect_limit()
+    { return (packet_flags & PKT_DETECT_LIMIT) ? alt_dsize : dsize; }
+
     const char* get_type() const;
     const char* get_pseudo_type() const;
 
@@ -243,11 +260,19 @@ struct SO_PUBLIC Packet
     bool is_rebuilt() const
     { return (packet_flags & (PKT_REBUILT_STREAM|PKT_REBUILT_FRAG)) != 0; }
 
-    int16_t get_application_protocol()
-    { return flow ? flow->ssn_state.application_protocol : 0; }
+    bool is_detection_enabled(bool to_server);
 
-    void set_application_protocol(int16_t ap)
-    { if ( flow ) flow->ssn_state.application_protocol = ap; }
+    bool test_session_flags(uint32_t);
+
+    SnortProtocolId get_snort_protocol_id();
+
+    void set_snort_protocol_id(SnortProtocolId proto_id)
+    {
+        assert( ptrs.get_pkt_type() != PktType::PDU);
+
+        if ( flow )
+            flow->ssn_state.snort_protocol_id = proto_id;
+    }
 
 private:
     bool allocated;
@@ -325,6 +350,6 @@ inline uint64_t alignedNtohq(const uint64_t* ptr)
     return value;
 #endif
 }
-
+}
 #endif
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -37,7 +37,6 @@
 #include "filters/sfthreshold.h"
 #include "hash/xhash.h"
 #include "helpers/process.h"
-#include "ips_options/ips_pcre.h"
 #include "latency/latency_config.h"
 #include "log/messages.h"
 #include "managers/event_manager.h"
@@ -60,14 +59,10 @@
 #include "utils/util.h"
 #include "utils/util_cstring.h"
 
-#ifdef HAVE_HYPERSCAN
-#include "ips_options/ips_regex.h"
-#include "ips_options/ips_sd_pattern.h"
-#include "search_engines/hyperscan.h"
-#endif
-
 #include "snort.h"
 #include "thread_config.h"
+
+using namespace snort;
 
 #define LOG_NONE    "none"
 #define LOG_DUMP    "dump"
@@ -86,6 +81,7 @@
 THREAD_LOCAL SnortConfig* snort_conf = nullptr;
 
 uint32_t SnortConfig::warning_flags = 0;
+static std::vector <std::pair<ScScratchFunc,ScScratchFunc>> scratch_handlers;
 
 //-------------------------------------------------------------------------
 // private implementation
@@ -160,22 +156,23 @@ static PolicyMode init_policy_mode(PolicyMode mode)
 
 static void init_policies(SnortConfig* sc)
 {
-    for ( auto p : sc->policy_map->ips_policy )
-        p->policy_mode = init_policy_mode(p->policy_mode);
+    IpsPolicy* ips_policy = nullptr;
+    InspectionPolicy* inspection_policy = nullptr;
 
-    for ( auto p : sc->policy_map->inspection_policy )
-        p->policy_mode = init_policy_mode(p->policy_mode);
+    for ( unsigned idx = 0; idx <  sc->policy_map->ips_policy_count(); ++idx )
+    {
+        ips_policy = sc->policy_map->get_ips_policy(idx);
+        ips_policy->policy_mode = init_policy_mode(ips_policy->policy_mode);
+    }
+
+    for ( unsigned idx = 0; idx < sc->policy_map->inspection_policy_count(); ++idx )
+    {
+        inspection_policy = sc->policy_map->get_inspection_policy(idx);
+        inspection_policy->policy_mode = init_policy_mode(inspection_policy->policy_mode);
+    }
 }
 
-//-------------------------------------------------------------------------
-// public methods
-//-------------------------------------------------------------------------
-
-/* A lot of this initialization can be skipped if not running in IDS mode
- * but the goal is to minimize config checks at run time when running in
- * IDS mode so we keep things simple and enforce that the only difference
- * among run_modes is how we handle packets via the log_func. */
-SnortConfig::SnortConfig(SnortConfig* other_conf)
+void SnortConfig::init(const SnortConfig* const other_conf, ProtocolReference* protocol_reference)
 {
     homenet.clear();
     obfuscation_net.clear();
@@ -194,7 +191,7 @@ SnortConfig::SnortConfig(SnortConfig* other_conf)
         InspectorManager::new_config(this);
 
         num_slots = ThreadConfig::get_instance_max();
-        state = (SnortState*)snort_calloc(num_slots, sizeof(SnortState));
+        state = new std::vector<void *>[num_slots];
 
         profiler = new ProfilerConfig;
         latency = new LatencyConfig();
@@ -203,7 +200,7 @@ SnortConfig::SnortConfig(SnortConfig* other_conf)
         thread_config = new ThreadConfig();
 
         memset(evalOrder, 0, sizeof(evalOrder));
-        proto_ref = new ProtocolReference;
+        proto_ref = new ProtocolReference(protocol_reference);
     }
     else
     {
@@ -211,16 +208,35 @@ SnortConfig::SnortConfig(SnortConfig* other_conf)
         policy_map = new PolicyMap(other_conf->policy_map);
     }
 
-    set_inspection_policy(get_inspection_policy());
-    set_ips_policy(get_ips_policy());
-    set_network_policy(get_network_policy());
+    set_inspection_policy(policy_map->get_inspection_policy());
+    set_ips_policy(policy_map->get_ips_policy());
+    set_network_policy(policy_map->get_network_policy());
+}
+
+//-------------------------------------------------------------------------
+// public methods
+//-------------------------------------------------------------------------
+
+/* A lot of this initialization can be skipped if not running in IDS mode
+ * but the goal is to minimize config checks at run time when running in
+ * IDS mode so we keep things simple and enforce that the only difference
+ * among run_modes is how we handle packets via the log_func. */
+SnortConfig::SnortConfig(const SnortConfig* const other_conf)
+{
+    init(other_conf, nullptr);
+}
+
+//  Copy the ProtocolReference data into the new SnortConfig.
+SnortConfig::SnortConfig(ProtocolReference* protocol_reference)
+{
+    init(nullptr, protocol_reference);
 }
 
 SnortConfig::~SnortConfig()
 {
     if ( cloned )
     {
-        policy_map->cloned = true;
+        policy_map->set_cloned(true);
         delete policy_map;
         return;
     }
@@ -229,12 +245,16 @@ SnortConfig::~SnortConfig()
     FreeClassifications(classifications);
     FreeReferences(references);
 
-#ifdef HAVE_HYPERSCAN
-    hyperscan_cleanup(this);
-    sdpattern_cleanup(this);
-    regex_cleanup(this);
-#endif
-    pcre_cleanup(this);
+    // Only call scratch cleanup if we actually called scratch setup
+    if ( state[0].size() > 0 )
+    {
+        for ( unsigned i = scratch_handlers.size(); i > 0; i-- )
+        {
+            if ( scratch_handlers[i - 1].second )
+                scratch_handlers[i - 1].second(this);
+        }
+        // FIXIT-T: Do we need to shrink_to_fit() state->scratch at this point?
+    }
 
     FreeRuleLists(this);
     OtnLookupFree(otn_map);
@@ -270,7 +290,7 @@ SnortConfig::~SnortConfig()
     delete policy_map;
     InspectorManager::delete_config(this);
 
-    snort_free(state);
+    delete[] state;
     delete thread_config;
 
     if (gtp_ports)
@@ -313,18 +333,23 @@ void SnortConfig::setup()
 
 void SnortConfig::post_setup()
 {
-    // FIXIT-L register setup and cleanup  to eliminate explicit calls and
-    // allow pcre, regex, and hyperscan to be built dynamically. Hyperscan setup
-    // moved to post_setup to ensure all the prep_patterns are called before it.
-    pcre_setup(this);
-#ifdef HAVE_HYPERSCAN
-    regex_setup(this);
-    sdpattern_setup(this);
-    hyperscan_setup(this);
-#endif
+    unsigned i;
+    unsigned int handler_count = scratch_handlers.size();
+
+    // Ensure we have allocated the scratch space vector for each thread
+    for ( i = 0; i < num_slots; ++i )
+    {
+        state[i].resize(handler_count);
+    }
+
+    for ( i = 0; i < handler_count; ++i )
+    {
+        if ( scratch_handlers[i].first )
+            scratch_handlers[i].first(this);
+    }
 }
 
-void SnortConfig::clone(SnortConfig* conf)
+void SnortConfig::clone(const SnortConfig* const conf)
 {
     *this = *conf;
     if (conf->homenet.get_family() != 0)
@@ -364,16 +389,20 @@ void SnortConfig::merge(SnortConfig* cmd_line)
     /* Merge checksum flags.  If command line modified them, use from the
      * command line, else just use from config_file. */
 
-    int cl_chk = cmd_line->get_network_policy()->checksum_eval;
-    int cl_drop = cmd_line->get_network_policy()->checksum_drop;
+    int cl_chk = cmd_line->policy_map->get_network_policy()->checksum_eval;
+    int cl_drop = cmd_line->policy_map->get_network_policy()->checksum_drop;
+    
+    NetworkPolicy* nw_policy = nullptr;
 
-    for ( auto p : policy_map->network_policy )
+    for ( unsigned idx = 0; idx < policy_map->network_policy_count(); ++idx )
     {
+        nw_policy = policy_map->get_network_policy(idx);
+
         if ( !(cl_chk & CHECKSUM_FLAG__DEF) )
-            p->checksum_eval = cl_chk;
+            nw_policy->checksum_eval = cl_chk;
 
         if ( !(cl_drop & CHECKSUM_FLAG__DEF) )
-            p->checksum_drop = cl_drop;
+            nw_policy->checksum_drop = cl_drop;
     }
 
     /* FIXIT-L do these belong in network policy? */
@@ -403,6 +432,9 @@ void SnortConfig::merge(SnortConfig* cmd_line)
 
     if (cmd_line->pkt_skip != 0)
         pkt_skip = cmd_line->pkt_skip;
+
+    if (cmd_line->pkt_pause_cnt != 0)
+        pkt_pause_cnt = cmd_line->pkt_pause_cnt;
 
     if (cmd_line->group_id != -1)
         group_id = cmd_line->group_id;
@@ -452,9 +484,9 @@ void SnortConfig::merge(SnortConfig* cmd_line)
     // FIXIT-M should cmd_line use the same var list / table?
     var_list = nullptr;
 
-    snort_free(state);
+    delete[] state;
     num_slots = ThreadConfig::get_instance_max();
-    state = (SnortState*)snort_calloc(num_slots, sizeof(SnortState));
+    state = new std::vector<void *>[num_slots];
 }
 
 bool SnortConfig::verify()
@@ -601,7 +633,6 @@ void SnortConfig::set_daemon(bool enabled)
 {
     if (enabled)
     {
-        DebugMessage(DEBUG_INIT, "Daemon mode flag set\n");
         run_flags |= RUN_FLAG__DAEMON;
     }
     else
@@ -612,7 +643,6 @@ void SnortConfig::set_decode_data_link(bool enabled)
 {
     if (enabled)
     {
-        DebugMessage(DEBUG_INIT, "Decode DLL set\n");
         output_flags |= OUTPUT_FLAG__SHOW_DATA_LINK;
     }
     else
@@ -624,7 +654,6 @@ void SnortConfig::set_dump_chars_only(bool enabled)
     if (enabled)
     {
         /* dump the application layer as text only */
-        DebugMessage(DEBUG_INIT, "Character payload dump set\n");
         output_flags |= OUTPUT_FLAG__CHAR_DATA;
     }
     else
@@ -636,7 +665,6 @@ void SnortConfig::set_dump_payload(bool enabled)
     if (enabled)
     {
         /* dump the application layer */
-        DebugMessage(DEBUG_INIT, "Payload dump set\n");
         output_flags |= OUTPUT_FLAG__APP_DATA;
     }
     else
@@ -647,7 +675,6 @@ void SnortConfig::set_dump_payload_verbose(bool enabled)
 {
     if (enabled)
     {
-        DebugMessage(DEBUG_INIT, "Verbose packet bytecode dumps enabled\n");
         output_flags |= OUTPUT_FLAG__VERBOSE_DUMP;
     }
     else
@@ -709,8 +736,6 @@ void SnortConfig::set_obfuscation_mask(const char* mask)
 {
    if (!mask)
         return;
-
-    DebugFormat(DEBUG_INIT, "Got obfus data: %s\n", mask);
 
     output_flags |= OUTPUT_FLAG__OBFUSCATE;
 
@@ -791,7 +816,6 @@ void SnortConfig::set_uid(const char* args)
     if (group_id == -1 && pw->pw_gid != getgid())
         group_id = (int) pw->pw_gid;
 
-    DebugFormat(DEBUG_INIT, "UserID: %d GroupID: %d.\n", user_id, group_id);
 }
 
 void SnortConfig::set_show_year(bool enabled)
@@ -799,7 +823,6 @@ void SnortConfig::set_show_year(bool enabled)
     if (enabled)
     {
         output_flags |= OUTPUT_FLAG__INCLUDE_YEAR;
-        DebugMessage(DEBUG_INIT, "Enabled year in timestamp\n");
     }
     else
         output_flags &= ~OUTPUT_FLAG__INCLUDE_YEAR;
@@ -865,7 +888,6 @@ void SnortConfig::set_verbose(bool enabled)
     if (enabled)
     {
         logging_flags |= LOGGING_FLAG__VERBOSE;
-        DebugMessage(DEBUG_INIT, "Verbose Flag active\n");
     }
     else
         logging_flags &= ~LOGGING_FLAG__VERBOSE;
@@ -922,6 +944,14 @@ void SnortConfig::set_plugin_path(const char* path)
         plugin_path = path;
     else
         plugin_path.clear();
+}
+
+void SnortConfig::set_tweaks(const char* t)
+{
+    if (t)
+        tweaks = t;
+    else
+        tweaks.clear();
 }
 
 void SnortConfig::add_script_path(const char* path)
@@ -999,8 +1029,27 @@ bool SnortConfig::tunnel_bypass_enabled(uint8_t proto)
     return (!((get_conf()->tunnel_mask & proto) or SFDAQ::get_tunnel_bypass(proto)));
 }
 
+SO_PUBLIC int SnortConfig::request_scratch(ScScratchFunc setup, ScScratchFunc cleanup)
+{
+    scratch_handlers.push_back(std::make_pair(setup, cleanup));
+
+    // We return an index that the caller uses to reference their per thread
+    // scratch space
+    return scratch_handlers.size() - 1;
+}
+
 SO_PUBLIC SnortConfig* SnortConfig::get_conf()
 { return snort_conf; }
 
-void SnortConfig::set_conf(SnortConfig* conf)
-{ snort_conf = conf; }
+void SnortConfig::set_conf(SnortConfig* sc)
+{
+    snort_conf = sc;
+
+    if ( sc )
+    {
+        Shell* sh = sc->policy_map->get_shell(0);
+        if (sc->policy_map->get_policies(sh))
+            set_policies(sc, sh);
+    }
+}
+

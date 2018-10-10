@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,6 +32,8 @@
 #include "utils/safec.h"
 
 #include "smtp.h"
+
+using namespace snort;
 
 void SMTP_GetEOL(const uint8_t* ptr, const uint8_t* end,
     const uint8_t** eol, const uint8_t** eolm)
@@ -99,7 +101,6 @@ int SMTP_CopyToAltBuffer(Packet* p, const uint8_t* start, int length)
 
     if ((unsigned long)length > alt_size - buf.len)
     {
-        //SetDetectLimit(p, 0);
         smtp_normalizing = false;
         return -1;
     }

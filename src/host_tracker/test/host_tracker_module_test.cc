@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,12 +26,18 @@
 #include "host_tracker/host_cache.h"
 #include "host_tracker/host_tracker_module.h"
 #include "target_based/snort_protocols.h"
+#include "main/snort_config.h"
 
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
-//  Fake to avoid bringing in a ton of dependencies.
-int16_t ProtocolReference::add(const char* protocol)
+using namespace snort;
+
+namespace snort
+{
+SnortConfig* SnortConfig::get_conf() { return nullptr; }
+SnortProtocolId ProtocolReference::find(char const*) { return 0; }
+SnortProtocolId ProtocolReference::add(const char* protocol)
 {
     if (!strcmp("servicename", protocol))
         return 3;
@@ -40,15 +46,13 @@ int16_t ProtocolReference::add(const char* protocol)
     return 1;
 }
 
-//  Fake show_stats to avoid bringing in a ton of dependencies.
-void show_stats(PegCount*, const PegInfo*, unsigned, const char*)
-{ }
-
-void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*, FILE*)
-{ }
-
 char* snort_strdup(const char* s)
 { return strdup(s); }
+}
+
+//  Fake show_stats to avoid bringing in a ton of dependencies.
+void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
+void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*, FILE*) { }
 
 #define FRAG_POLICY 33
 #define STREAM_POLICY 100

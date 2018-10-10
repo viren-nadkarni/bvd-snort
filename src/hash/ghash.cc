@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -65,6 +65,8 @@
 #include "hashfcn.h"
 #include "primetable.h"
 
+namespace snort
+{
 /*
 *
 *    Create a new hash table
@@ -505,4 +507,5 @@ int ghash_set_keyops(GHash* h,
     assert(h && hash_fcn && keycmp_fcn);
 
     return hashfcn_set_keyops(h->hashfcn, hash_fcn, keycmp_fcn);
+}
 }

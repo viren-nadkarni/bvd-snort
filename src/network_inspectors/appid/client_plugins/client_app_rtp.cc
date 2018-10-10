@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,7 +25,6 @@
 
 #include "client_app_rtp.h"
 
-#include "main/snort_debug.h"
 #include "protocols/packet.h"
 #include "utils/sflsq.h"
 #include "utils/util.h"
@@ -286,7 +285,7 @@ int RtpClientDetector::validate(AppIdDiscoveryArgs& args)
         return APPID_INPROCESS;
     }
 
-    add_app(args.asd, APP_ID_RTP, APP_ID_RTP, nullptr);
+    add_app(args.asd, APP_ID_RTP, APP_ID_RTP, nullptr, args.change_bits);
     return APPID_SUCCESS;
 }
 

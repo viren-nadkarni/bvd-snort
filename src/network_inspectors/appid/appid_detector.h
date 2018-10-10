@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,15 +23,21 @@
 #define APPID_DETECTOR_H
 
 #include <vector>
-#include "appid_discovery.h"
-#include "application_ids.h"
-#include "appid_session.h"
-#include "service_state.h"
+
 #include "flow/flow.h"
+
+#include "appid_discovery.h"
+#include "appid_session.h"
+#include "application_ids.h"
+#include "service_state.h"
 
 class AppIdConfig;
 class LuaStateDescriptor;
+
+namespace snort
+{
 struct Packet;
+}
 
 #define STATE_ID_MAX_VALID_COUNT 5
 
@@ -69,24 +75,22 @@ typedef std::vector<ServiceDetectorPort> ServiceDetectorPorts;
 class AppIdDiscoveryArgs
 {
 public:
-    AppIdDiscoveryArgs(const uint8_t* data, uint16_t size, int dir, AppIdSession* asd, Packet* p)
-        : data(data), size(size), dir(dir), asd(asd), pkt(p)
-    {
-        config = asd->config;
-        session_logging_enabled = asd->session_logging_enabled;
-        session_logging_id = asd->session_logging_id;
-    }
+    AppIdDiscoveryArgs(const uint8_t* data, uint16_t size, AppidSessionDirection dir,
+        AppIdSession& asd, snort::Packet* p, AppidChangeBits& cb) : data(data),
+        size(size), dir(dir), asd(asd), pkt(p), config(asd.config), change_bits(cb)
+    {}
 
     const uint8_t* data;
     uint16_t size;
-    int dir;
-    AppIdSession* asd;
-    Packet* pkt;
+    AppidSessionDirection dir;
+    AppIdSession& asd;
+    snort::Packet* pkt;
     const AppIdConfig* config = nullptr;
-    bool session_logging_enabled = false;
-    char* session_logging_id = nullptr;
+    AppidChangeBits& change_bits;
 };
 
+// These numbers are what Lua (VDB/ODP) gives us. If these numbers are ever changed,
+// we need to change get_code_string() code to avoid misinterpretations.
 enum APPID_STATUS_CODE
 {
     APPID_SUCCESS = 0,
@@ -109,24 +113,27 @@ public:
 
     virtual int initialize();
     virtual void do_custom_init() = 0;
+    virtual void release_thread_resources() = 0;
     virtual int validate(AppIdDiscoveryArgs&) = 0;
     virtual void register_appid(AppId, unsigned extractsInfo) = 0;
 
-    virtual void* data_get(AppIdSession*);
-    virtual int data_add(AppIdSession*, void*, AppIdFreeFCN);
-    virtual void add_info(AppIdSession*, const char*);
-    virtual void add_user(AppIdSession*, const char*, AppId, bool);
-    virtual void add_payload(AppIdSession*, AppId);
-    virtual void add_app(AppIdSession*, AppId, AppId, const char*);
+    virtual void* data_get(AppIdSession&);
+    virtual int data_add(AppIdSession&, void*, AppIdFreeFCN);
+    virtual void add_info(AppIdSession&, const char*, AppidChangeBits&);
+    virtual void add_user(AppIdSession&, const char*, AppId, bool);
+    virtual void add_payload(AppIdSession&, AppId);
+    virtual void add_app(AppIdSession&, AppId, AppId, const char*, AppidChangeBits&);
+    virtual void finalize_patterns() {}
+    const char* get_code_string(APPID_STATUS_CODE) const;
 
     const std::string& get_name() const
     { return name; }
 
+    const std::string& get_log_name() const
+    { return log_name.empty()? name : log_name; }
+
     unsigned get_minimum_matches() const
     { return minimum_matches; }
-
-    void set_minimum_matches(unsigned minimumMatches = 0)
-    { minimum_matches = minimumMatches; }
 
     unsigned int get_precedence() const
     { return precedence; }
@@ -137,21 +144,19 @@ public:
     bool is_custom_detector() const
     { return custom_detector; }
 
-    void set_custom_detector(bool isCustom = false)
-    { this->custom_detector = isCustom; }
-
     AppIdDiscovery& get_handler() const
     { return *handler; }
 
-	bool is_client() const
-	{ return client; }
+    bool is_client() const
+    { return client; }
 
-	virtual LuaStateDescriptor* validate_lua_state(bool /*packet_context*/)
-	{ return nullptr; }
+    virtual LuaStateDescriptor* validate_lua_state(bool /*packet_context*/)
+    { return nullptr; }
 
 protected:
     AppIdDiscovery* handler = nullptr;
-    std::string name;
+    std::string name;     // unique name to map detector; can be UUID file name for lua-detector
+    std::string log_name; // name from detector package info; can be same as 'name' for c-detector
     bool client = false;
     bool enabled = true;
     bool custom_detector = false;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,10 +29,10 @@
 #include "network_inspectors/appid/appid_http_event_handler.cc"
 #include "protocols/protocol_ids.h"
 #include "service_inspectors/http_inspect/http_msg_header.h"
-#include "thirdparty_appid_api.h"
+#include "tp_appid_module_api.h"
+#include "tp_appid_session_api.h"
 
 #include "appid_mock_definitions.h"
-#include "appid_mock_http_session.h"
 #include "appid_mock_inspector.h"
 #include "appid_mock_session.h"
 
@@ -40,7 +40,16 @@
 #include <CppUTest/TestHarness.h>
 #include <CppUTestExt/MockSupport.h>
 
+// Stubs for AppIdDebug
+THREAD_LOCAL AppIdDebug* appidDebug = nullptr;
+void AppIdDebug::activate(const Flow*, const AppIdSession*, bool) { active = true; }
+
+using namespace snort;
+
+namespace snort
+{
 AppIdApi appid_api;
+}
 
 const char* content_type = nullptr;
 const char* cookie = nullptr;
@@ -58,6 +67,10 @@ class FakeHttpMsgHeader
 {
 };
 FakeHttpMsgHeader* fake_msg_header = nullptr;
+
+void AppIdDiscovery::publish_appid_event(AppidChangeBits&, snort::Flow*) {}
+
+void AppIdHttpSession::set_http_change_bits(AppidChangeBits&, HttpFieldIds) {}
 
 const uint8_t* HttpEvent::get_content_type(int32_t& length)
 {
@@ -162,7 +175,7 @@ bool HttpEvent::contains_webdav_method()
 Flow* flow = nullptr;
 AppIdSession* mock_session = nullptr;
 
-AppIdSession* AppIdApi::get_appid_session(Flow*)
+AppIdSession* AppIdApi::get_appid_session(Flow&)
 {
     mock().actualCall("get_appid_session");
     return mock_session;
@@ -176,6 +189,8 @@ TEST_GROUP(appid_http_event)
         flow = new Flow;
         mock_session = new AppIdSession(IpProtocol::TCP, nullptr, 1492, appid_inspector);
         flow->set_flow_data(mock_session);
+        appidDebug = new AppIdDebug();
+        appidDebug->activate(nullptr, nullptr, 0);
     }
 
     void teardown() override
@@ -184,6 +199,7 @@ TEST_GROUP(appid_http_event)
         delete mock_session;
         delete flow;
         mock().clear();
+        delete appidDebug;
         MemoryLeakWarningPlugin::turnOnNewDeleteOverloads();
     }
 };
@@ -252,27 +268,28 @@ static void run_event_handler(TestData test_data, TestData* expect_data = nullpt
 
     mock().strictOrder();
     mock().expectOneCall("get_appid_session");
+    MockAppIdHttpSession* hsession = (MockAppIdHttpSession*)mock_session->get_http_session();
+    hsession->reset();
     event_handler.handle(event, flow);
     LONGS_EQUAL(expect_data->scan_flags, mock_session->scan_flags);
-    STRCMP_EQUAL(expect_data->host, mock_session->hsession->host);
-    STRCMP_EQUAL(expect_data->uri, mock_session->hsession->uri);
-    STRCMP_EQUAL(expect_data->content_type, mock_session->hsession->content_type);
-    STRCMP_EQUAL(expect_data->cookie, mock_session->hsession->cookie);
-    STRCMP_EQUAL(expect_data->location, mock_session->hsession->location);
-    STRCMP_EQUAL(expect_data->referer, mock_session->hsession->referer);
-    STRCMP_EQUAL(expect_data->server, mock_session->hsession->server);
-    STRCMP_EQUAL(expect_data->x_working_with, mock_session->hsession->x_working_with);
-    STRCMP_EQUAL(expect_data->useragent, mock_session->hsession->useragent);
-    STRCMP_EQUAL(expect_data->via, mock_session->hsession->via);
-    if (nullptr == mock_session->hsession->response_code)
+    STRCMP_EQUAL(expect_data->host, hsession->get_cfield(REQ_HOST_FID));
+    STRCMP_EQUAL(expect_data->uri, hsession->get_cfield(REQ_URI_FID));
+    STRCMP_EQUAL(expect_data->content_type, hsession->get_cfield(RSP_CONTENT_TYPE_FID));
+    STRCMP_EQUAL(expect_data->cookie, hsession->get_cfield(REQ_COOKIE_FID));
+    STRCMP_EQUAL(expect_data->location, hsession->get_cfield(RSP_LOCATION_FID));
+    STRCMP_EQUAL(expect_data->referer, hsession->get_cfield(REQ_REFERER_FID));
+    STRCMP_EQUAL(expect_data->server, hsession->get_cfield(MISC_SERVER_FID));
+    STRCMP_EQUAL(expect_data->x_working_with, hsession->get_cfield(MISC_XWW_FID));
+    STRCMP_EQUAL(expect_data->useragent, hsession->get_cfield(REQ_AGENT_FID));
+    STRCMP_EQUAL(expect_data->via, hsession->get_cfield(MISC_VIA_FID));
+    if (nullptr == hsession->get_field(MISC_RESP_CODE_FID))
     {
         LONGS_EQUAL(0, expect_data->response_code);
     }
     else
     {
-        LONGS_EQUAL(expect_data->response_code, strtol(mock_session->hsession->response_code,
-            nullptr,
-            10));
+        LONGS_EQUAL(expect_data->response_code, strtol(hsession->get_field(
+            MISC_RESP_CODE_FID)->c_str(), nullptr, 10));
     }
     mock().checkExpectations();
 }

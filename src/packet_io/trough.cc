@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -34,6 +34,8 @@
 #include "log/messages.h"
 #include "main/snort_config.h"
 #include "utils/util.h"
+
+using namespace snort;
 
 std::vector<struct Trough::PcapReadObject> Trough::pcap_object_list;
 std::vector<std::string> Trough::pcap_queue;
@@ -76,14 +78,14 @@ int Trough::get_pcaps(std::vector<struct PcapReadObject> &pol)
                             continue;
 
                         /* do a quick check to make sure file exists */
-                        if (SnortConfig::read_mode() && stat(pcap_name.c_str(), &sb) == -1)
+                        if (snort::SnortConfig::read_mode() && stat(pcap_name.c_str(), &sb) == -1)
                         {
                             ErrorMessage("Error getting stat on pcap file: %s: %s\n",
                                     pcap_name.c_str(), get_error(errno));
                             pcap_list_file.close();
                             return -1;
                         }
-                        else if (SnortConfig::read_mode() && S_ISDIR(sb.st_mode))
+                        else if (snort::SnortConfig::read_mode() && S_ISDIR(sb.st_mode))
                         {
                             Directory pcap_dir(pcap_name.c_str(), filter.c_str());
                             std::vector<std::string> tmp_queue;
@@ -102,7 +104,7 @@ int Trough::get_pcaps(std::vector<struct PcapReadObject> &pol)
                             pcap_queue.reserve(pcap_queue.size() + tmp_queue.size());
                             pcap_queue.insert(pcap_queue.end(), tmp_queue.begin(), tmp_queue.end());
                         }
-                        else if (!SnortConfig::read_mode() || S_ISREG(sb.st_mode))
+                        else if (!snort::SnortConfig::read_mode() || S_ISREG(sb.st_mode))
                         {
                             if (filter.empty() ||
                                 (fnmatch(filter.c_str(), pcap_name.c_str(), 0) == 0))
@@ -147,7 +149,7 @@ int Trough::get_pcaps(std::vector<struct PcapReadObject> &pol)
                             i = ++pos;
                         }
                         /* do a quick check to make sure file exists */
-                        if (SnortConfig::read_mode())
+                        if (snort::SnortConfig::read_mode() and pcap_name != "-")
                         {
                             if (stat(pcap_name.c_str(), &sb) == -1)
                             {

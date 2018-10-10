@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,22 +28,22 @@
 #define TCP_CONNECTOR_NAME "tcp_connector"
 #define TCP_CONNECTOR_HELP "implement the tcp stream connector"
 
-class TcpConnectorModule : public Module
+class TcpConnectorModule : public snort::Module
 {
 public:
     TcpConnectorModule();
     ~TcpConnectorModule() override;
 
-    bool set(const char*, Value&, SnortConfig*) override;
-    bool begin(const char*, int, SnortConfig*) override;
-    bool end(const char*, int, SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool end(const char*, int, snort::SnortConfig*) override;
 
     TcpConnectorConfig::TcpConnectorConfigSet* get_and_clear_config();
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
 
-    ProfileStats* get_profile() const override;
+    snort::ProfileStats* get_profile() const override;
 
     Usage get_usage() const override
     { return GLOBAL; }

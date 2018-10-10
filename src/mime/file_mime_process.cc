@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,8 @@
 #include "file_api/file_flows.h"
 #include "log/messages.h"
 #include "search_engines/search_tool.h"
+
+using namespace snort;
 
 struct MimeToken
 {
@@ -67,11 +69,11 @@ struct MIMESearchInfo
     int length;
 };
 
-MIMESearchInfo mime_search_info;
+static THREAD_LOCAL MIMESearchInfo mime_search_info;
+static THREAD_LOCAL MIMESearch* mime_current_search = nullptr;
 
 SearchTool* mime_hdr_search_mpse = nullptr;
 MIMESearch mime_hdr_search[HDR_LAST];
-MIMESearch* mime_current_search = nullptr;
 
 static void get_mime_eol(const uint8_t* ptr, const uint8_t* end,
     const uint8_t** eol, const uint8_t** eolm)
@@ -531,17 +533,6 @@ const uint8_t* MimeSession::process_mime_data_paf(
 
     if (data_state == STATE_DATA_HEADER)
     {
-#ifdef DEBUG_MSGS
-        if (data_state == STATE_DATA_HEADER)
-        {
-            DEBUG_WRAP(DebugMessage(DEBUG_FILE, "DATA HEADER STATE ~~~~~~~~~~~~~~~~~~~~~~\n"); );
-        }
-        else
-        {
-            DEBUG_WRAP(DebugMessage(DEBUG_FILE, "DATA UNKNOWN STATE ~~~~~~~~~~~~~~~~~~~~~\n"); );
-        }
-#endif
-
         start = process_mime_header(start, end);
         if (start == nullptr)
             return nullptr;
@@ -557,11 +548,9 @@ const uint8_t* MimeSession::process_mime_data_paf(
         switch (data_state)
         {
         case STATE_MIME_HEADER:
-            DEBUG_WRAP(DebugMessage(DEBUG_FILE, "MIME HEADER STATE ~~~~~~~~~~~~~~~~~~~~~~\n"); );
             start = process_mime_header(start, end);
             break;
         case STATE_DATA_BODY:
-            DEBUG_WRAP(DebugMessage(DEBUG_FILE, "DATA BODY STATE ~~~~~~~~~~~~~~~~~~~~~~~~\n"); );
             start = process_mime_body(start, end, isFileEnd(position) );
             break;
         }

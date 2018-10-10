@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -49,7 +49,7 @@ OptFpList* AddOptFuncToList(RuleOptEvalFunc ro_eval_func, OptTreeNode* otn)
     return ofp;
 }
 
-bool otn_set_agent(OptTreeNode* otn, IpsOption* opt)
+bool otn_set_agent(OptTreeNode* otn, snort::IpsOption* opt)
 {
     if ( otn->agent )
         return false;
@@ -58,7 +58,7 @@ bool otn_set_agent(OptTreeNode* otn, IpsOption* opt)
     return true;
 }
 
-void otn_trigger_actions(const OptTreeNode* otn, Packet* p)
+void otn_trigger_actions(const OptTreeNode* otn, snort::Packet* p)
 {
     if ( otn->agent )
         otn->agent->action(p);
@@ -84,6 +84,8 @@ void* get_rule_type_data(OptTreeNode* otn, const char* name)
     return nullptr;
 }
 
+namespace snort
+{
 bool otn_has_plugin(OptTreeNode* otn, const char* name)
 {
     OptFpList* fpl = otn->opt_func;
@@ -100,4 +102,4 @@ bool otn_has_plugin(OptTreeNode* otn, const char* name)
     }
     return false;
 }
-
+}

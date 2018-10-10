@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,14 +25,14 @@
 
 #include "framework/inspector.h"
 
-#ifdef PIGLET
-#include "framework/inspector.h"
-#endif
-
-struct Packet;
+class Binder;
 struct FrameworkPolicy;
-struct SnortConfig;
 struct InspectionPolicy;
+
+namespace snort
+{
+struct Packet;
+struct SnortConfig;
 
 //-------------------------------------------------------------------------
 
@@ -61,7 +61,7 @@ public:
     static InspectorType get_type(const char* key);
     SO_PUBLIC static Inspector* get_inspector(const char* key, bool dflt_only = false);
 
-    SO_PUBLIC static Inspector* get_binder();
+    SO_PUBLIC static Binder* get_binder();
 
     SO_PUBLIC static Inspector* acquire(const char* key, bool dflt_only = false);
     SO_PUBLIC static void release(Inspector*);
@@ -70,6 +70,7 @@ public:
     static void print_config(SnortConfig*);
 
     static void thread_init(SnortConfig*);
+    static void thread_reinit(SnortConfig*);
     static void thread_stop(SnortConfig*);
     static void thread_term(SnortConfig*);
 
@@ -89,8 +90,7 @@ public:
 private:
     static void bumble(Packet*);
     static void full_inspection(Packet*);
-    static void execute_control(Packet*);
 };
-
+}
 #endif
 

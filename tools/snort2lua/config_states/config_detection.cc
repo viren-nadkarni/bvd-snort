@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -56,8 +56,8 @@ bool Detection::convert(std::istringstream& data_stream)
 
         else if (keyword == "no_stream_inserts")
         {
-            table_api.add_diff_option_comment("no_stream_inserts", "inspect_stream_inserts");
-            tmpval = table_api.add_option("inspect_stream_inserts", false);
+            table_api.add_diff_option_comment("no_stream_inserts", "detect_raw_tcp");
+            tmpval = table_api.add_option("detect_raw_tcp", false);
         }
 
         else if (keyword == "debug")

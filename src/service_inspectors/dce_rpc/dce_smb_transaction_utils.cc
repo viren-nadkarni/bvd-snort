@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,8 +26,6 @@
 #endif
 
 #include "dce_smb_transaction_utils.h"
-
-#include "main/snort_debug.h"
 
 #define TRANS_NM_PIPE_0       (0)
 #define TRANS_NM_PIPE_1       (TRANS_NM_PIPE_0+7)
@@ -361,9 +359,7 @@ DCE2_Ret DCE2_SmbValidateTransactionFields(
 DCE2_Ret DCE2_SmbBufferTransactionData(DCE2_SmbTransactionTracker* ttracker,
     const uint8_t* data_ptr, uint16_t dcnt, uint16_t ddisp)
 {
-    Profile profile(dce2_smb_pstat_smb_req);
-
-    DebugMessage(DEBUG_DCE_SMB, "Buffering transaction data.\n");
+    snort::Profile profile(dce2_smb_pstat_smb_req);
 
     if (ttracker->dbuf == nullptr)
     {
@@ -374,13 +370,8 @@ DCE2_Ret DCE2_SmbBufferTransactionData(DCE2_SmbTransactionTracker* ttracker,
     if (DCE2_BufferAddData(ttracker->dbuf, data_ptr, dcnt, ddisp,
         DCE2_BUFFER_MIN_ADD_FLAG__IGNORE) != DCE2_RET__SUCCESS)
     {
-        DebugMessage(DEBUG_DCE_SMB,
-            "Failed to buffer transaction data.\n");
         return DCE2_RET__ERROR;
     }
-
-    DebugMessage(DEBUG_DCE_SMB,
-        "Successfully buffered transaction data.\n");
 
     return DCE2_RET__SUCCESS;
 }
@@ -388,9 +379,7 @@ DCE2_Ret DCE2_SmbBufferTransactionData(DCE2_SmbTransactionTracker* ttracker,
 DCE2_Ret DCE2_SmbBufferTransactionParameters(DCE2_SmbTransactionTracker* ttracker,
     const uint8_t* param_ptr, uint16_t pcnt, uint16_t pdisp)
 {
-    Profile profile(dce2_smb_pstat_smb_req);
-
-    DebugMessage(DEBUG_DCE_SMB, "Buffering transaction parameters.\n");
+    snort::Profile profile(dce2_smb_pstat_smb_req);
 
     if (ttracker->pbuf == nullptr)
     {
@@ -401,13 +390,8 @@ DCE2_Ret DCE2_SmbBufferTransactionParameters(DCE2_SmbTransactionTracker* ttracke
     if (DCE2_BufferAddData(ttracker->pbuf, param_ptr, pcnt, pdisp,
         DCE2_BUFFER_MIN_ADD_FLAG__IGNORE) != DCE2_RET__SUCCESS)
     {
-        DebugMessage(DEBUG_DCE_SMB,
-            "Failed to buffer transaction parameter data.\n");
         return DCE2_RET__ERROR;
     }
-
-    DebugMessage(DEBUG_DCE_SMB,
-        "Successfully buffered transaction parameter data.\n");
 
     return DCE2_RET__SUCCESS;
 }

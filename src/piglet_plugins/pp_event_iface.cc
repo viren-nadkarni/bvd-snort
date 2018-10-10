@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -106,7 +106,7 @@ static const luaL_Reg methods[] =
                 si_table.set_field("rev", si->rev);
                 si_table.set_field("class_id", si->class_id);
                 si_table.set_field("priority", si->priority);
-                si_table.set_field("text_rule", si->text_rule);
+                si_table.set_field("builtin", si->builtin);
                 si_table.set_field("num_services", si->num_services);
 
                 Lua::Table(L, 2).set_field_from_stack("sig_info", si_table.index);
@@ -138,7 +138,7 @@ static const luaL_Reg methods[] =
                 si_table.get_field("rev", si->rev);
                 si_table.get_field("class_id", si->class_id);
                 si_table.get_field("priority", si->priority);
-                si_table.get_field("text_rule", si->text_rule);
+                si_table.get_field("builtin", si->builtin);
                 si_table.get_field("num_services", si->num_services);
             }
 

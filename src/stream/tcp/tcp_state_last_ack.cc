@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,7 +25,7 @@
 
 #include "tcp_state_last_ack.h"
 
-#include "tcp_normalizer.h"
+#include "tcp_normalizers.h"
 #include "tcp_session.h"
 
 using namespace std;
@@ -43,7 +43,7 @@ bool TcpStateLastAck::syn_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 
 bool TcpStateLastAck::syn_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    trk.normalizer->ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs() );
+    trk.normalizer.ecn_tracker(tsd.get_tcph(), trk.session->config->require_3whs());
     if ( tsd.get_seg_len() )
         trk.session->handle_data_on_syn(tsd);
     return true;
@@ -85,7 +85,7 @@ bool TcpStateLastAck::fin_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 
 bool TcpStateLastAck::fin_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    Flow* flow = tsd.get_flow();
+    snort::Flow* flow = tsd.get_flow();
 
     trk.update_tracker_ack_recv(tsd);
     if ( SEQ_EQ(tsd.get_seg_ack(), trk.get_snd_nxt() ) )
@@ -129,7 +129,7 @@ bool TcpStateLastAck::do_post_sm_packet_actions(TcpSegmentDescriptor& tsd, TcpSt
         ( trk.get_tcp_event() != TcpStreamTracker::TCP_FIN_RECV_EVENT ) )
     {
         TcpStreamTracker::TcpState talker_state = trk.session->get_talker_state();
-        Flow* flow = tsd.get_flow();
+        snort::Flow* flow = tsd.get_flow();
 
         if ( ( talker_state == TcpStreamTracker::TCP_TIME_WAIT )
             || ( talker_state == TcpStreamTracker::TCP_CLOSED ) )

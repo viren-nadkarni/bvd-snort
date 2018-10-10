@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,30 +22,19 @@
 #ifndef ACSMX2_H
 #define ACSMX2_H
 
-#ifndef CL
+// Version 2.0
 
-#include "CL/cl.hpp"
-#define CL
-#endif
-
-#include <vector>
 #include <cstdint>
-#include "search_common.h"
-#include <time.h>
 
-//#include "./detection/fp_detect.h"
-//#include "./protocols/packet.h"
+#include "search_common.h"
+
+namespace snort
+{
+struct SnortConfig;
+}
 
 #define MAX_ALPHABET_SIZE 256
 
-#define USE_GPU 3
-/* 0: CPU (custom)
- * 1: GPU single buffer
- * 2: GPU multi buffer
- * 3: CPU (upstream)
- */
-
-#define KERNEL_SIZE 768
 /*
    FAIL STATE for 1,2,or 4 bytes for state transitions
    Uncomment this define to use 32 bit state values
@@ -63,6 +52,7 @@ typedef unsigned int acstate_t;
 
 typedef unsigned short acstate_t;
 #define ACSM_FAIL_STATE2 0xffff
+
 #endif
 
 struct ACSM_PATTERN2
@@ -79,12 +69,11 @@ struct ACSM_PATTERN2
     int n;
     int nocase;
     int negative;
-
 };
 
 /*
- *    transition nodes  - either 8 or 12 bytes
- */
+*    transition nodes  - either 8 or 12 bytes
+*/
 struct trans_node_t
 {
     /* The character that got us here - sized to keep structure aligned on 4 bytes
@@ -93,12 +82,12 @@ struct trans_node_t
      */
     acstate_t key;
     acstate_t next_state;
-    trans_node_t* next;          /* next transition for this state */
+    trans_node_t* next; /* next transition for this state */
 };
 
 /*
- *  User specified final storage type for the state transitions
- */
+*  User specified final storage type for the state transitions
+*/
 enum
 {
     ACF_FULL,
@@ -108,14 +97,13 @@ enum
 };
 
 /*
- *   Aho-Corasick State Machine Struct - one per group of patterns
- */
+*   Aho-Corasick State Machine Struct - one per group of patterns
+*/
 struct ACSM_STRUCT2
 {
     ACSM_PATTERN2* acsmPatterns;
     acstate_t* acsmFailState;
     ACSM_PATTERN2** acsmMatchList;
-    ;
 
     /* list of transitions in each state, this is used to build the nfa & dfa
        after construction we convert to sparse or full format matrix and free
@@ -123,8 +111,6 @@ struct ACSM_STRUCT2
     trans_node_t** acsmTransTable;
     acstate_t** acsmNextState;
     const MpseAgent* agent;
-
-    int * acsmLenList;
 
     int acsmMaxStates;
     int acsmNumStates;
@@ -143,95 +129,50 @@ struct ACSM_STRUCT2
     bool dfa;
 
     void enable_dfa()
-        { dfa = true; }
+    { dfa = true; }
 
     bool dfa_enabled()
-        { return dfa; }
-
-    //ACSM_BUFFER_OBJ* acsmBuffer;     Buffering for packets, not used atm
-    //int packetsInBuff;
-    //int packetsBuffMax;
-
-    uint8_t* textBuffer;
-    int totalFound;
-    int totalFoundCPU;
-    int buffSize;
-    uint8_t* TxArray;
-    int * resultArray;
-    int nTotal;
-    int * stateArray;
-
-    int currentBuffer;
-    int searchLaunched;
-    int * resultMap;
-    int * countsMap;
-    uint8_t* mapPtr;
-    uint8_t* mapPtr2;
-
-    //OpenCL var
-    cl::Buffer textBuffer1;
-    cl::Buffer textBuffer2;
-    cl::Buffer stateBuffer;
-    cl::Buffer xlatBuffer;
-    cl::Buffer matchBuffer;
-    cl::Buffer countsBuffer;
-    cl::Buffer matchLenBuffer;
-
-    cl::Event* bufferEvent;
-
-    std::vector<cl::Platform> all_platforms;
-    cl::Platform default_platform;
-    std::vector<cl::Device> all_devices;
-    cl::Device default_device;
-    cl::Context context;
-    cl::CommandQueue queue;
-    cl::Program program;
-    cl::Kernel kernel;
-    cl::Program::Sources sources;
+    { return dfa; }
 };
 
 /*
- *   Prototypes
- */
+*   Prototypes
+*/
 void acsmx2_init_xlatcase();
 
 ACSM_STRUCT2* acsmNew2(const MpseAgent*, int format);
 
 int acsmAddPattern2(
-ACSM_STRUCT2* p, const uint8_t* pat, unsigned n, bool nocase, bool negative, void* id);
+    ACSM_STRUCT2* p, const uint8_t* pat, unsigned n,
+    bool nocase, bool negative, void* id);
 
-int acsmCompile2(struct SnortConfig*, ACSM_STRUCT2*);
+int acsmCompile2(snort::SnortConfig*, ACSM_STRUCT2*);
 
 int acsm_search_nfa(
-ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
+    ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_sparse(
-ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
+    ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_banded(
-ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
-
-int acsm_search_dfa_full_gpu(
-ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
-
-int acsm_search_dfa_full_gpu_singleBuff(
-ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
-
-int acsm_search_dfa_full_cpu(
-ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch,void* context, int* current_state);
+    ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_full(
-ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
+    ACSM_STRUCT2*, const uint8_t* T, int n, MpseMatch, void* context, int* current_state);
 
 int acsm_search_dfa_full_all(
-ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch, void* context, int* current_state);
+    ACSM_STRUCT2*, const uint8_t* Tx, int n, MpseMatch, void* context, int* current_state);
 
 void acsmFree2(ACSM_STRUCT2*);
 int acsmPatternCount2(ACSM_STRUCT2*);
 void acsmCompressStates(ACSM_STRUCT2*, int);
+
 void acsmPrintInfo2(ACSM_STRUCT2* p);
+
 int acsmPrintDetailInfo2(ACSM_STRUCT2*);
 int acsmPrintSummaryInfo2();
 void acsmx2_print_qinfo();
 void acsm_init_summary();
+
 #endif
+

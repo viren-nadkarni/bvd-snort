@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -19,11 +19,14 @@
 #ifndef SEARCH_COMMON_H
 #define SEARCH_COMMON_H
 
-// interface to Mpse
+namespace snort
+{
+    struct SnortConfig;
+}
 
 struct MpseAgent
 {
-    int (* build_tree)(struct SnortConfig*, void* id, void** tree);
+    int (* build_tree)(snort::SnortConfig*, void* id, void** tree);
     int (* negate_list)(void* id, void** list);
 
     void (* user_free)(void*);

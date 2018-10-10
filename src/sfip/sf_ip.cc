@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -35,6 +35,8 @@
 #include "utils/util_net.h"
 
 #include "sf_cidr.h"
+
+using namespace snort;
 
 /* Support function */
 // note that an ip6 address may have a trailing dotted quad form
@@ -340,6 +342,17 @@ SfIpRet SfIp::set(const void* src, int fam)
     return SFIP_SUCCESS;
 }
 
+SfIpRet SfIp::set(const void* src)
+{
+    assert(src);
+    if ( ((const uint32_t*)src)[0] == 0 &&
+         ((const uint32_t*)src)[1] == 0 &&
+         ((const uint16_t*)src)[4] == 0 &&
+         ((const uint16_t*)src)[5] == 0xffff )
+        return set(&((const uint32_t*)src)[3], AF_INET);
+    return set(src, AF_INET6);
+}
+
 /* Obfuscates this IP with an obfuscation CIDR
     Makes this:  ob | (this & mask) */
 void SfIp::obfuscate(SfCidr* ob)
@@ -381,16 +394,21 @@ const char* SfIp::ntop(char* buf, int bufsize) const
     return snort_inet_ntop(family, get_ptr(), buf, bufsize);
 }
 
-/* Uses a static buffer to return a string representation of the IP */
-const char* SfIp::ntoa() const
+const char* SfIp::ntop(SfIpString str) const
 {
-    static THREAD_LOCAL char buf[INET6_ADDRSTRLEN];
-
-    ntop(buf, sizeof(buf));
-
-    return buf;
+    return snort_inet_ntop(family, get_ptr(), str, sizeof(SfIpString));
 }
 
+bool SfIp::is_mapped() const
+{
+    if (ip32[0] || ip32[1] || ip16[4] || (ip16[5] != 0xffff && ip16[5]))
+        return false;
+
+    return true;
+}
+
+namespace snort
+{
 const char* snort_inet_ntop(int family, const void* ip_raw, char* buf, int bufsize)
 {
     if (!ip_raw || !buf ||
@@ -408,7 +426,7 @@ const char* snort_inet_ntop(int family, const void* ip_raw, char* buf, int bufsi
         return buf;
     }
 
-#if defined(HAVE_INET_NTOP) && !defined(REG_TEST)
+#ifndef REG_TEST
     if (!inet_ntop(family, ip_raw, buf, bufsize))
         snprintf(buf, bufsize, "ERROR");
 #else
@@ -463,12 +481,4 @@ const char* sfip_ntop(const SfIp* ip, char* buf, int bufsize)
 
     return buf;
 }
-
-bool SfIp::is_mapped() const
-{
-    if (ip32[0] || ip32[1] || ip16[4] || (ip16[5] != 0xffff && ip16[5]))
-        return false;
-
-    return true;
 }
-

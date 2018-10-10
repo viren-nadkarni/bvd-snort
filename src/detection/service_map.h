@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,15 +32,18 @@
 
 #include "target_based/snort_protocols.h"
 
-struct PortGroup;
-struct GHash;
+namespace snort
+{
 struct SnortConfig;
+struct GHash;
+}
+struct PortGroup;
 
 //  Service Rule Map Master Table
 struct srmm_table_t
 {
-    GHash* to_srv[SNORT_PROTO_MAX];
-    GHash* to_cli[SNORT_PROTO_MAX];
+    snort::GHash* to_srv[SNORT_PROTO_MAX];
+    snort::GHash* to_cli[SNORT_PROTO_MAX];
 };
 
 srmm_table_t* ServiceMapNew();
@@ -49,8 +52,8 @@ void ServiceMapFree(srmm_table_t*);
 srmm_table_t* ServicePortGroupMapNew();
 void ServicePortGroupMapFree(srmm_table_t*);
 
-void fpPrintServicePortGroupSummary(SnortConfig*, srmm_table_t*);
-int fpCreateServiceMaps(SnortConfig*);
+void fpPrintServicePortGroupSummary(snort::SnortConfig*);
+int fpCreateServiceMaps(snort::SnortConfig*);
 
 //  Service/Protocol Ordinal To PortGroup table
 typedef std::vector<PortGroup*> PortGroupVector;
@@ -59,7 +62,7 @@ struct sopg_table_t
 {
     sopg_table_t(unsigned size);
     bool set_user_mode();
-    PortGroup* get_port_group(int proto, bool c2s, int16_t proto_ordinal);
+    PortGroup* get_port_group(SnortProtocolId proto_id, bool c2s, SnortProtocolId snort_protocol_id);
 
     PortGroupVector to_srv[SNORT_PROTO_MAX];
     PortGroupVector to_cli[SNORT_PROTO_MAX];

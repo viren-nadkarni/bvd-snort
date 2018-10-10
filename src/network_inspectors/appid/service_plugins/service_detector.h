@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -31,32 +31,34 @@ class ServiceDetector : public AppIdDetector
 {
 public:
     ServiceDetector();
-
     void do_custom_init() override { }
+    void release_thread_resources() override { }
     void register_appid(AppId, unsigned extractsInfo) override;
-    int service_inprocess(AppIdSession*, const Packet*, int dir);
-    int add_service(AppIdSession*, const Packet*, int dir, AppId, const char* vendor = nullptr,
-        const char* version = nullptr, const AppIdServiceSubtype* = nullptr);
-    int add_service_consume_subtype(AppIdSession*, const Packet*, int dir, AppId,
-        const char* vendor, const char* version, AppIdServiceSubtype*);
-    int incompatible_data(AppIdSession*, const Packet*, int dir);
-    int fail_service(AppIdSession*, const Packet*, int dir);
+    int service_inprocess(AppIdSession&, const snort::Packet*, AppidSessionDirection dir);
+    int add_service(AppidChangeBits&, AppIdSession&, const snort::Packet*, AppidSessionDirection dir, AppId,
+        const char* vendor = nullptr, const char* version = nullptr,
+        const snort::AppIdServiceSubtype* = nullptr);
+    int add_service_consume_subtype(AppIdSession&, const snort::Packet*,
+        AppidSessionDirection dir, AppId, const char* vendor, const char* version,
+        snort::AppIdServiceSubtype*, AppidChangeBits&);
+    int incompatible_data(AppIdSession&, const snort::Packet*, AppidSessionDirection dir);
+    int fail_service(AppIdSession&, const snort::Packet*, AppidSessionDirection dir);
 
-    void add_host_info(AppIdSession*, SERVICE_HOST_INFO_CODE, const void*)
+    void add_host_info(AppIdSession&, SERVICE_HOST_INFO_CODE, const void*)
     {
         // FIXIT-L - this function is called but does nothing... what if anything should it do...
     }
 
-    void add_miscellaneous_info(AppIdSession* asd, AppId miscId)
+    void add_miscellaneous_info(AppIdSession& asd, AppId miscId)
     {
-        asd->misc_app_id = miscId;
+        asd.misc_app_id = miscId;
     }
 
-    void initialize_expected_session(AppIdSession*, AppIdSession*, uint64_t flags, APPID_SESSION_DIRECTION dir);
+    void initialize_expected_session(AppIdSession&, AppIdSession&, uint64_t flags, AppidSessionDirection dir);
 
 private:
-    int update_service_data(AppIdSession*, const Packet*, int dir, AppId, const char* vendor,
-        const char* version);
+    int update_service_data(AppIdSession&, const snort::Packet*, AppidSessionDirection dir, AppId,
+        const char* vendor, const char* version, AppidChangeBits& change_bits);
 };
 #endif
 

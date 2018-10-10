@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -90,11 +90,10 @@ struct tcp_event_sid tcp_event_sids[] =
 
 void TcpEventLogger::log_internal_event(uint32_t eventSid)
 {
-    if (is_internal_event_enabled(SnortConfig::get_conf()->rate_filter_config, eventSid))
+    if (is_internal_event_enabled(snort::SnortConfig::get_conf()->rate_filter_config, eventSid))
     {
         tcpStats.internalEvents++;
-        DetectionEngine::queue_event(GENERATOR_INTERNAL, eventSid);
-        DebugFormat(DEBUG_STREAM, "Stream raised internal event %u\n", eventSid);
+        snort::DetectionEngine::queue_event(GID_SESSION, eventSid);
     }
 }
 
@@ -105,7 +104,7 @@ void TcpEventLogger::log_tcp_events()
         uint32_t idx = ffs(tcp_events);
         if ( idx )
         {
-            DetectionEngine::queue_event(GID_STREAM_TCP, tcp_event_sids[ idx ].sid);
+            snort::DetectionEngine::queue_event(GID_STREAM_TCP, tcp_event_sids[ idx ].sid);
             tcp_events ^= tcp_event_sids[ idx ].event_id;
             tcpStats.events++;
         }

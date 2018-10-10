@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,8 @@
 
 struct HashFnc;
 
+namespace snort
+{
 #define XHASH_NOMEM    (-2)
 #define XHASH_ERR      (-1)
 #define XHASH_OK        0
@@ -155,6 +157,6 @@ SO_PUBLIC void xhash_set_keyops(XHash* h, hash_func, keycmp_func);
 
 SO_PUBLIC XHashNode* xhash_gfindfirst(XHash* t);
 SO_PUBLIC XHashNode* xhash_gfindnext(XHash* t);
-
+} // namespace snort
 #endif
 

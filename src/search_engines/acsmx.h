@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -29,13 +29,10 @@
 
 #include "search_common.h"
 
-//Added
-#ifndef CL
-#include "CL/cl.hpp"             //Added
-#define CL
-#endif
-#include <vector>
-//Added end
+namespace snort
+{
+struct SnortConfig;
+}
 
 #define ALPHABET_SIZE    256
 #define ACSM_FAIL_STATE   (-1)
@@ -75,8 +72,8 @@ struct ACSM_STATETABLE
 };
 
 /*
- * State machine Struct
- */
+* State machine Struct
+*/
 struct ACSM_STRUCT
 {
     int acsmMaxStates;
@@ -90,34 +87,22 @@ struct ACSM_STRUCT
 
     int numPatterns;
     const MpseAgent* agent;
-
-    //Added
-    int * stateArray;
-    std::vector<cl::Platform> all_platforms;
-    cl::Platform default_platform;
-    std::vector<cl::Device> all_devices;
-    cl::Device default_device;
-    cl::Context context;
-    cl::CommandQueue queue;
-    cl::Program program;
-    cl::Kernel kernel;
-    cl::Program::Sources sources;
 };
 
 /*
- *   Prototypes
- */
+*   Prototypes
+*/
 void acsmx_init_xlatcase();
 
 ACSM_STRUCT* acsmNew(const MpseAgent*);
 
 int acsmAddPattern(ACSM_STRUCT* p, const uint8_t* pat, unsigned n,
-bool nocase, bool negative, void* id);
+    bool nocase, bool negative, void* id);
 
-int acsmCompile(struct SnortConfig*, ACSM_STRUCT*);
+int acsmCompile(snort::SnortConfig*, ACSM_STRUCT*);
 
 int acsmSearch(ACSM_STRUCT * acsm, const uint8_t* T,
-int n, MpseMatch, void* context, int* current_state);
+    int n, MpseMatch, void* context, int* current_state);
 
 void acsmFree(ACSM_STRUCT* acsm);
 int acsmPatternCount(ACSM_STRUCT* acsm);
@@ -125,4 +110,6 @@ int acsmPatternCount(ACSM_STRUCT* acsm);
 int acsmPrintDetailInfo(ACSM_STRUCT*);
 
 int acsmPrintSummaryInfo();
+
 #endif
+

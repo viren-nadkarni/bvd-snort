@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,8 +22,6 @@
 #include "config.h"
 #endif
 
-#include "ips_options/ips_regex.h"
-
 #include "framework/base_api.h"
 #include "framework/counts.h"
 #include "framework/cursor.h"
@@ -37,55 +35,71 @@
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
+using namespace snort;
+
 //-------------------------------------------------------------------------
 // stubs, spies, etc.
 //-------------------------------------------------------------------------
 
-extern const BaseApi* ips_regex;
-
-void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
+namespace snort
+{
 
 void mix_str(uint32_t& a, uint32_t&, uint32_t&, const char* s, unsigned)
 { a += strlen(s); }
 
-Packet::Packet(bool) { }
-Packet::~Packet() { }
+SnortConfig s_conf;
+THREAD_LOCAL SnortConfig* snort_conf = &s_conf;
 
-Cursor::Cursor(Packet* p)
-{ set("pkt_data", p->data, p->dsize); }
+static std::vector<void *> s_state;
+
+ScScratchFunc scratch_setup;
+ScScratchFunc scratch_cleanup;
+
+SnortConfig::SnortConfig(const SnortConfig* const)
+{
+    state = &s_state;
+    num_slots = 1;
+}
+
+SnortConfig::~SnortConfig() = default;
+
+int SnortConfig::request_scratch(ScScratchFunc setup, ScScratchFunc cleanup)
+{
+    scratch_setup = setup;
+    scratch_cleanup = cleanup;
+    s_state.resize(1);
+
+    return 0;
+}
+
+SnortConfig* SnortConfig::get_conf()
+{ return snort_conf; }
+
+Packet::Packet(bool) { }
+Packet::~Packet() = default;
 
 static unsigned s_parse_errors = 0;
 
 void ParseError(const char*, ...)
 { s_parse_errors++; }
 
-SnortConfig s_conf;
-THREAD_LOCAL SnortConfig* snort_conf = &s_conf;
-
-static SnortState s_state;
-
-SnortConfig::SnortConfig(SnortConfig*)
-{
-    state = &s_state;
-    memset(state, 0, sizeof(*state));
-    num_slots = 1;
-}
-
-SnortConfig::~SnortConfig() { }
-
-SnortConfig* SnortConfig::get_conf()
-{ return snort_conf; }
-
 unsigned get_instance_id()
 { return 0; }
 
-MemoryContext::MemoryContext(MemoryTracker&) { }
-MemoryContext::~MemoryContext() { }
-
-void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*, FILE*) { }
-
 char* snort_strdup(const char* s)
 { return strdup(s); }
+
+MemoryContext::MemoryContext(MemoryTracker&) { }
+MemoryContext::~MemoryContext() = default;
+}
+
+extern const BaseApi* ips_regex;
+
+Cursor::Cursor(Packet* p)
+{ set("pkt_data", p->data, p->dsize); }
+
+void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
+void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*, FILE*) { }
 
 //-------------------------------------------------------------------------
 // helpers
@@ -134,7 +148,7 @@ static IpsOption* get_option(const char* pat, bool relative = false)
 
 TEST_GROUP(ips_regex_base)
 {
-    void setup()
+    void setup() override
     { CHECK(ips_regex); }
 };
 
@@ -168,14 +182,14 @@ TEST_GROUP(ips_regex_module)
     bool end = true;
     unsigned expect = 0;
 
-    void setup()
+    void setup() override
     {
         s_parse_errors = 0;
         mod = ips_regex->mod_ctor();
         CHECK(mod);
         CHECK(mod->begin(ips_regex->name, 0, nullptr));
     }
-    void teardown()
+    void teardown() override
     {
         CHECK(mod->end(ips_regex->name, 0, nullptr) == end);
         LONGS_EQUAL(expect, s_parse_errors);
@@ -259,20 +273,17 @@ TEST_GROUP(ips_regex_option)
 {
     IpsOption* opt = nullptr;
 
-    void setup()
+    void setup() override
     {
-        // FIXIT-L cpputest hangs or crashes in the leak detector
-        MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
         opt = get_option(" foo ");
-        regex_setup(snort_conf);
+        scratch_setup(snort_conf);
     }
-    void teardown()
+    void teardown() override
     {
         IpsApi* api = (IpsApi*)ips_regex;
         api->dtor(opt);
-        regex_cleanup(snort_conf);
+        scratch_cleanup(snort_conf);
         api->pterm(snort_conf);
-        MemoryLeakWarningPlugin::turnOnNewDeleteOverloads();
     }
 };
 
@@ -333,19 +344,16 @@ TEST_GROUP(ips_regex_option_relative)
 {
     IpsOption* opt = nullptr;
 
-    void setup()
+    void setup() override
     {
-        // FIXIT-L cpputest hangs or crashes in the leak detector
-        MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
         opt = get_option("\\bfoo", true);
-        regex_setup(snort_conf);
+        scratch_setup(snort_conf);
     }
-    void teardown()
+    void teardown() override
     {
         IpsApi* api = (IpsApi*)ips_regex;
         api->dtor(opt);
-        regex_cleanup(snort_conf);
-        MemoryLeakWarningPlugin::turnOnNewDeleteOverloads();
+        scratch_cleanup(snort_conf);
     }
 };
 
@@ -369,6 +377,8 @@ TEST(ips_regex_option_relative, no_match)
 
 int main(int argc, char** argv)
 {
+    // FIXIT-L cpputest hangs or crashes in the leak detector
+    MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
     return CommandLineTestRunner::RunAllTests(argc, argv);
 }
 

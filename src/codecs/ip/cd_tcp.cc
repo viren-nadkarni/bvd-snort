@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -34,6 +34,8 @@
 #include "utils/util.h"
 
 #include "checksum.h"
+
+using namespace snort;
 
 #define CD_TCP_NAME "tcp"
 #define CD_TCP_HELP "support for transmission control protocol"
@@ -128,7 +130,7 @@ private:
         const uint8_t* const end,
         const int expected_len);
 
-    void DecodeTCPOptions(const uint8_t*, uint32_t, CodecData&);
+    void DecodeTCPOptions(const uint8_t*, uint32_t, CodecData&, DecodeData&);
     void TCPMiscTests(const tcp::TCPHdr* const tcph,
         const DecodeData& snort,
         const CodecData& codec);
@@ -194,7 +196,7 @@ bool TcpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
         /* IPv6 traffic */
         else
         {
-            bad_cksum_cnt = &(stats.bad_ip4_cksum);
+            bad_cksum_cnt = &(stats.bad_ip6_cksum);
             checksum::Pseudoheader6 ph6;
             const ip::IP6Hdr* const ip6h = snort.ip_api.get_ip6h();
             COPY4(ph6.sip, ip6h->get_src()->u6_addr32);
@@ -240,8 +242,11 @@ bool TcpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
             }
         }
 
-        if ( sfvar_ip_in(SynToMulticastDstIp, snort.ip_api.get_dst()) )
-            codec_event(codec, DECODE_SYN_TO_MULTICAST);
+        if ( SnortConfig::is_address_anomaly_check_enabled() )
+        {
+            if ( sfvar_ip_in(SynToMulticastDstIp, snort.ip_api.get_dst()) )
+                codec_event(codec, DECODE_SYN_TO_MULTICAST);
+        }
 
         if ( (tcph->th_flags & TH_RST) )
             codec_event(codec, DECODE_TCP_SYN_RST);
@@ -263,8 +268,10 @@ bool TcpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
     uint16_t tcp_opt_len = (uint16_t)(tcph->hlen() - tcp::TCP_MIN_HEADER_LEN);
 
     if (tcp_opt_len > 0)
-        DecodeTCPOptions((const uint8_t*)(raw.data + tcp::TCP_MIN_HEADER_LEN), tcp_opt_len, codec);
-
+    {
+        const uint8_t* opts = (const uint8_t*)(raw.data + tcp::TCP_MIN_HEADER_LEN);
+        DecodeTCPOptions(opts, tcp_opt_len, codec, snort);
+    }
     int dsize = raw.len - tcph->hlen();
     if (dsize < 0)
         dsize = 0;
@@ -342,7 +349,8 @@ bool TcpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
  *
  * Returns: void function
  */
-void TcpCodec::DecodeTCPOptions(const uint8_t* start, uint32_t o_len, CodecData& codec)
+void TcpCodec::DecodeTCPOptions(
+    const uint8_t* start, uint32_t o_len, CodecData& codec, DecodeData& snort)
 {
     const uint8_t* const end_ptr = start + o_len; /* points to byte after last option */
     const tcp::TcpOption* opt = reinterpret_cast<const tcp::TcpOption*>(start);
@@ -394,6 +402,7 @@ void TcpCodec::DecodeTCPOptions(const uint8_t* start, uint32_t o_len, CodecData&
                     /* LOG INVALID WINDOWSCALE alert */
                     codec_event(codec, DECODE_TCPOPT_WSCALE_INVALID);
                 }
+                snort.decode_flags |= DECODE_WSCALE;
             }
             break;
 
@@ -658,7 +667,7 @@ bool TcpCodec::encode(const uint8_t* const raw_in, const uint16_t /*raw_len*/,
         checksum::Pseudoheader ps;
         int len = buf.size();
 
-        const IP4Hdr* const ip4h = ip_api.get_ip4h();
+        const ip::IP4Hdr* const ip4h = ip_api.get_ip4h();
         ps.sip = ip4h->get_src();
         ps.dip = ip4h->get_dst();
         ps.zero = 0;
@@ -754,7 +763,7 @@ static void mod_dtor(Module* m)
 static void tcp_codec_ginit()
 {
     // Multicast addresses pursuant to RFC 5771
-    SynToMulticastDstIp = sfip_var_from_string("[224.0.0.0/4]");
+    SynToMulticastDstIp = sfip_var_from_string("[224.0.0.0/4]", "tcp");
     assert(SynToMulticastDstIp);
 }
 

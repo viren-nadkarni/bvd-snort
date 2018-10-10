@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -55,6 +55,8 @@ enum PlugType
     PT_MAX
 };
 
+namespace snort
+{
 class Module;
 typedef Module* (* ModNewFunc)();
 typedef void (* ModDelFunc)(Module*);
@@ -71,9 +73,9 @@ struct BaseApi
     const char* options;
     const char* name;
     const char* help;
-    ModNewFunc mod_ctor;
+    snort::ModNewFunc mod_ctor;
     ModDelFunc mod_dtor;
 };
-
+}
 #endif
 

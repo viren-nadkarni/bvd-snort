@@ -1,10 +1,11 @@
 set (PUB_SUB_INCLUDES
+    appid_events.h
     expect_events.h
     http_events.h
     sip_events.h
 )
 
-add_library( pub_sub STATIC
+add_library( pub_sub OBJECT
     ${PUB_SUB_INCLUDES}
     http_events.cc
     sip_events.cc

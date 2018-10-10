@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -36,13 +36,14 @@ public:
     int validate(AppIdDiscoveryArgs&) override;
 
     // FIXIT-L - move to service discovery class
-    static void AppIdFreeDhcpData(DHCPData*);
-    static void AppIdFreeDhcpInfo(DHCPInfo*);
+    static void AppIdFreeDhcpData(snort::DHCPData*);
+    static void AppIdFreeDhcpInfo(snort::DHCPInfo*);
 
+    void release_thread_resources() override;
 private:
-    int add_dhcp_info(AppIdSession*, unsigned op55_len, const uint8_t* op55, unsigned
+    int add_dhcp_info(AppIdSession&, unsigned op55_len, const uint8_t* op55, unsigned
         op60_len, const uint8_t* op60, const uint8_t* mac);
-    void add_new_dhcp_lease(AppIdSession*, const uint8_t* mac, uint32_t ip, int32_t zone,
+    void add_new_dhcp_lease(AppIdSession&, const uint8_t* mac, uint32_t ip, int32_t zone,
         uint32_t subnetmask, uint32_t leaseSecs, uint32_t router);
 };
 #endif

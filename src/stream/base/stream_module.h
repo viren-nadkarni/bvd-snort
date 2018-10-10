@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,12 +24,17 @@
 #include "flow/flow_config.h"
 #include "framework/module.h"
 
-extern THREAD_LOCAL ProfileStats s5PerfStats;
+extern THREAD_LOCAL snort::ProfileStats s5PerfStats;
+
+namespace snort
+{
 struct SnortConfig;
+}
 
 //-------------------------------------------------------------------------
 // stream module
 //-------------------------------------------------------------------------
+extern Trace TRACE_NAME(stream);
 
 #define MOD_NAME "stream"
 #define MOD_HELP "common flow tracking"
@@ -69,20 +74,24 @@ struct StreamModuleConfig
 
     int footprint;
     bool ip_frags_only;
+    bool track_on_syn;
 };
 
-class StreamModule : public Module
+class StreamModule : public snort::Module
 {
 public:
     StreamModule();
 
-    bool begin(const char*, int, SnortConfig*) override;
-    bool set(const char*, Value&, SnortConfig*) override;
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
-    ProfileStats* get_profile() const override;
+    snort::ProfileStats* get_profile() const override;
     const StreamModuleConfig* get_data();
+
+    unsigned get_gid() const override;
+    const snort::RuleMap* get_rules() const override;
 
     void sum_stats(bool) override;
     void show_stats() override;

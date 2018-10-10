@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,8 +22,11 @@
 
 #include "lua/lua_iface.h"
 
+namespace snort
+{
 class Logger;
+}
 
-extern const struct Lua::InstanceInterface<Logger> LoggerIface;
+extern const struct Lua::InstanceInterface<snort::Logger> LoggerIface;
 
 #endif

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -41,6 +41,7 @@
 #include "json_formatter.h"
 #include "text_formatter.h"
 
+using namespace snort;
 using namespace std;
 
 static inline bool check_file_size(FILE* fh, uint64_t max_file_size)
@@ -59,25 +60,25 @@ static inline bool check_file_size(FILE* fh, uint64_t max_file_size)
     return false;
 }
 
-PerfTracker::PerfTracker(PerfConfig* config, bool file, const char* tracker_name)
+PerfTracker::PerfTracker(PerfConfig* config, const char* tracker_name)
 {
     this->config = config;
 
     switch (config->format)
     {
-        case PERF_CSV: formatter = new CSVFormatter(tracker_name); break;
-        case PERF_TEXT: formatter = new TextFormatter(tracker_name); break;
-        case PERF_JSON: formatter = new JSONFormatter(tracker_name); break;
+        case PerfFormat::CSV: formatter = new CSVFormatter(tracker_name); break;
+        case PerfFormat::TEXT: formatter = new TextFormatter(tracker_name); break;
+        case PerfFormat::JSON: formatter = new JSONFormatter(tracker_name); break;
 #ifdef HAVE_FLATBUFFERS
-        case PERF_FBS: formatter = new FbsFormatter(tracker_name); break;
+        case PerfFormat::FBS: formatter = new FbsFormatter(tracker_name); break;
 #endif
 #ifdef UNIT_TEST
-        case PERF_MOCK: formatter = new MockFormatter(tracker_name); break;
+        case PerfFormat::MOCK: formatter = new MockFormatter(tracker_name); break;
 #endif
         default: break;
     }
 
-    if (file)
+    if ( config->output == PerfOutput::TO_FILE )
     {
         string tracker_fname = tracker_name;
         tracker_fname += formatter->get_extension();
@@ -122,12 +123,13 @@ bool PerfTracker::open(bool append)
                         file_name, mode, get_error(errno));
                 }
 
-                if (chown(file_name, SnortConfig::get_uid(), SnortConfig::get_gid()) != 0)
+                if (chown(file_name, snort::SnortConfig::get_uid(),
+                    snort::SnortConfig::get_gid()) != 0)
                 {
                     WarningMessage("perfmonitor: Unable to change permissions of "
                         "stats file '%s' to user:%d and group:%d: %s.\n",
-                        file_name, SnortConfig::get_uid(), SnortConfig::get_gid(), get_error(
-                        errno));
+                        file_name, snort::SnortConfig::get_uid(), snort::SnortConfig::get_gid(),
+                        get_error(errno));
                 }
             }
         }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,8 +27,10 @@ class Inspector;
 struct ThirdPartyAppIDModule;
 
 AppIdConfig* pAppidActiveConfig = nullptr;
-THREAD_LOCAL ThirdPartyAppIDModule* thirdparty_appid_module = nullptr;
+ThirdPartyAppIDModule* tp_appid_module = nullptr;
 
+namespace snort
+{
 char* snort_strndup(const char* src, size_t dst_size)
 {
     return strndup(src, dst_size);
@@ -43,6 +45,14 @@ char* snort_strdup(const char* str)
     return p;
 }
 
+void ErrorMessage(const char*,...) { }
+void WarningMessage(const char*,...) { }
+void LogMessage(const char*,...) { }
+void ParseWarning(WarningGroup, const char*, ...) { }
+
+void LogLabel(const char*, FILE*) {}
+}
+
 void Field::set(int32_t length, const uint8_t* start, bool own_the_buffer_)
 {
     strt = start;
@@ -52,14 +62,6 @@ void Field::set(int32_t length, const uint8_t* start, bool own_the_buffer_)
 
 Field global_field;
 
-#ifdef DEBUG_MSGS
-void Debug::print(const char*, int, uint64_t, const char*, ...) { }
-#endif
-
-void ErrorMessage(const char*,...) { }
-void WarningMessage(const char*,...) { }
-void LogMessage(const char*,...) { }
-void ParseWarning(WarningGroup, const char*, ...) { }
 
 int ServiceDiscovery::add_ftp_service_state(AppIdSession&)
 {
@@ -89,21 +91,18 @@ ServiceDiscoveryState* AppIdServiceState::add(SfIp const*, IpProtocol, unsigned 
 void ServiceDiscoveryState::set_service_id_valid(ServiceDetector*) { }
 
 // Stubs for service_plugins/service_discovery.h
-int ServiceDiscovery::incompatible_data(AppIdSession*, Packet const*, int, ServiceDetector*)
+int ServiceDiscovery::incompatible_data(AppIdSession&, const Packet*, AppidSessionDirection, ServiceDetector*)
 {
   return 0;
 }
 
-int ServiceDiscovery::fail_service(AppIdSession*, Packet const*, int, ServiceDetector*)
+int ServiceDiscovery::fail_service(AppIdSession&, const Packet*, AppidSessionDirection, ServiceDetector*, ServiceDiscoveryState*)
 {
   return 0;
 }
 
 void mock_init_appid_pegs()
 {
-    AppIdPegCounts::set_detectors_configured();
-    AppIdPegCounts::add_unknown_app_peg();
-    AppIdPegCounts::get_peg_info();
     AppIdPegCounts::init_pegs();
 }
 
@@ -112,5 +111,8 @@ void mock_cleanup_appid_pegs()
     AppIdPegCounts::cleanup_pegs();
     AppIdPegCounts::cleanup_peg_info();
 }
+
+THREAD_LOCAL AppIdStats appid_stats;
+
 #endif
 

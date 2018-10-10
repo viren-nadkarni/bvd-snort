@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,6 +31,8 @@
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 #include <CppUTestExt/MockSupport.h>
+
+using namespace snort;
 
 NormMode mockNormMode = NORM_MODE_ON;
 bool norm_enabled = true;
@@ -120,14 +122,14 @@ TEST(tcp_normalizers, os_policy)
     StreamPolicy os_policy;
     Flow* flow = new FlowMock;
     TcpSession* session = new TcpSessionMock( flow );
+    TcpNormalizerState tns;
 
     for( os_policy = StreamPolicy::OS_FIRST; os_policy <= StreamPolicy::OS_PROXY; ++os_policy )
     {
-        TcpNormalizer* normalizer = TcpNormalizerFactory::create( session, os_policy,
-            session->client, session->server );
-        CHECK( normalizer->get_os_policy() == os_policy );
+        TcpNormalizer* normalizer = TcpNormalizerFactory::create(
+            tns, os_policy, session, session->client, session->server);
 
-        delete normalizer;
+        CHECK( normalizer.get_os_policy(tns) == os_policy );
     }
 
     delete flow;
@@ -139,24 +141,23 @@ TEST(tcp_normalizers, paws_fudge_config)
     StreamPolicy os_policy;
     Flow* flow = new FlowMock;
     TcpSession* session = new TcpSessionMock( flow );
+    TcpNormalizerState tns;
 
     for( os_policy = StreamPolicy::OS_FIRST; os_policy <= StreamPolicy::OS_PROXY; ++os_policy )
     {
-        TcpNormalizer* normalizer = TcpNormalizerFactory::create( session, os_policy,
-            session->client, session->server );
+        TcpNormalizer* normalizer = TcpNormalizerFactory::create(
+            tns, os_policy, session, session->client, session->server);
 
         switch ( os_policy )
         {
         case StreamPolicy::OS_LINUX:
-            CHECK( normalizer->get_paws_ts_fudge() == 1 );
+            CHECK( normalizer.get_paws_ts_fudge(tns) == 1 );
             break;
 
         default:
-            CHECK( normalizer->get_paws_ts_fudge() == 0 );
+            CHECK( normalizer.get_paws_ts_fudge(tns) == 0 );
             break;
         }
-
-        delete normalizer;
     }
 
     delete flow;
@@ -168,11 +169,12 @@ TEST(tcp_normalizers, paws_drop_zero_ts_config)
     StreamPolicy os_policy;
     Flow* flow = new FlowMock;
     TcpSession* session = new TcpSessionMock( flow );
+    TcpNormalizerState tns;
 
     for( os_policy = StreamPolicy::OS_FIRST; os_policy <= StreamPolicy::OS_PROXY; ++os_policy )
     {
-        TcpNormalizer* normalizer = TcpNormalizerFactory::create( session, os_policy,
-            session->client, session->server );
+        TcpNormalizer* normalizer = TcpNormalizerFactory::create(
+            tns, os_policy, session, session->client, session->server );
 
         switch ( os_policy )
         {
@@ -181,15 +183,13 @@ TEST(tcp_normalizers, paws_drop_zero_ts_config)
         case StreamPolicy::OS_WINDOWS:
         case StreamPolicy::OS_WINDOWS2K3:
         case StreamPolicy::OS_VISTA:
-            CHECK( !normalizer->is_paws_drop_zero_ts() );
+            CHECK( !normalizer.is_paws_drop_zero_ts(tns) );
             break;
 
         default:
-            CHECK( normalizer->is_paws_drop_zero_ts() );
+            CHECK( normalizer.is_paws_drop_zero_ts(tns) );
             break;
         }
-
-        delete normalizer;
     }
 
     delete flow;
@@ -205,36 +205,35 @@ TEST(tcp_normalizers, norm_options_enabled)
     norm_enabled = true;
     for( os_policy = StreamPolicy::OS_FIRST; os_policy <= StreamPolicy::OS_PROXY; ++os_policy )
     {
-        TcpNormalizer* normalizer = TcpNormalizerFactory::create( session, os_policy,
-            session->client, session->server );
+        TcpNormalizerState tns;
+        TcpNormalizer* normalizer = TcpNormalizerFactory::create(
+            tns, os_policy, session, session->client, session->server);
 
-        CHECK( normalizer->get_opt_block() == NORM_MODE_ON );
-        CHECK( normalizer->get_strip_ecn() == NORM_MODE_ON );
-        CHECK( normalizer->get_tcp_block() == NORM_MODE_ON );
-        CHECK( normalizer->get_trim_syn() == NORM_MODE_ON );
-        CHECK( normalizer->get_trim_rst() == NORM_MODE_ON );
-        CHECK( normalizer->get_trim_mss() == NORM_MODE_ON );
-        CHECK( normalizer->get_trim_win() == NORM_MODE_ON );
-        CHECK( normalizer->is_tcp_ips_enabled() );
-
-        delete normalizer;
+        CHECK( normalizer.get_opt_block(tns) == NORM_MODE_ON );
+        CHECK( normalizer.get_strip_ecn(tns) == NORM_MODE_ON );
+        CHECK( normalizer.get_tcp_block(tns) == NORM_MODE_ON );
+        CHECK( normalizer.get_trim_syn(tns) == NORM_MODE_ON );
+        CHECK( normalizer.get_trim_rst(tns) == NORM_MODE_ON );
+        CHECK( normalizer.get_trim_mss(tns) == NORM_MODE_ON );
+        CHECK( normalizer.get_trim_win(tns) == NORM_MODE_ON );
+        CHECK( normalizer.is_tcp_ips_enabled(tns) );
     }
 
     norm_enabled = false;
     for( os_policy = StreamPolicy::OS_FIRST; os_policy <= StreamPolicy::OS_PROXY; ++os_policy )
     {
-        TcpNormalizer* normalizer = TcpNormalizerFactory::create( session, os_policy,
-            session->client, session->server );
+        TcpNormalizerState tns;
+        TcpNormalizer* normalizer = TcpNormalizerFactory::create(
+            tns, os_policy, session, session->client, session->server);
 
-        CHECK( normalizer->get_opt_block() == NORM_MODE_TEST );
-        CHECK( normalizer->get_strip_ecn() == NORM_MODE_TEST );
-        CHECK( normalizer->get_tcp_block() == NORM_MODE_TEST );
-        CHECK( normalizer->get_trim_syn() == NORM_MODE_TEST );
-        CHECK( normalizer->get_trim_rst() == NORM_MODE_TEST );
-        CHECK( normalizer->get_trim_mss() == NORM_MODE_TEST );
-        CHECK( normalizer->get_trim_win() == NORM_MODE_TEST );
-        CHECK( !normalizer->is_tcp_ips_enabled() );
-        delete normalizer;
+        CHECK( normalizer.get_opt_block(tns) == NORM_MODE_TEST );
+        CHECK( normalizer.get_strip_ecn(tns) == NORM_MODE_TEST );
+        CHECK( normalizer.get_tcp_block(tns) == NORM_MODE_TEST );
+        CHECK( normalizer.get_trim_syn(tns) == NORM_MODE_TEST );
+        CHECK( normalizer.get_trim_rst(tns) == NORM_MODE_TEST );
+        CHECK( normalizer.get_trim_mss(tns) == NORM_MODE_TEST );
+        CHECK( normalizer.get_trim_win(tns) == NORM_MODE_TEST );
+        CHECK( !normalizer.is_tcp_ips_enabled(tns) );
     }
 
     delete flow;

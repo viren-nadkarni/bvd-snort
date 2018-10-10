@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -33,6 +33,8 @@
 #include "utils/dnet_header.h"
 
 #include "sfdaq.h"
+
+using namespace snort;
 
 #define MAX_ATTEMPTS 20
 
@@ -147,9 +149,9 @@ void Active::kill_session(Packet* p, EncodeFlags flags)
 
     default:
         if ( Active::packet_force_dropped() )
-            Active::send_unreach(p, UnreachResponse::FWD);
+            Active::send_unreach(p, snort::UnreachResponse::FWD);
         else
-            Active::send_unreach(p, UnreachResponse::PORT);
+            Active::send_unreach(p, snort::UnreachResponse::PORT);
         break;
     }
 }
@@ -177,6 +179,10 @@ bool Active::init(SnortConfig* sc)
 #endif
         }
     }
+
+    if (sc->max_responses > 0)
+        Active::set_enabled();
+
     return true;
 }
 
@@ -216,7 +222,7 @@ void Active::send_reset(Packet* p, EncodeFlags ef)
     }
 }
 
-void Active::send_unreach(Packet* p, UnreachResponse type)
+void Active::send_unreach(Packet* p, snort::UnreachResponse type)
 {
     uint32_t len;
     const uint8_t* rej;
@@ -462,9 +468,9 @@ void Active::reset_session(Packet* p, bool force)
     if ( force or SnortConfig::inline_mode() or SnortConfig::treat_drop_as_ignore() )
         Stream::drop_flow(p);
 
-    if ( s_enabled and SnortConfig::get_conf()->max_responses )
+    if ( s_enabled )
     {
-        ActionManager::queue_reject(p);
+        ActionManager::queue_reject();
 
         if ( p->flow )
         {

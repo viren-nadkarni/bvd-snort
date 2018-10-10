@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -56,7 +56,7 @@ public:
 
 private:
     ZHashNode* get_free_node();
-    ZHashNode* find_node_row(const void*, int*);
+    ZHashNode* find_node_row(const void*, int&);
 
     void glink_node(ZHashNode*);
     void gunlink_node(ZHashNode*);

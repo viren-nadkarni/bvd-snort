@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -63,8 +63,8 @@ struct StreamIpConfig
     StreamIpConfig();
 };
 
-StreamIpConfig* get_ip_cfg(Inspector*);
-class Defrag* get_defrag(Inspector*);
+StreamIpConfig* get_ip_cfg(snort::Inspector*);
+class Defrag* get_defrag(snort::Inspector*);
 
 #endif
 

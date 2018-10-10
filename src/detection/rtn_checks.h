@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -21,22 +21,25 @@
 #ifndef RTN_CHECKS_H
 #define RTN_CHECKS_H
 
-struct Packet;
+namespace snort
+{
+    struct Packet;
+}
 struct RuleFpList;
 struct RuleTreeNode;
 
 // parsing
-int RuleListEnd(Packet*, RuleTreeNode*, RuleFpList*, int);
-int OptListEnd(void* option_data, class Cursor&, Packet*);
+int RuleListEnd(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
+int OptListEnd(void* option_data, class Cursor&, snort::Packet*);
 
 // detection
-int CheckBidirectional(Packet*, RuleTreeNode*, RuleFpList*, int);
-int CheckSrcIP(Packet*, RuleTreeNode*, RuleFpList*, int);
-int CheckDstIP(Packet*, RuleTreeNode*, RuleFpList*, int);
-int CheckSrcPortEqual(Packet*, RuleTreeNode*, RuleFpList*, int);
-int CheckDstPortEqual(Packet*, RuleTreeNode*, RuleFpList*, int);
-int CheckSrcPortNotEq(Packet*, RuleTreeNode*, RuleFpList*, int);
-int CheckDstPortNotEq(Packet*, RuleTreeNode*, RuleFpList*, int);
+int CheckBidirectional(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
+int CheckSrcIP(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
+int CheckDstIP(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
+int CheckSrcPortEqual(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
+int CheckDstPortEqual(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
+int CheckSrcPortNotEq(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
+int CheckDstPortNotEq(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
 
 #endif
 

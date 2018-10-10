@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2010-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,14 +32,12 @@
 #include <iconv.h>
 #endif
 
-#include "main/snort_types.h"
-
 #define DSTATE_FIRST 0
 #define DSTATE_SECOND 1
 #define DSTATE_THIRD 2
 #define DSTATE_FOURTH 3
 
-SNORT_FORCED_INCLUSION_DEFINITION(utf);
+using namespace snort;
 
 UtfDecodeSession::UtfDecodeSession()
 {
@@ -367,7 +365,10 @@ char* UtfDecodeSession::convert_character_encoding(const char* to_code, const ch
     char* out = out_buf;
     size_t iconv_rval = iconv(convert_encoding, &in_buf, &in_bytes, &out, &out_bytes);
     if (iconv_rval == (size_t)-1)
+    {
+        iconv_close(convert_encoding);
         return nullptr;
+    }
 
     *out = '\0';
     *out_buf_length = (out - out_buf);

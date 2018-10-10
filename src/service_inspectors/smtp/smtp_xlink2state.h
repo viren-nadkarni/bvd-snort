@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,6 +26,6 @@
 
 #include "smtp.h"
 
-int ParseXLink2State(SMTP_PROTO_CONF*, Packet*, SMTPData*, const uint8_t*);
+int ParseXLink2State(SMTP_PROTO_CONF*, snort::Packet*, SMTPData*, const uint8_t*);
 
 #endif

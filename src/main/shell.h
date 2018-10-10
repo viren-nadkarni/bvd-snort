@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,11 @@
 
 struct lua_State;
 
+namespace snort
+{
+struct SnortConfig;
+}
+
 class Shell
 {
 public:
@@ -36,7 +41,7 @@ public:
     void set_overrides(const char*);
     void set_overrides(Shell*);
 
-    void configure(struct SnortConfig*);
+    void configure(snort::SnortConfig*);
     void install(const char*, const struct luaL_Reg*);
     void execute(const char*, std::string&);
 

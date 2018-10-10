@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2008-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,8 +28,11 @@
 #include "main/snort_types.h"
 #include "time/clock_defs.h"
 
+namespace snort
+{
 class IpsOption;
 struct Packet;
+}
 struct RuleTreeNode;
 struct PortObject;
 struct OutputSet;
@@ -39,9 +42,9 @@ struct sfip_var_t;
 /* same as the rule header FP list */
 struct OptFpList
 {
-    IpsOption* ips_opt;
+    snort::IpsOption* ips_opt;
 
-    int (* OptTestFunc)(void* option_data, class Cursor&, Packet*);
+    int (* OptTestFunc)(void* option_data, class Cursor&, snort::Packet*);
 
     OptFpList* next;
 
@@ -76,7 +79,7 @@ struct OptTreeNode
     /* plugin/detection functions go here */
     OptFpList* opt_func;
     OutputSet* outputFuncs; /* per sid enabled output functions */
-    IpsOption* agent;
+    snort::IpsOption* agent;
 
     /* metadata about signature */
     SigInfo sigInfo;
@@ -92,8 +95,9 @@ struct OptTreeNode
 
     int chain_node_number;
     int evalIndex;       /* where this rule sits in the evaluation sets */
-    int proto;           /* protocol, added for integrity checks
-                            during rule parsing */
+
+    // Added for integrity checks during rule parsing.
+    SnortProtocolId snort_protocol_id;
 
     unsigned ruleIndex; // unique index
 
@@ -124,7 +128,7 @@ struct RuleFpList
     void* context;
 
     /* rule check function pointer */
-    int (* RuleHeadFunc)(Packet*, RuleTreeNode*, RuleFpList*, int);
+    int (* RuleHeadFunc)(snort::Packet*, RuleTreeNode*, RuleFpList*, int);
 
     /* pointer to the next rule function node */
     RuleFpList* next;
@@ -144,23 +148,26 @@ struct RuleTreeNode
 
     struct ListHead* listhead;
 
-    int proto;
+    SnortProtocolId snort_protocol_id;
 
     uint32_t flags;     /* control flags */
 
-    RuleType type;
+    snort::Actions::Type type;
 
     // reference count from otn.
     // Multiple OTNs can reference this RTN with the same policy.
     unsigned int otnRefCount;
 };
 
-typedef int (* RuleOptEvalFunc)(void*, Cursor&, Packet*);
+typedef int (* RuleOptEvalFunc)(void*, Cursor&, snort::Packet*);
 OptFpList* AddOptFuncToList(RuleOptEvalFunc, OptTreeNode*);
 
 void* get_rule_type_data(OptTreeNode*, const char* name);
 
+namespace snort
+{
 SO_PUBLIC bool otn_has_plugin(OptTreeNode* otn, const char* name);
+}
 
 inline bool otn_has_plugin(OptTreeNode* otn, int id)
 { return (otn->plugins & (0x1 << id)) != 0; }
@@ -168,9 +175,9 @@ inline bool otn_has_plugin(OptTreeNode* otn, int id)
 inline void otn_set_plugin(OptTreeNode* otn, int id)
 { otn->plugins |= (0x1 << id); }
 
-bool otn_set_agent(OptTreeNode*, IpsOption*);
+bool otn_set_agent(OptTreeNode*, snort::IpsOption*);
 
-void otn_trigger_actions(const OptTreeNode*, Packet*);
+void otn_trigger_actions(const OptTreeNode*, snort::Packet*);
 
 #endif
 

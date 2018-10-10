@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -76,11 +76,14 @@ inline bool scanning_boundary(MimeDataPafInfo* mime_info, uint32_t boundary_star
     return false;
 }
 
+namespace snort
+{
 SO_PUBLIC void reset_mime_paf_state(MimeDataPafInfo*);
 
 /*  Process data boundary and flush each file based on boundary*/
 SO_PUBLIC bool process_mime_paf_data(MimeDataPafInfo*,  uint8_t val);
 SO_PUBLIC bool check_data_end(void* end_state,  uint8_t val);
+}
 
 #endif
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,7 @@
 
 #include "side_channel.h"
 
+using namespace snort;
 
 //-------------------------------------------------------------------------
 // side_channel module
@@ -87,27 +88,13 @@ static bool validate_config(SideChannelConfig* config)
 }
 
 SideChannelModule::SideChannelModule() :
-    Module(SIDECHANNEL_NAME, SIDECHANNEL_HELP, sc_params)
-{
-    DebugMessage(DEBUG_SIDE_CHANNEL,"SideChannelModule::SideChannelModule()\n");
-}
-
-SideChannelModule::~SideChannelModule()
-{
-    DebugMessage(DEBUG_SIDE_CHANNEL,"SideChannelModule::~SideChannelModule()\n");
-}
+    Module(SIDECHANNEL_NAME, SIDECHANNEL_HELP, sc_params){}
 
 ProfileStats* SideChannelModule::get_profile() const
 { return &sc_perf_stats; }
 
-bool SideChannelModule::set(const char* fqn, Value& v, SnortConfig*)
+bool SideChannelModule::set(const char*, Value& v, SnortConfig*)
 {
-#ifdef DEBUG_MSGS
-    DebugFormat(DEBUG_SIDE_CHANNEL,"SideChannelModule::set(): %s %s\n", fqn, v.get_name());
-#else
-    UNUSED(fqn);
-#endif
-
     assert(config);
 
     if ( v.is("connector") )
@@ -125,14 +112,8 @@ bool SideChannelModule::set(const char* fqn, Value& v, SnortConfig*)
     return true;
 }
 
-bool SideChannelModule::begin(const char* fqn, int idx, SnortConfig*)
+bool SideChannelModule::begin(const char*, int, SnortConfig*)
 {
-#ifdef DEBUG_MSGS
-    DebugFormat(DEBUG_SIDE_CHANNEL,"SideChannelModule::begin(): %s %d\n", fqn, idx);
-#else
-    UNUSED(fqn);
-    UNUSED(idx);
-#endif
     if ( !config )
     {
         config = new SideChannelConfig;
@@ -143,12 +124,6 @@ bool SideChannelModule::begin(const char* fqn, int idx, SnortConfig*)
 
 bool SideChannelModule::end(const char* fqn, int idx, SnortConfig*)
 {
-#ifdef DEBUG_MSGS
-    DebugFormat(DEBUG_SIDE_CHANNEL,"SideChannelModule::end(): %s %d\n", fqn, idx);
-#else
-    UNUSED(fqn);
-#endif
-
     if ( (idx == 0) || (strcmp(fqn, "side_channel.connectors") == 0 ) )
         return true;
 

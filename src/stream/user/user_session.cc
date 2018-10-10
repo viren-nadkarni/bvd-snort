@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,6 +32,8 @@
 
 #include "stream_user.h"
 #include "user_module.h"
+
+using namespace snort;
 
 THREAD_LOCAL ProfileStats user_perf_stats;
 
@@ -158,7 +160,7 @@ void UserTracker::detect(
     up->packet_flags |= (p->packet_flags & (PKT_STREAM_EST|PKT_STREAM_UNEST_UNI));
 
     trace_logf(stream_user, "detect[%d]\n", up->dsize);
-    Snort::inspect(up);
+    snort::Snort::inspect(up);
 }
 
 int UserTracker::scan(Packet* p, uint32_t& flags)
@@ -206,7 +208,7 @@ void UserTracker::flush(Packet* p, unsigned flush_amt, uint32_t flags)
     StreamBuffer sb = { nullptr, 0 };
     trace_logf(stream_user, "flush[%d]\n", flush_amt);
     uint32_t rflags = flags & ~PKT_PDU_TAIL;
-    Packet* up = DetectionEngine::set_next_packet();
+    Packet* up = DetectionEngine::set_next_packet(p);
 
     while ( !seg_list.empty() and bytes_flushed < flush_amt )
     {
@@ -363,7 +365,7 @@ void UserSession::start(Packet* p, Flow* flow)
 
         StreamUpdatePerfBaseState(&sfBase, tmp->flow, TCP_STATE_SYN_SENT);
 
-        EventInternal(INTERNAL_EVENT_SESSION_ADD);
+        EventInternal(SESSION_EVENT_SETUP);
 #endif
     }
 }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,7 +26,7 @@
 using namespace HttpEnums;
 
 ScanResult HttpStartCutter::cut(const uint8_t* buffer, uint32_t length,
-    HttpInfractions* infractions, HttpEventGen* events, uint32_t, uint32_t)
+    HttpInfractions* infractions, HttpEventGen* events, uint32_t, bool)
 {
     for (uint32_t k = 0; k < length; k++)
     {
@@ -107,7 +107,7 @@ ScanResult HttpStartCutter::cut(const uint8_t* buffer, uint32_t length,
         }
     }
     octets_seen += length;
-    return SCAN_NOTFOUND;
+    return SCAN_NOT_FOUND;
 }
 
 HttpStartCutter::ValidationResult HttpRequestCutter::validate(uint8_t octet, HttpInfractions*,
@@ -154,7 +154,7 @@ HttpStartCutter::ValidationResult HttpStatusCutter::validate(uint8_t octet,
 }
 
 ScanResult HttpHeaderCutter::cut(const uint8_t* buffer, uint32_t length,
-    HttpInfractions* infractions, HttpEventGen* events, uint32_t, uint32_t)
+    HttpInfractions* infractions, HttpEventGen* events, uint32_t, bool)
 {
     // Header separators: leading \r\n, leading \n, nonleading \r\n\r\n, nonleading \n\r\n,
     // nonleading \r\n\n, and nonleading \n\n. The separator itself becomes num_excess which is
@@ -247,13 +247,13 @@ ScanResult HttpHeaderCutter::cut(const uint8_t* buffer, uint32_t length,
         }
     }
     octets_seen += length;
-    return SCAN_NOTFOUND;
+    return SCAN_NOT_FOUND;
 }
 
 ScanResult HttpBodyClCutter::cut(const uint8_t*, uint32_t length, HttpInfractions*,
-    HttpEventGen*, uint32_t flow_target, uint32_t flow_max)
+    HttpEventGen*, uint32_t flow_target, bool stretch)
 {
-    assert(remaining > 0);
+    assert(remaining > octets_seen);
 
     // Are we skipping to the next message?
     if (flow_target == 0)
@@ -272,48 +272,102 @@ ScanResult HttpBodyClCutter::cut(const uint8_t*, uint32_t length, HttpInfraction
         }
     }
 
-    // The normal body section size is flow_target. But if there are only flow_max or less
-    // remaining we take the whole thing rather than leave a small final section.
-    if (remaining <= flow_max)
+    // A target that is bigger than the entire rest of the message body makes no sense
+    if (remaining <= flow_target)
     {
-        num_flush = remaining;
+        flow_target = remaining;
+        stretch = false;
+    }
+
+    if (!stretch)
+    {
+        num_flush = flow_target;
+        if (num_flush < remaining)
+        {
+            remaining -= num_flush;
+            return SCAN_FOUND_PIECE;
+        }
+        else
+        {
+            remaining = 0;
+            return SCAN_FOUND;
+        }
+    }
+
+    if (octets_seen + length < flow_target)
+    {
+        octets_seen += length;
+        return SCAN_NOT_FOUND;
+    }
+
+    if (octets_seen + length < remaining)
+    {
+        // The message body continues beyond this segment
+        // Stretch the section to include this entire segment provided it is not too big
+        if (octets_seen + length <= flow_target + MAX_SECTION_STRETCH)
+            num_flush = length;
+        else
+            num_flush = flow_target - octets_seen;
+        remaining -= octets_seen + num_flush;
+        return SCAN_FOUND_PIECE;
+    }
+
+    if (remaining - flow_target <= MAX_SECTION_STRETCH)
+    {
+        // Stretch the section to finish the message body
+        num_flush = remaining - octets_seen;
         remaining = 0;
         return SCAN_FOUND;
     }
+
+    // Cannot stretch to the end of the message body. Cut at the original target.
+    num_flush = flow_target - octets_seen;
+    remaining -= flow_target;
+    return SCAN_FOUND_PIECE;
+}
+
+ScanResult HttpBodyOldCutter::cut(const uint8_t*, uint32_t length, HttpInfractions*, HttpEventGen*,
+    uint32_t flow_target, bool stretch)
+{
+    if (flow_target == 0)
+    {
+        // FIXIT-P Need StreamSplitter::END
+        // With other types of body we would skip to the trailers and/or next message now. But this
+        // will run to connection close so we should just stop processing this flow. But there is
+        // no way to ask stream to do that so we must skip through the rest of the message
+        // ourselves.
+        num_flush = length;
+        return SCAN_DISCARD_PIECE;
+    }
+
+    if (octets_seen + length < flow_target)
+    {
+        // Not enough data yet to create a message section
+        octets_seen += length;
+        return SCAN_NOT_FOUND;
+    }
+    else if (stretch && (octets_seen + length <= flow_target + MAX_SECTION_STRETCH))
+    {
+        // Cut the section at the end of this TCP segment to avoid splitting a packet
+        num_flush = length;
+        return SCAN_FOUND_PIECE;
+    }
     else
     {
-        num_flush = flow_target;
-        remaining -= num_flush;
+        // Cut the section at the target length. Either stretching is not allowed or the end of
+        // the segment is too far away.
+        num_flush = flow_target - octets_seen;
         return SCAN_FOUND_PIECE;
     }
 }
 
-ScanResult HttpBodyOldCutter::cut(const uint8_t*, uint32_t, HttpInfractions*, HttpEventGen*,
-    uint32_t flow_target, uint32_t)
-{
-    if (flow_target == 0)
-    {
-        // With other types of body we could skip to the next message now. But this body will run
-        // to connection close so we just stop.
-        return SCAN_END;
-    }
-
-    num_flush = flow_target;
-    return SCAN_FOUND_PIECE;
-}
-
 ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
-    HttpInfractions* infractions, HttpEventGen* events, uint32_t flow_target, uint32_t)
+    HttpInfractions* infractions, HttpEventGen* events, uint32_t flow_target, bool stretch)
 {
     // Are we skipping through the rest of this chunked body to the trailers and the next message?
     const bool discard_mode = (flow_target == 0);
 
-    if (new_section)
-    {
-        new_section = false;
-        octets_seen = 0;
-        num_good_chunks = 0;
-    }
+    const uint32_t adjusted_target = stretch ? MAX_SECTION_STRETCH + flow_target : flow_target;
 
     for (int32_t k=0; k < static_cast<int32_t>(length); k++)
     {
@@ -327,8 +381,26 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
                 events->create_event(EVENT_CHUNK_BAD_SEP);
                 break;
             }
-            curr_state = CHUNK_ZEROS;
+            curr_state = CHUNK_LEADING_WS;
             k--; // Reprocess this octet in the next state
+            break;
+        case CHUNK_LEADING_WS:
+            // Looking for whitespace before the chunk size
+            if (is_sp_tab[buffer[k]])
+            {
+                *infractions += INF_CHUNK_LEADING_WS;
+                events->create_event(EVENT_CHUNK_WHITESPACE);
+                num_leading_ws++;
+                if (num_leading_ws == 5)
+                {
+                    events->create_event(EVENT_BROKEN_CHUNK);
+                    curr_state = CHUNK_BAD;
+                    k--;
+                }
+                break;
+            }
+            curr_state = CHUNK_ZEROS;
+            k--;
             break;
         case CHUNK_ZEROS:
             // Looking for leading zeros in the chunk size.
@@ -362,7 +434,7 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
             {
                 *infractions += INF_CHUNK_WHITESPACE;
                 events->create_event(EVENT_CHUNK_WHITESPACE);
-                curr_state = CHUNK_WHITESPACE;
+                curr_state = CHUNK_TRAILING_WS;
             }
             else if (buffer[k] == ';')
             {
@@ -376,6 +448,7 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
                 *infractions += INF_CHUNK_BAD_CHAR;
                 events->create_event(EVENT_BROKEN_CHUNK);
                 curr_state = CHUNK_BAD;
+                k--;
             }
             else
             {
@@ -386,10 +459,11 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
                     *infractions += INF_CHUNK_TOO_LARGE;
                     events->create_event(EVENT_BROKEN_CHUNK);
                     curr_state = CHUNK_BAD;
+                    k--;
                 }
             }
             break;
-        case CHUNK_WHITESPACE:
+        case CHUNK_TRAILING_WS:
             // Skipping over improper whitespace following the chunk size
             if (buffer[k] == '\r')
             {
@@ -414,6 +488,7 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
                 *infractions += INF_CHUNK_BAD_CHAR;
                 events->create_event(EVENT_BROKEN_CHUNK);
                 curr_state = CHUNK_BAD;
+                k--;
             }
             break;
         case CHUNK_OPTIONS:
@@ -441,6 +516,7 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
                 *infractions += INF_CHUNK_LONE_CR;
                 events->create_event(EVENT_BROKEN_CHUNK);
                 curr_state = CHUNK_BAD;
+                k--;
                 break;
             }
             if (expected > 0)
@@ -459,27 +535,26 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
                 *infractions += INF_CHUNK_NO_LENGTH;
                 events->create_event(EVENT_BROKEN_CHUNK);
                 curr_state = CHUNK_BAD;
+                k--;
             }
             break;
         case CHUNK_DATA:
             // Moving through the chunk data
           {
             uint32_t skip_amount = (length-k <= expected) ? length-k : expected;
-            if (!discard_mode && (skip_amount > flow_target-data_seen))
-            { // Do not exceed requested section size
-                skip_amount = flow_target-data_seen;
+            if (!discard_mode && (skip_amount > adjusted_target-data_seen))
+            { // Do not exceed requested section size (including stretching)
+                skip_amount = adjusted_target-data_seen;
             }
             k += skip_amount - 1;
             if ((expected -= skip_amount) == 0)
             {
                 curr_state = CHUNK_DCRLF1;
             }
-            if ((data_seen += skip_amount) == flow_target)
+            if ((data_seen += skip_amount) == adjusted_target)
             {
-                // FIXIT-M need to randomize slice point
                 data_seen = 0;
                 num_flush = k+1;
-                new_section = true;
                 return SCAN_FOUND_PIECE;
             }
             break;
@@ -502,11 +577,13 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
                 *infractions += INF_CHUNK_BAD_END;
                 events->create_event(EVENT_BROKEN_CHUNK);
                 curr_state = CHUNK_BAD;
+                k--;
             }
             break;
         case CHUNK_DCRLF2:
             // The LF from the end-of-chunk CRLF should be here
             num_good_chunks++;
+            num_leading_ws = 0;
             num_zeros = 0;
             expected = 0;
             digits_seen = 0;
@@ -524,18 +601,28 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
             // If we are skipping to the trailers and next message the broken chunk thwarts us
             if (discard_mode)
             {
-                return SCAN_ABORT;
+                // FIXIT-P Need StreamSplitter::END
+                // With the broken chunk this will run to connection close so we should just stop
+                // processing this flow. But there is no way to ask stream to do that so we must
+                // skip through the rest of the message ourselves.
+                num_flush = length;
+                return SCAN_DISCARD_PIECE;
             }
+
+            // When chunk parsing breaks down and we first enter CHUNK_BAD state, it may happen
+            // that there were chunk header bytes between the last good chunk and the point where
+            // the failure occurred. These will not have been counted in data_seen because we
+            // planned to delete them during reassembly. Because they are not part of a valid chunk
+            // they will be reassembled after all. This will overrun the adjusted_target making the
+            // message section a little bigger than planned. It's not important.
             uint32_t skip_amount = length-k;
-            skip_amount = (skip_amount <= flow_target-data_seen) ? skip_amount :
-                flow_target-data_seen;
+            skip_amount = (skip_amount <= adjusted_target-data_seen) ? skip_amount :
+                adjusted_target-data_seen;
             k += skip_amount - 1;
-            if ((data_seen += skip_amount) == flow_target)
+            if ((data_seen += skip_amount) == adjusted_target)
             {
-                // FIXIT-M need to randomize slice point
                 data_seen = 0;
                 num_flush = k+1;
-                new_section = true;
                 return SCAN_FOUND_PIECE;
             }
             break;
@@ -546,7 +633,16 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
         num_flush = length;
         return SCAN_DISCARD_PIECE;
     }
+
+    if (data_seen >= flow_target)
+    {
+        // We passed the flow_target and stretched to the end of the segment
+        data_seen = 0;
+        num_flush = length;
+        return SCAN_FOUND_PIECE;
+    }
+
     octets_seen += length;
-    return SCAN_NOTFOUND;
+    return SCAN_NOT_FOUND;
 }
 

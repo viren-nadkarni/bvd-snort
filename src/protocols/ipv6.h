@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,8 @@
 
 #include "protocols/protocol_ids.h"
 
+namespace snort
+{
 namespace ip
 {
 constexpr uint8_t IP6_HEADER_LEN = 40;
@@ -246,7 +248,7 @@ inline int IPV6ExtensionOrder(const IpProtocol ip_proto)
 {
     return IPV6IdExtensionOrder((ProtocolId)ip_proto);
 }
-} // namespace ipv6
-
+} // namespace ip
+} // namespace snort
 #endif
 

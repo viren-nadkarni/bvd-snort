@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,13 +33,32 @@
 
 #include "detection/detection_util.h"
 
+class MpseStash;
+struct OtnxMatchData;
+struct SF_EVENTQ;
+
+namespace snort
+{
+struct SnortConfig;
+struct Replacement
+{
+    std::string data;
+    unsigned offset;
+};
+
+struct FlowSnapshot
+{
+    uint32_t session_flags;
+    SnortProtocolId proto_id;
+};
+
 class SO_PUBLIC IpsContextData
 {
 public:
     virtual ~IpsContextData() = default;
 
     static unsigned get_ips_id();
-    static unsigned get_max_id();
+    virtual void clear() {}
 
 protected:
     IpsContextData() = default;
@@ -48,6 +67,8 @@ protected:
 class SO_PUBLIC IpsContext
 {
 public:
+    using Callback = void(*)(IpsContext*);
+
     IpsContext(unsigned size = 0);  // defaults to max id
     ~IpsContext();
 
@@ -56,6 +77,7 @@ public:
 
     void set_context_data(unsigned id, IpsContextData*);
     IpsContextData* get_context_data(unsigned id) const;
+    void clear_context_data();
 
     void set_slot(unsigned s)
     { slot = s; }
@@ -63,8 +85,24 @@ public:
     unsigned get_slot()
     { return slot; }
 
+    void snapshot_flow(Flow*);
+
+    uint32_t get_session_flags()
+    { return flow.session_flags; }
+
+    SnortProtocolId get_snort_protocol_id()
+    { return flow.proto_id; }
+
     enum ActiveRules
     { NONE, NON_CONTENT, CONTENT };
+
+    void register_post_callback(Callback callback)
+    { post_callbacks.push_back(callback); }
+
+    void clear_callbacks()
+    { post_callbacks.clear(); }
+
+    void post_detection();
 
 public:
     Packet* packet;
@@ -72,24 +110,30 @@ public:
     DAQ_PktHdr_t* pkth;
     uint8_t* buf;
 
-    struct SnortConfig* conf;
-    class MpseStash* stash;
-    struct OtnxMatchData* otnx;
-    struct SF_EVENTQ* equeue;
+    SnortConfig* conf;
+    MpseStash* stash;
+    OtnxMatchData* otnx;
+    SF_EVENTQ* equeue;
 
     DataPointer file_data;
     DataBuffer alt_data;
 
     uint64_t context_num;
+    uint64_t packet_number;
     ActiveRules active_rules;
     bool check_tags;
+
+    std::vector<Replacement> rpl;
 
     static const unsigned buf_size = Codec::PKT_MAX;
 
 private:
+    FlowSnapshot flow;
     std::vector<IpsContextData*> data;
+    std::vector<Callback> post_callbacks;
+
     unsigned slot;
 };
-
+}
 #endif
 

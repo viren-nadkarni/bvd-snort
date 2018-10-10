@@ -16,6 +16,7 @@ option ( ENABLE_STATIC_DAQ "link static DAQ modules" ON )
 
 # features
 option ( ENABLE_SHELL "enable shell support" OFF )
+option ( ENABLE_APPID_THIRD_PARTY "enable third party appid" OFF )
 option ( ENABLE_UNIT_TESTS "enable unit tests" OFF )
 option ( ENABLE_PIGLET "enable piglet test harness" OFF )
 
@@ -28,6 +29,7 @@ option ( ENABLE_TSC_CLOCK "Use timestamp counter register clock (x86 only)" OFF 
 option ( MAKE_HTML_DOC "Create the HTML documentation" ON )
 option ( MAKE_PDF_DOC "Create the PDF documentation" ON )
 option ( MAKE_TEXT_DOC "Create the text documentation" ON )
+option ( MAKE_DOC "Create documentation" ON )
 
 # security
 option ( ENABLE_HARDENED_BUILD "Detect and use compile-time hardening options" OFF )
@@ -37,10 +39,15 @@ option ( ENABLE_SAFEC "Use bounds checked functions provided by libsafec" ON )
 # debugging
 option ( ENABLE_DEBUG_MSGS "Enable debug printing options (bugreports and developers only)" OFF )
 option ( ENABLE_DEBUG "Enable debugging options (bugreports and developers only)" OFF )
-option ( ENABLE_GDB "Enable gdb debugging information" OFF )
+option ( ENABLE_GDB "Enable gdb debugging information" ON )
 option ( ENABLE_PROFILE "Enable profiling options (developers only)" OFF )
+option ( DISABLE_SNORT_PROFILER "Disable snort Profiler (developers only)" OFF )
+option ( ENABLE_DEEP_PROFILING "Enable deep profiling of snort functions (developers only)" OFF )
+option ( DISABLE_MEMORY_MANAGER "Disable snort memory manager (developers only)" OFF )
 option ( ENABLE_ADDRESS_SANITIZER "enable address sanitizer support" OFF )
 option ( ENABLE_THREAD_SANITIZER "enable thread sanitizer support" OFF )
+option ( ENABLE_UB_SANITIZER "enable undefined behavior sanitizer support" OFF )
+option ( ENABLE_TCMALLOC "enable using tcmalloc for dynamic memory management" OFF )
 option ( ENABLE_CODE_COVERAGE "Whether to enable code coverage support" OFF )
 
 # signals
@@ -63,7 +70,3 @@ set (
     SIGNAL_SNORT_READ_ATTR_TBL "SIGURG"
     CACHE STRING "set the SNORT_READ_ATTR_TBL signal (must be a valid integer or signal name)"
 )
-
-#Setting default directories...appended to INSTALL_PREFIX unless a full path is provided
-set ( SNORT_DATA_DIR share/doc/${CMAKE_PROJECT_NAME} )
-

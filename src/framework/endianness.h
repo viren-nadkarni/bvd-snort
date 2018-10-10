@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,6 +23,8 @@
 
 #include "main/snort_types.h"
 
+namespace snort
+{
 class SO_PUBLIC Endianness
 {
 public:
@@ -30,6 +32,6 @@ public:
     virtual ~Endianness() = default;
     virtual bool get_offset_endianness(int32_t offset, uint8_t& endian) = 0;
 };
-
+}
 #endif
 

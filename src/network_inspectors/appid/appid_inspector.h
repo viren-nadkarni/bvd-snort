@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,22 +27,25 @@
 #include "application_ids.h"
 #include "flow/flow.h"
 
+namespace snort
+{
 struct Packet;
-class SipEventHandler;
 struct SnortConfig;
+}
+class SipEventHandler;
 
-class AppIdInspector : public Inspector
+class AppIdInspector : public snort::Inspector
 {
 public:
 
     AppIdInspector(AppIdModule&);
     ~AppIdInspector() override;
 
-    bool configure(SnortConfig*) override;
-    void show(SnortConfig*) override;
+    bool configure(snort::SnortConfig*) override;
+    void show(snort::SnortConfig*) override;
     void tinit() override;
     void tterm() override;
-    void eval(Packet*) override;
+    void eval(snort::Packet*) override;
     AppIdConfig* get_appid_config();
 
     SipEventHandler& get_sip_event_handler()
@@ -58,7 +61,6 @@ private:
 };
 
 int sslAppGroupIdLookup(void*, const char*, const char*, AppId*, AppId*, AppId*);
-AppId getOpenAppId(Flow*);
 
 #endif
 

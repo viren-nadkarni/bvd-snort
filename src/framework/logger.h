@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,8 @@
 #include "main/snort_types.h"
 
 struct Event;
+namespace snort
+{
 struct Packet;
 
 // this is the current version of the api
@@ -80,6 +82,6 @@ struct LogApi
     LogNewFunc ctor;
     LogDelFunc dtor;
 };
-
+}
 #endif
 

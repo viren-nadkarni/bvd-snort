@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,37 +28,57 @@
 
 #include "file_config.h"
 
+namespace snort
+{
 struct XHash;
+struct XHashNode;
+}
 
 class FileCache
 {
 public:
-// FIXIT-L Merge definition with duplicate in file_enforcer.h?
+
 PADDING_GUARD_BEGIN
     struct FileHashKey
     {
-        SfIp sip;
-        SfIp dip;
+        snort::SfIp sip;
+        snort::SfIp dip;
         uint32_t padding;
-        uint64_t file_sig;
+        uint64_t file_id;
     };
 PADDING_GUARD_END
 
     struct FileNode
     {
         time_t expires;
-        FileContext* file;
+        snort::FileContext* file;
     };
 
-    FileCache();
+    FileCache(int64_t max_files_cached);
     ~FileCache();
-    FileContext* add(const FileHashKey&);
-    FileContext* find(const FileHashKey&);
+
+    void set_block_timeout(int64_t);
+    void set_lookup_timeout(int64_t);
+    void set_max_files(int64_t);
+
+    snort::FileContext* get_file(snort::Flow*, uint64_t file_id, bool to_create);
+    FileVerdict cached_verdict_lookup(snort::Flow*, snort::FileInfo*,
+        snort::FilePolicyBase*);
+    bool apply_verdict(snort::Flow*, snort::FileInfo*, FileVerdict, bool resume,
+        snort::FilePolicyBase*);
 
 private:
+    snort::FileContext* add(const FileHashKey&, int64_t timeout);
+    snort::FileContext* find(const FileHashKey&, int64_t);
+    snort::FileContext* get_file(snort::Flow*, uint64_t file_id, bool to_create, int64_t timeout);
+    FileVerdict check_verdict(snort::Flow*, snort::FileInfo*, snort::FilePolicyBase*);
+    int store_verdict(snort::Flow*, snort::FileInfo*, int64_t timeout);
+
     /* The hash table of expected files */
-    XHash* fileHash = nullptr;
-    uint32_t timeout = DEFAULT_FILE_BLOCK_TIMEOUT;
+    snort::XHash* fileHash = nullptr;
+    int64_t block_timeout = DEFAULT_FILE_BLOCK_TIMEOUT;
+    int64_t lookup_timeout = DEFAULT_FILE_LOOKUP_TIMEOUT;
+    int64_t max_files = DEFAULT_MAX_FILES_CACHED;
     std::mutex cache_mutex;
 };
 

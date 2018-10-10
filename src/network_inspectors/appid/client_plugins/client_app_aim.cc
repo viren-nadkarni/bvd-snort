@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -228,7 +228,7 @@ int AimClientDetector::validate(AppIdDiscoveryArgs& args)
 
                 snprintf(version, sizeof(version), "%d.%d.%d", major, minor, lesser);
                 add_app(args.asd, APP_ID_AOL_INSTANT_MESSENGER, APP_ID_AOL_INSTANT_MESSENGER,
-                    version);
+                    version, args.change_bits);
             }
         }
     }
@@ -237,7 +237,7 @@ int AimClientDetector::validate(AppIdDiscoveryArgs& args)
 
 bail:
     // FIXIT-L - why are we setting client detected here?
-    args.asd->set_client_detected();
+    args.asd.set_client_detected();
     return APPID_SUCCESS;
 }
 

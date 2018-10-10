@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,6 +31,7 @@
 
 #include "reputation_parse.h"
 
+using namespace snort;
 using namespace std;
 
 #define REPUTATION_EVENT_BLACKLIST_STR \
@@ -43,13 +44,16 @@ using namespace std;
 static const Parameter s_params[] =
 {
     { "blacklist", Parameter::PT_STRING, nullptr, nullptr,
-      "blacklist file name with ip lists" },
+      "blacklist file name with IP lists" },
+
+    { "list_dir", Parameter::PT_STRING, nullptr, nullptr,
+      "directory for IP lists and manifest file" },
 
     { "memcap", Parameter::PT_INT, "1:4095", "500",
       "maximum total MB of memory allocated" },
 
     { "nested_ip", Parameter::PT_ENUM, "inner|outer|all", "inner",
-      "ip to use when there is IP encapsulation" },
+      "IP to use when there is IP encapsulation" },
 
     { "priority", Parameter::PT_ENUM, "blacklist|whitelist", "whitelist",
       "defines priority when there is a decision conflict during run-time" },
@@ -61,7 +65,7 @@ static const Parameter s_params[] =
       "specify the meaning of whitelist" },
 
     { "whitelist", Parameter::PT_STRING, nullptr, nullptr,
-      "whitelist file name with ip lists" },
+      "whitelist file name with IP lists" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -100,18 +104,21 @@ PegCount* ReputationModule::get_counts() const
 { return (PegCount*)&reputationstats; }
 
 ProfileStats* ReputationModule::get_profile() const
-{ return &reputationPerfStats; }
+{ return &reputation_perf_stats; }
 
 bool ReputationModule::set(const char*, Value& v, SnortConfig*)
 {
     if ( v.is("blacklist") )
-        conf->blacklist_path = snort_strdup(v.get_string());
+        conf->blacklist_path = v.get_string();
+
+    else if ( v.is("list_dir") )
+        conf->list_dir = v.get_string();
 
     else if ( v.is("memcap") )
         conf->memcap = v.get_long();
 
     else if ( v.is("nested_ip") )
-        conf->nestedIP = (NestedIP)v.get_long();
+        conf->nested_ip = (NestedIP)v.get_long();
 
     else if ( v.is("priority") )
         conf->priority = (IPdecision)(v.get_long() + 1);
@@ -120,10 +127,10 @@ bool ReputationModule::set(const char*, Value& v, SnortConfig*)
         conf->scanlocal = v.get_bool();
 
     else if ( v.is("white") )
-        conf->whiteAction = (WhiteAction)v.get_long();
+        conf->white_action = (WhiteAction)v.get_long();
 
     else if ( v.is("whitelist") )
-        conf->whitelist_path = snort_strdup(v.get_string());
+        conf->whitelist_path = v.get_string();
 
     else
         return false;
@@ -133,39 +140,24 @@ bool ReputationModule::set(const char*, Value& v, SnortConfig*)
 
 ReputationConfig* ReputationModule::get_data()
 {
-    ReputationConfig* tmp = conf;
-    conf = nullptr;
-    return tmp;
+    return conf;
 }
 
 bool ReputationModule::begin(const char*, int, SnortConfig*)
 {
-    assert(!conf);
     conf = new ReputationConfig;
     return true;
 }
 
 bool ReputationModule::end(const char*, int, SnortConfig*)
 {
-    EstimateNumEntries(conf);
-    if (conf->numEntries <= 0)
-    {
-        ParseWarning(WARN_CONF,
-            "reputation: can't find any whitelist/blacklist entries; disabled.");
-        return true;
-    }
-
-    IpListInit(conf->numEntries + 1, conf);
-
-    if ( (conf->priority == WHITELISTED_TRUST) && (conf->whiteAction == UNBLACK) )
+    if ( (conf->priority == WHITELISTED_TRUST) && (conf->white_action == UNBLACK) )
     {
         ParseWarning(WARN_CONF, "Keyword \"whitelist\" for \"priority\" is "
             "not applied when white action is unblack.\n");
             conf->priority = WHITELISTED_UNBLACK;
     }
 
-    LoadListFile(conf->blacklist_path, conf->local_black_ptr, conf);
-    LoadListFile(conf->whitelist_path, conf->local_white_ptr, conf);
     return true;
 }
 

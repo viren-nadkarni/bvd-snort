@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,6 +29,7 @@
 #include "http_test_manager.h"
 #include "http_transaction.h"
 
+using namespace snort;
 using namespace HttpEnums;
 
 unsigned HttpFlowData::inspector_id = 0;
@@ -100,9 +101,11 @@ void HttpFlowData::half_reset(SourceId source_id)
     data_length[source_id] = STAT_NOT_PRESENT;
     body_octets[source_id] = STAT_NOT_PRESENT;
     section_size_target[source_id] = 0;
-    section_size_max[source_id] = 0;
+    stretch_section_to_packet[source_id] = false;
     file_depth_remaining[source_id] = STAT_NOT_PRESENT;
     detect_depth_remaining[source_id] = STAT_NOT_PRESENT;
+    detection_status[source_id] = DET_REACTIVATING;
+
     compression[source_id] = CMP_NONE;
     if (compress_stream[source_id] != nullptr)
     {
@@ -155,6 +158,7 @@ void HttpFlowData::trailer_prep(SourceId source_id)
         delete compress_stream[source_id];
         compress_stream[source_id] = nullptr;
     }
+    detection_status[source_id] = DET_REACTIVATING;
 }
 
 bool HttpFlowData::add_to_pipeline(HttpTransaction* latest)

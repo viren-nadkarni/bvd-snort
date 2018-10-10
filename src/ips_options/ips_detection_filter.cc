@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -31,6 +31,8 @@
 #include "framework/ips_option.h"
 #include "framework/module.h"
 #include "main/snort_config.h"
+
+using namespace snort;
 
 #define s_name "detection_filter"
 

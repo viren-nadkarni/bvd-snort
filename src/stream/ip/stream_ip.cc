@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,6 +29,8 @@
 #include "ip_ha.h"
 #include "ip_module.h"
 #include "ip_session.h"
+
+using namespace snort;
 
 /* max frags in a single frag tracker */
 #define DEFAULT_MAX_FRAGS 8192
@@ -176,7 +178,7 @@ static const InspectApi ip_api =
         mod_dtor
     },
     IT_STREAM,
-    (unsigned)PktType::IP,
+    PROTO_BIT__IP,
     nullptr, // buffers
     nullptr, // service
     nullptr, // pinit

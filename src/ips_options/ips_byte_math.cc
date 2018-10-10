@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -36,6 +36,7 @@
 
 #include "extract.h"
 
+using namespace snort;
 using namespace std;
 
 #define s_name "byte_math"
@@ -109,9 +110,9 @@ uint32_t ByteMathOption::hash() const
     mix(a,b,c);
 
     a += data->offset;
-    b += (data->rvalue_var << 24 |
-        data->offset_var << 16 |
-        data->result_var << 8 |
+    b += ((uint32_t) data->rvalue_var << 24 |
+        (uint32_t) data->offset_var << 16 |
+        (uint32_t) data->result_var << 8 |
         data->endianess);
     c += data->base;
 
@@ -176,7 +177,7 @@ IpsOption::EvalStatus ByteMathOption::eval(Cursor& c, Packet* p)
     if (config.rvalue_var >= 0 && config.rvalue_var < NUM_IPS_OPTIONS_VARS)
     {
         GetVarValueByIndex(&rvalue, config.rvalue_var);
-        if (rvalue == 0)
+        if (rvalue == 0 and config.oper == BM_DIVIDE)
             return NO_MATCH;
     }
     else

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -49,7 +49,11 @@ struct PegInfo
     const char* help;
 };
 
+
+namespace snort
+{
 SO_PUBLIC extern const struct PegInfo simple_pegs[];
+} // namespace snort
 
 #define array_size(a) (sizeof(a)/sizeof((a)[0]))
 

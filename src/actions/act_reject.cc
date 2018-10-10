@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -53,6 +53,8 @@
 #include "packet_io/active.h"
 #include "profiler/profiler.h"
 
+using namespace snort;
+
 #define REJ_RST_SRC  0x01
 #define REJ_RST_DST  0x02
 #define REJ_UNR_NET  0x04
@@ -91,6 +93,28 @@ private:
 void RejectAction::exec(Packet* p)
 {
     Profile profile(rejPerfStats);
+
+    if ( !p->ptrs.ip_api.is_ip() )
+        return;
+
+    switch ( p->type() )
+    {
+    case PktType::TCP:
+        if ( !Active::is_reset_candidate(p) )
+            return;
+        break;
+
+    case PktType::UDP:
+    case PktType::ICMP:
+    case PktType::IP:
+        if ( !Active::is_unreachable_candidate(p) )
+            return;
+        break;
+
+    default:
+        return;
+    }
+
     send(p);
 }
 
@@ -111,13 +135,13 @@ void RejectAction::send(Packet* p)
         Active::send_reset(p, ENC_FLAG_FWD);
 
     if ( flags & REJ_UNR_NET )
-        Active::send_unreach(p, UnreachResponse::NET);
+        Active::send_unreach(p, snort::UnreachResponse::NET);
 
     if ( flags & REJ_UNR_HOST )
-        Active::send_unreach(p, UnreachResponse::HOST);
+        Active::send_unreach(p, snort::UnreachResponse::HOST);
 
     if ( flags & REJ_UNR_PORT )
-        Active::send_unreach(p, UnreachResponse::PORT);
+        Active::send_unreach(p, snort::UnreachResponse::PORT);
 }
 
 //-------------------------------------------------------------------------
@@ -127,10 +151,10 @@ void RejectAction::send(Packet* p)
 static const Parameter s_params[] =
 {
     { "reset", Parameter::PT_ENUM, "source|dest|both", nullptr,
-      "send tcp reset to one or both ends" },
+      "send TCP reset to one or both ends" },
 
     { "control", Parameter::PT_ENUM, "network|host|port|all", nullptr,
-      "send icmp unreachable(s)" },
+      "send ICMP unreachable(s)" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -228,7 +252,7 @@ static const ActionApi rej_api =
         mod_ctor,
         mod_dtor
     },
-    RULE_TYPE__RESET,
+    Actions::RESET,
     nullptr,
     nullptr,
     nullptr,

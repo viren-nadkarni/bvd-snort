@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -166,7 +166,7 @@ DCE2_Ret DCE2_SmbProcessResponseData(DCE2_SmbSsnData*,
     const uint8_t*, uint32_t);
 void DCE2_SmbInitRdata(uint8_t*, int);
 void DCE2_SmbSetRdata(DCE2_SmbSsnData*, uint8_t*, uint16_t);
-Packet* DCE2_SmbGetRpkt(DCE2_SmbSsnData*, const uint8_t**,
+snort::Packet* DCE2_SmbGetRpkt(DCE2_SmbSsnData*, const uint8_t**,
     uint32_t*, DCE2_RpktType);
 DCE2_Ret DCE2_SmbHandleSegmentation(DCE2_Buffer**,
     const uint8_t*, uint32_t, uint32_t);
@@ -177,7 +177,7 @@ void DCE2_SmbProcessFileData(DCE2_SmbSsnData* ssd,
     DCE2_SmbFileTracker* ftracker, const uint8_t* data_ptr,
     uint32_t data_len, bool upload);
 void DCE2_FileDetect();
-FileVerdict DCE2_get_file_verdict(DCE2_SmbSsnData* );
+FileVerdict DCE2_get_file_verdict();
 void DCE2_SmbInitDeletePdu();
 void DCE2_Update_Ftracker_from_ReqTracker(DCE2_SmbFileTracker*, DCE2_SmbRequestTracker*);
 
@@ -202,9 +202,9 @@ void DCE2_Update_Ftracker_from_ReqTracker(DCE2_SmbFileTracker*, DCE2_SmbRequestT
  *  SMB_TYPE__RESPONSE if packet is from server
  *
  ********************************************************************/
-inline int DCE2_SmbType(DCE2_SmbSsnData* ssd)
+inline int DCE2_SmbType()
 {
-    if (DCE2_SsnFromClient(ssd->sd.wire_pkt))
+    if ( snort::DetectionEngine::get_current_packet()->is_from_client() )
         return SMB_TYPE__REQUEST;
     else
         return SMB_TYPE__RESPONSE;
@@ -212,7 +212,7 @@ inline int DCE2_SmbType(DCE2_SmbSsnData* ssd)
 
 inline bool SmbUnicode(const SmbNtHdr* hdr)
 {
-    return (alignedNtohs(&hdr->smb_flg2) & SMB_FLG2__UNICODE) ? true : false;
+    return (snort::alignedNtohs(&hdr->smb_flg2) & SMB_FLG2__UNICODE) ? true : false;
 }
 
 inline bool SmbExtAttrReadOnly(const uint32_t ext_file_attrs)
@@ -250,14 +250,14 @@ inline uint8_t SmbCom(const SmbNtHdr* hdr)
 
 inline bool SmbStatusNtCodes(const SmbNtHdr* hdr)
 {
-    if (alignedNtohs(&hdr->smb_flg2) & SMB_FLG2__NT_CODES)
+    if (snort::alignedNtohs(&hdr->smb_flg2) & SMB_FLG2__NT_CODES)
         return true;
     return false;
 }
 
 inline uint32_t SmbNtStatus(const SmbNtHdr* hdr)
 {
-    return alignedNtohl(&hdr->smb_status.nt_status);
+    return snort::alignedNtohl(&hdr->smb_status.nt_status);
 }
 
 inline uint8_t SmbStatusClass(const SmbNtHdr* hdr)
@@ -267,7 +267,7 @@ inline uint8_t SmbStatusClass(const SmbNtHdr* hdr)
 
 inline uint16_t SmbStatusCode(const SmbNtHdr* hdr)
 {
-    return alignedNtohs(&hdr->smb_status.smb_status.smb_code);
+    return snort::alignedNtohs(&hdr->smb_status.smb_status.smb_code);
 }
 
 inline uint8_t SmbNtStatusSeverity(const SmbNtHdr* hdr)
@@ -277,22 +277,22 @@ inline uint8_t SmbNtStatusSeverity(const SmbNtHdr* hdr)
 
 inline uint16_t SmbPid(const SmbNtHdr* hdr)
 {
-    return alignedNtohs(&hdr->smb_pid);
+    return snort::alignedNtohs(&hdr->smb_pid);
 }
 
 inline uint16_t SmbMid(const SmbNtHdr* hdr)
 {
-    return alignedNtohs(&hdr->smb_mid);
+    return snort::alignedNtohs(&hdr->smb_mid);
 }
 
 inline uint16_t SmbUid(const SmbNtHdr* hdr)
 {
-    return alignedNtohs(&hdr->smb_uid);
+    return snort::alignedNtohs(&hdr->smb_uid);
 }
 
 inline uint16_t SmbTid(const SmbNtHdr* hdr)
 {
-    return alignedNtohs(&hdr->smb_tid);
+    return snort::alignedNtohs(&hdr->smb_tid);
 }
 
 inline bool SmbErrorInvalidDeviceRequest(const SmbNtHdr* hdr)
@@ -341,7 +341,7 @@ inline bool DCE2_SmbIsTransactionComplete(DCE2_SmbTransactionTracker* ttracker)
 
 inline DCE2_Buffer** DCE2_SmbGetSegBuffer(DCE2_SmbSsnData* ssd)
 {
-    if (DCE2_SsnFromServer(ssd->sd.wire_pkt))
+    if ( snort::DetectionEngine::get_current_packet()->is_from_server() )
         return &ssd->srv_seg;
     return &ssd->cli_seg;
 }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,7 +30,10 @@
 
 #include "dce_smb.h"
 
+using namespace snort;
 using namespace std;
+
+Trace TRACE_NAME(dce_smb);
 
 static const PegInfo dce2_smb_pegs[] =
 {
@@ -140,6 +143,7 @@ static const RuleMap dce2_smb_rules[] =
     { DCE2_SMB_BAD_OFF, DCE2_SMB_BAD_OFF_STR },
     { DCE2_SMB_TDCNT_ZE, DCE2_SMB_TDCNT_ZE_STR },
     { DCE2_SMB_NB_LT_SMBHDR, DCE2_SMB_NB_LT_SMBHDR_STR },
+    { DCE2_SMB_NB_LT_COM, DCE2_SMB_NB_LT_COM_STR },
     { DCE2_SMB_NB_LT_BCC, DCE2_SMB_NB_LT_BCC_STR },
     { DCE2_SMB_NB_LT_DSIZE, DCE2_SMB_NB_LT_DSIZE_STR },
     { DCE2_SMB_TDCNT_LT_DSIZE, DCE2_SMB_TDCNT_LT_DSIZE_STR },
@@ -174,7 +178,7 @@ static const RuleMap dce2_smb_rules[] =
     { 0, nullptr }
 };
 
-Dce2SmbModule::Dce2SmbModule() : Module(DCE2_SMB_NAME, DCE2_SMB_HELP, s_params)
+Dce2SmbModule::Dce2SmbModule() : Module(DCE2_SMB_NAME, DCE2_SMB_HELP, s_params, false, &TRACE_NAME(dce_smb))
 {
     memset(&config, 0, sizeof(config));
 }
@@ -423,7 +427,7 @@ static bool set_smb_invalid_shares(dce2SmbProtoConf& config, Value& v)
     return(true);
 }
 
-bool Dce2SmbModule::set(const char*, Value& v, SnortConfig*)
+bool Dce2SmbModule::set(const char* fqn, snort::Value& v, snort::SnortConfig* c)
 {
     if (dce2_set_co_config(v,config.common))
         return true;
@@ -444,7 +448,7 @@ bool Dce2SmbModule::set(const char*, Value& v, SnortConfig*)
     else if ( v.is("smb_legacy_mode"))
         config.legacy_mode = v.get_bool();
     else
-        return false;
+        return Module::set(fqn, v, c);
     return true;
 }
 

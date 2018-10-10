@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2007-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -52,6 +52,7 @@
 #include "utils/util.h"
 #include "utils/util_cstring.h"
 
+using namespace snort;
 using namespace std;
 
 #define S_NAME "unified2"
@@ -215,7 +216,7 @@ static void alert_event(Packet* p, const char*, Unified2Config* config, const Ev
         u2_event.pkt_ip_proto = (uint8_t)p->get_ip_proto_next();
 
         const char* app_name = p->flow ?
-            appid_api.get_application_name(p->flow, p->is_from_client()) : nullptr;
+            appid_api.get_application_name(*p->flow, p->is_from_client()) : nullptr;
 
         if ( app_name )
             memcpy_s(u2_event.app_name, sizeof(u2_event.app_name),
@@ -346,8 +347,6 @@ static void _Unified2LogPacketAlert(
     {
         logheader.event_id = htonl(event->event_reference);
         logheader.event_second = htonl(event->ref_time.tv_sec);
-
-        DebugMessage(DEBUG_LOG, "------------\n");
     }
     else
     {
@@ -672,7 +671,7 @@ static void _AlertIP4_v2(Packet* p, const char*, Unified2Config* config, const E
         alertdata.pad2 = htons((uint16_t)p->user_ips_policy_id);
 
         const char* app_name = p->flow ?
-            appid_api.get_application_name(p->flow, p->is_from_client()) : nullptr;
+            appid_api.get_application_name(*p->flow, p->is_from_client()) : nullptr;
 
         if ( app_name )
             memcpy_s(alertdata.app_name, sizeof(alertdata.app_name),
@@ -758,7 +757,7 @@ static void _AlertIP6_v2(Packet* p, const char*, Unified2Config* config, const E
         alertdata.pad2 = htons((uint16_t)p->user_ips_policy_id);
 
         const char* app_name = p->flow ?
-            appid_api.get_application_name(p->flow, p->is_from_client()) : nullptr;
+            appid_api.get_application_name(*p->flow, p->is_from_client()) : nullptr;
 
         if ( app_name )
             memcpy_s(alertdata.app_name, sizeof(alertdata.app_name),

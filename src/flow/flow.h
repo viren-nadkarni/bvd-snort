@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,10 +27,12 @@
 // state.  Inspector state is stored in FlowData, and Flow manages a list
 // of FlowData items.
 
+#include "framework/data_bus.h"
 #include "framework/decode_data.h"
 #include "framework/inspector.h"
 #include "protocols/layer.h"
 #include "sfip/sf_ip.h"
+#include "target_based/snort_protocols.h"
 
 #define SSNFLAG_SEEN_CLIENT         0x00000001
 #define SSNFLAG_SEEN_SENDER         0x00000001
@@ -63,6 +65,8 @@
 #define SSNFLAG_CLIENT_SWAPPED      0x00400000
 
 #define SSNFLAG_PROXIED             0x01000000
+#define SSNFLAG_NO_DETECT_TO_CLIENT 0x02000000
+#define SSNFLAG_NO_DETECT_TO_SERVER 0x04000000
 
 #define SSNFLAG_ABORT_CLIENT        0x10000000
 #define SSNFLAG_ABORT_SERVER        0x20000000
@@ -87,9 +91,12 @@
 #define STREAM_STATE_NO_PICKUP         0x2000
 #define STREAM_STATE_BLOCK_PENDING     0x4000
 
-#define FLOW_IS_OFFLOADED              0x01
-#define FLOW_WAS_OFFLOADED             0x02  // FIXIT-L debug only
+class BitOp;
+class FlowHAState;
+class Session;
 
+namespace snort
+{
 struct FlowKey;
 struct Packet;
 
@@ -126,7 +133,7 @@ struct LwState
     uint32_t session_flags;
 
     int16_t ipprotocol;
-    int16_t application_protocol;
+    SnortProtocolId snort_protocol_id;
 
     char direction;
     char ignore_direction;
@@ -170,6 +177,7 @@ public:
     void set_ttl(Packet*, bool client);
     void set_mpls_layer_per_dir(Packet*);
     Layer get_mpls_layer_per_dir(bool);
+    void set_service(Packet* pkt, const char* new_service);
 
     uint32_t update_session_flags(uint32_t flags)
     { return ssn_state.session_flags = flags; }
@@ -180,11 +188,11 @@ public:
     uint32_t get_session_flags()
     { return ssn_state.session_flags; }
 
-    uint32_t test_session_flags(uint32_t flags)
-    { return (ssn_state.session_flags & flags) != 0; }
-
     uint32_t clear_session_flags(uint32_t flags)
     { return ssn_state.session_flags &= ~flags; }
+
+    void set_to_client_detection(bool enable);
+    void set_to_server_detection(bool enable);
 
     int get_ignore_direction()
     { return ssn_state.ignore_direction; }
@@ -209,7 +217,7 @@ public:
     { return (ssn_state.session_flags & SSNFLAG_PROXIED) != 0; }
 
     bool is_stream()
-    { return (to_utype(pkt_type) & to_utype(PktType::STREAM)) != 0; }
+    { return pkt_type == PktType::TCP or pkt_type == PktType::PDU; }
 
     void block()
     { ssn_state.session_flags |= SSNFLAG_BLOCK; }
@@ -278,13 +286,21 @@ public:
     { return disable_inspect; }
 
     bool is_offloaded() const
-    { return flow_flags & FLOW_IS_OFFLOADED; }
+    { return offloads_pending; }
 
     void set_offloaded()
-    { flow_flags |= (FLOW_IS_OFFLOADED|FLOW_WAS_OFFLOADED); }
+    {
+        assert(offloads_pending < 0xFF);
+
+        offloads_pending++;
+    }
 
     void clear_offloaded()
-    { flow_flags &= ~FLOW_IS_OFFLOADED; }
+    {
+        assert(offloads_pending);
+
+        offloads_pending--;
+    }
 
 public:  // FIXIT-M privatize if possible
     // fields are organized by initialization and size to minimize
@@ -292,15 +308,14 @@ public:  // FIXIT-M privatize if possible
 
     // these fields are const after initialization
     const FlowKey* key;
-    class Session* session;
-    class BitOp* bitop;
-    class FlowHAState* ha_state;
+    Session* session;
+    BitOp* bitop;
+    FlowHAState* ha_state;
 
-    uint8_t ip_proto; // FIXIT-M do we need both of these?
+    uint8_t ip_proto;
     PktType pkt_type; // ^^
 
     // these fields are always set; not zeroed
-    uint64_t flow_flags;  // FIXIT-H required to ensure atomic?
     Flow* prev, * next;
     Inspector* ssn_client;
     Inspector* ssn_server;
@@ -337,11 +352,31 @@ public:  // FIXIT-M privatize if possible
     uint8_t outer_client_ttl, outer_server_ttl;
 
     uint8_t response_count;
+
+    uint8_t offloads_pending;
     bool disable_inspect;
 
 private:
     void clean();
 };
+
+inline void Flow::set_to_client_detection(bool enable)
+{
+    if ( enable )
+        ssn_state.session_flags &= ~SSNFLAG_NO_DETECT_TO_CLIENT;
+    else
+        ssn_state.session_flags |= SSNFLAG_NO_DETECT_TO_CLIENT;
+}
+
+inline void Flow::set_to_server_detection(bool enable)
+{
+    if ( enable )
+        ssn_state.session_flags &= ~SSNFLAG_NO_DETECT_TO_SERVER;
+    else
+        ssn_state.session_flags |= SSNFLAG_NO_DETECT_TO_SERVER;
+}
+
+}
 
 #endif
 

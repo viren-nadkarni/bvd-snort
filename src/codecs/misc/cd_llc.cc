@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,8 @@
 #include "codecs/codec_module.h"
 #include "framework/codec.h"
 #include "log/text_log.h"
+
+using namespace snort;
 
 #define LLC_NAME "llc"
 #define LLC_HELP "support for logical link control"

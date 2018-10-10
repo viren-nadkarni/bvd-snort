@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 // Copyright (C) 2000,2001 Andrew R. Baker <andrewb@uab.edu>
@@ -41,6 +41,8 @@
 #include "parser.h"
 #include "parse_stream.h"
 #include "vars.h"
+
+using namespace snort;
 
 struct Location
 {
@@ -95,6 +97,7 @@ void inc_parse_position()
 void parse_include(SnortConfig* sc, const char* arg)
 {
     struct stat file_stat;  /* for include path testing */
+    arg = ExpandVars(sc, arg);
     char* fname = snort_strdup(arg);
 
     /* Stat the file.  If that fails, make it relative to the directory
@@ -151,18 +154,17 @@ void ParseIpVar(SnortConfig* sc, const char* var, const char* val)
     }
 }
 
-void add_service_to_otn(
-    SnortConfig* sc, OptTreeNode* otn, const char* svc_name)
+void add_service_to_otn(SnortConfig* sc, OptTreeNode* otn, const char* svc_name)
 {
     if (otn->sigInfo.num_services >= sc->max_metadata_services)
     {
         ParseError("too many service's specified for rule, can't add %s", svc_name);
         return;
     }
-    int16_t svc_id = sc->proto_ref->add(svc_name);
+    SnortProtocolId svc_id = sc->proto_ref->add(svc_name);
 
     for ( unsigned i = 0; i < otn->sigInfo.num_services; ++i )
-        if ( otn->sigInfo.services[i].service_ordinal == svc_id )
+        if ( otn->sigInfo.services[i].snort_protocol_id == svc_id )
             return;  // already added
 
     if ( !otn->sigInfo.services )
@@ -172,7 +174,7 @@ void add_service_to_otn(
     int idx = otn->sigInfo.num_services++;
 
     otn->sigInfo.services[idx].service = snort_strdup(svc_name);
-    otn->sigInfo.services[idx].service_ordinal = svc_id;
+    otn->sigInfo.services[idx].snort_protocol_id = svc_id;
 }
 
 // only keep drop rules ...
@@ -190,27 +192,27 @@ static inline int ScLoadAsDropRules()
     return ( SnortConfig::inline_test_mode() || SnortConfig::adaptor_inline_test_mode() );
 }
 
-RuleType get_rule_type(const char* s)
+Actions::Type get_rule_type(const char* s)
 {
-    RuleType rt = get_action_type(s);
+    Actions::Type rt = Actions::get_type(s);
 
-    if ( rt == RULE_TYPE__NONE )
+    if ( rt == Actions::NONE )
         rt = ActionManager::get_action_type(s);
 
     switch ( rt )
     {
-    case RULE_TYPE__DROP:
-    case RULE_TYPE__BLOCK:
-    case RULE_TYPE__RESET:
+    case Actions::DROP:
+    case Actions::BLOCK:
+    case Actions::RESET:
         if ( SnortConfig::treat_drop_as_alert() )
-            return RULE_TYPE__ALERT;
+            return Actions::ALERT;
 
         if ( ScKeepDropRules() || ScLoadAsDropRules() )
             return rt;
 
-        return RULE_TYPE__NONE;
+        return Actions::NONE;
 
-    case RULE_TYPE__NONE:
+    case Actions::NONE:
         ParseError("unknown rule type '%s'", s);
         break;
 

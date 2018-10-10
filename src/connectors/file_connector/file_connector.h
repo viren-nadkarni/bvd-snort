@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -43,32 +43,31 @@ public:
     uint32_t connector_msg_length;
 };
 
-class FileConnectorMsgHandle : public ConnectorMsgHandle
+class FileConnectorMsgHandle : public snort::ConnectorMsgHandle
 {
 public:
     FileConnectorMsgHandle(const uint32_t length);
     ~FileConnectorMsgHandle();
-    ConnectorMsg connector_msg;
+    snort::ConnectorMsg connector_msg;
 };
 
-class FileConnectorCommon : public ConnectorCommon
+class FileConnectorCommon : public snort::ConnectorCommon
 {
 public:
     FileConnectorCommon(FileConnectorConfig::FileConnectorConfigSet*);
     ~FileConnectorCommon();
 };
 
-class FileConnector : public Connector
+class FileConnector : public snort::Connector
 {
 public:
     FileConnector(FileConnectorConfig*);
-    ~FileConnector() override;
-    ConnectorMsgHandle* alloc_message(const uint32_t, const uint8_t**) override;
-    void discard_message(ConnectorMsgHandle*) override;
-    bool transmit_message(ConnectorMsgHandle*) override;
-    ConnectorMsgHandle* receive_message(bool) override;
+    snort::ConnectorMsgHandle* alloc_message(const uint32_t, const uint8_t**) override;
+    void discard_message(snort::ConnectorMsgHandle*) override;
+    bool transmit_message(snort::ConnectorMsgHandle*) override;
+    snort::ConnectorMsgHandle* receive_message(bool) override;
 
-    ConnectorMsg* get_connector_msg(ConnectorMsgHandle* handle) override
+    snort::ConnectorMsg* get_connector_msg(snort::ConnectorMsgHandle* handle) override
     { return( &((FileConnectorMsgHandle*)handle)->connector_msg ); }
     Direction get_connector_direction() override
     { return( ((const FileConnectorConfig*)config)->direction ); }
@@ -76,8 +75,8 @@ public:
     std::fstream file;
 
 private:
-    ConnectorMsgHandle* receive_message_binary();
-    ConnectorMsgHandle* receive_message_text();
+    snort::ConnectorMsgHandle* receive_message_binary();
+    snort::ConnectorMsgHandle* receive_message_text();
 };
 
 #endif

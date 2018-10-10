@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -33,6 +33,8 @@
 #include "shell.h"
 #include "snort_config.h"
 
+using namespace snort;
+
 //-------------------------------------------------------------------------
 // traffic policy
 //-------------------------------------------------------------------------
@@ -61,7 +63,7 @@ public:
     AltPktHandler() = default;
 
     void handle(DataEvent& e, Flow*) override
-    { DetectionEngine::detect((Packet*)e.get_packet()); }  // FIXIT-L not const!
+    { DetectionEngine::detect(const_cast<Packet*>(e.get_packet())); }
 };
 
 InspectionPolicy::InspectionPolicy(PolicyId id)
@@ -231,6 +233,13 @@ std::shared_ptr<PolicyTuple> PolicyMap::add_shell(Shell* sh)
         ips_policy.back(), network_policy.back());
 }
 
+std::shared_ptr<PolicyTuple> PolicyMap::get_policies(Shell* sh)
+{
+    const auto& pt = shell_map.find(sh);
+    
+    return pt == shell_map.end() ? nullptr:pt->second;
+}
+
 //-------------------------------------------------------------------------
 // policy nav
 //-------------------------------------------------------------------------
@@ -239,6 +248,8 @@ static THREAD_LOCAL NetworkPolicy* s_traffic_policy = nullptr;
 static THREAD_LOCAL InspectionPolicy* s_inspection_policy = nullptr;
 static THREAD_LOCAL IpsPolicy* s_detection_policy = nullptr;
 
+namespace snort
+{
 NetworkPolicy* get_network_policy()
 { return s_traffic_policy; }
 
@@ -249,17 +260,31 @@ IpsPolicy* get_ips_policy()
 { return s_detection_policy; }
 
 InspectionPolicy* get_default_inspection_policy(SnortConfig* sc)
-{ return sc->policy_map->inspection_policy[0]; }
+{ return sc->policy_map->get_inspection_policy(0); }
+
+void set_ips_policy(IpsPolicy* p)
+{ s_detection_policy = p; }
 
 void set_network_policy(NetworkPolicy* p)
 { s_traffic_policy = p; }
+
+IpsPolicy* get_user_ips_policy(SnortConfig* sc, unsigned policy_id)
+{
+    return sc->policy_map->get_user_ips(policy_id);
+}
+
+NetworkPolicy* get_user_network_policy(SnortConfig* sc, unsigned policy_id)
+{
+    return sc->policy_map->get_user_network(policy_id);
+}
+} // namespace snort
 
 void set_network_policy(SnortConfig* sc, unsigned i)
 {
     PolicyMap* pm = sc->policy_map;
 
-    if ( i < pm->network_policy.size() )
-        set_network_policy(pm->network_policy[i]);
+    if ( i < pm->network_policy_count() )
+        set_network_policy(pm->get_network_policy(i));
 }
 
 void set_inspection_policy(InspectionPolicy* p)
@@ -269,36 +294,21 @@ void set_inspection_policy(SnortConfig* sc, unsigned i)
 {
     PolicyMap* pm = sc->policy_map;
 
-    if ( i < pm->inspection_policy.size() )
-        set_inspection_policy(pm->inspection_policy[i]);
-}
-
-void set_ips_policy(IpsPolicy* p)
-{ s_detection_policy = p; }
-
-void set_user_ips_policy(unsigned policy_id)
-{
-    IpsPolicy *p = SnortConfig::get_conf()->policy_map->get_user_ips(policy_id);
-    if(!p)
-    {
-        ips_module_stats.invalid_policy_ids++;
-        return;
-    }
-
-    s_detection_policy = p;
+    if ( i < pm->inspection_policy_count() )
+        set_inspection_policy(pm->get_inspection_policy(i));
 }
 
 void set_ips_policy(SnortConfig* sc, unsigned i)
 {
     PolicyMap* pm = sc->policy_map;
 
-    if ( i < pm->ips_policy.size() )
-        set_ips_policy(pm->ips_policy[i]);
+    if ( i < pm->ips_policy_count() )
+        set_ips_policy(pm->get_ips_policy(i));
 }
 
 void set_policies(SnortConfig* sc, Shell* sh)
 {
-    auto policies = sc->policy_map->shell_map[sh];
+    auto policies = sc->policy_map->get_policies(sh);
 
     if ( policies->inspection )
         set_inspection_policy(policies->inspection);
@@ -312,13 +322,24 @@ void set_policies(SnortConfig* sc, Shell* sh)
 
 void set_default_policy(SnortConfig* sc)
 {
-    set_network_policy(sc->policy_map->network_policy[0]);
-    set_inspection_policy(sc->policy_map->inspection_policy[0]);
-    set_ips_policy(sc->policy_map->ips_policy[0]);
+    set_network_policy(sc->policy_map->get_network_policy(0));
+    set_inspection_policy(sc->policy_map->get_inspection_policy(0));
+    set_ips_policy(sc->policy_map->get_ips_policy(0));
 }
 
 void set_default_policy()
 { set_default_policy(SnortConfig::get_conf()); }
+
+bool default_inspection_policy()
+{
+    if ( !get_inspection_policy() )
+        return false;
+    
+    if ( get_inspection_policy()->policy_id != 0 )
+        return false;
+
+    return true;
+}
 
 bool only_inspection_policy()
 { return get_inspection_policy() && !get_ips_policy() && !get_network_policy(); }

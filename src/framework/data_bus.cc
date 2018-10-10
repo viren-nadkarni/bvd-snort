@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,8 +27,10 @@
 #include "main/snort_config.h"
 #include "protocols/packet.h"
 
+using namespace snort;
+
 static DataBus& get_data_bus()
-{ return get_inspection_policy()->dbus; }
+{ return snort::get_inspection_policy()->dbus; }
 
 class BufferEvent : public DataEvent
 {
@@ -77,14 +79,30 @@ void DataBus::subscribe(const char* key, DataHandler* h)
     get_data_bus()._subscribe(key, h);
 }
 
+// for subscribers that need to receive events regardless of active inspection policy
+void DataBus::subscribe_default(const char* key, DataHandler* h)
+{
+    get_default_inspection_policy(SnortConfig::get_conf())->dbus._subscribe(key, h);
+}
+
+void DataBus::unsubscribe(const char* key, DataHandler* h)
+{
+    get_data_bus()._unsubscribe(key, h);
+}
+
+void DataBus::unsubscribe_default(const char* key, DataHandler* h)
+{
+    get_default_inspection_policy(SnortConfig::get_conf())->dbus._unsubscribe(key, h);
+}
+
 // notify subscribers of event
 void DataBus::publish(const char* key, DataEvent& e, Flow* f)
 {
-    InspectionPolicy* pi = get_inspection_policy();
+    InspectionPolicy* pi = snort::get_inspection_policy();
     pi->dbus._publish(key, e, f);
 
     // also publish to default policy to notify control subscribers such as appid
-    InspectionPolicy* di = get_default_inspection_policy(SnortConfig::get_conf());
+    InspectionPolicy* di = snort::get_default_inspection_policy(SnortConfig::get_conf());
 
     // of course, only when current is not default
     if ( di != pi )
@@ -100,9 +118,15 @@ void DataBus::publish(const char* key, const uint8_t* buf, unsigned len, Flow* f
 void DataBus::publish(const char* key, Packet* p, Flow* f)
 {
     PacketEvent e(p);
-    if ( !f )
+    if ( p && !f )
         f = p->flow;
     publish(key, e, f);
+}
+
+void DataBus::publish(const char* key, void* user, int type, const uint8_t* data)
+{
+    DaqMetaEvent e(user, type, data);
+    publish(key, e, nullptr);
 }
 
 //--------------------------------------------------------------------------
@@ -115,12 +139,27 @@ void DataBus::_subscribe(const char* key, DataHandler* h)
     v.push_back(h);
 }
 
-// notify subscribers of event
-void DataBus::_publish(const char* key, DataEvent& e, Flow* f)
+void DataBus::_unsubscribe(const char* key, DataHandler* h)
 {
     DataList& v = map[key];
 
-    for ( auto* h : v )
-        h->handle(e, f);
+    for ( unsigned i = 0; i < v.size(); i++ )
+        if ( v[i] == h )
+            v.erase(v.begin() + i--);
+
+    if ( v.empty() )
+        map.erase(key);
+}
+
+// notify subscribers of event
+void DataBus::_publish(const char* key, DataEvent& e, Flow* f)
+{
+    auto v = map.find(key);
+
+    if ( v != map.end() )
+    {
+        for ( auto* h : v->second )
+            h->handle(e, f);
+    }
 }
 

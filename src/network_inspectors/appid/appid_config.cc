@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,22 +28,35 @@
 #include <glob.h>
 #include <climits>
 
+#include "app_forecast.h"
 #include "app_info_table.h"
+#include "appid_discovery.h"
 #include "appid_session.h"
-#include "thirdparty_appid_utils.h"
 #ifdef USE_RNA_CONFIG
 #include "appid_utils/network_set.h"
+#include "appid_utils/ip_funcs.h"
 #endif
-#include "main/snort_debug.h"
+#include "detector_plugins/detector_pattern.h"
+#include "host_port_app_cache.h"
 #include "main/snort_config.h"
 #include "log/messages.h"
+#include "lua_detector_module.h"
 #include "utils/util.h"
+#include "service_plugins/service_ssl.h"
+#include "detector_plugins/detector_dns.h"
 #include "target_based/snort_protocols.h"
+#ifdef ENABLE_APPID_THIRD_PARTY
+#include "tp_lib_handler.h"
+#endif
+
+using namespace snort;
 
 #define ODP_PORT_DETECTORS "odp/port/*"
 #define CUSTOM_PORT_DETECTORS "custom/port/*"
 #define MAX_DISPLAY_SIZE   65536
 #define MAX_LINE    2048
+
+using namespace snort;
 
 uint32_t app_id_netmasks[33] =
 { 0x00000000, 0x80000000, 0xC0000000, 0xE0000000, 0xF0000000, 0xF8000000, 0xFC000000,
@@ -58,22 +71,23 @@ struct PortList
     uint16_t port;
 };
 
-int16_t snortId_for_unsynchronized;
-int16_t snortId_for_ftp_data;
-int16_t snortId_for_http2;
+SnortProtocolId snortId_for_unsynchronized;
+SnortProtocolId snortId_for_ftp_data;
+SnortProtocolId snortId_for_http2;
 
-static void map_app_names_to_snort_ids()
+static void map_app_names_to_snort_ids(SnortConfig* sc)
 {
     /* init globals for snortId compares */
-    snortId_for_unsynchronized = SnortConfig::get_conf()->proto_ref->add("unsynchronized");
-    snortId_for_ftp_data = SnortConfig::get_conf()->proto_ref->add("ftp-data");
-    snortId_for_http2    = SnortConfig::get_conf()->proto_ref->add("http2");
-}
+    snortId_for_unsynchronized = sc->proto_ref->add("unsynchronized");
+    snortId_for_ftp_data = sc->proto_ref->add("ftp-data");
+    snortId_for_http2    = sc->proto_ref->add("http2");
 
-AppIdModuleConfig::AppIdModuleConfig()
-{
-    session_log_filter.sip.clear();
-    session_log_filter.dip.clear();
+    // Have to create SnortProtocolIds during configuration initialization.
+    sc->proto_ref->add("rexec");
+    sc->proto_ref->add("rsh-error");
+    sc->proto_ref->add("snmp");
+    sc->proto_ref->add("sunrpc");
+    sc->proto_ref->add("tftp");
 }
 
 AppIdModuleConfig::~AppIdModuleConfig()
@@ -82,11 +96,14 @@ AppIdModuleConfig::~AppIdModuleConfig()
     snort_free((void*)conf_file);
 #endif
     snort_free((void*)app_detector_dir);
-    snort_free((void*)thirdparty_appid_dir);
 }
 
+//FIXIT-M: RELOAD - move initialization back to AppIdConfig
+//class constructor
+AppInfoManager& AppIdConfig::app_info_mgr = AppInfoManager::get_instance();
+
 AppIdConfig::AppIdConfig(AppIdModuleConfig* config)
-    : mod_config(config), app_info_mgr(AppInfoManager::get_instance())
+    : mod_config(config)
 {
 #ifdef USE_RNA_CONFIG
     for ( unsigned i = 0; i < MAX_ZONES; i++ )
@@ -114,6 +131,13 @@ AppIdConfig::AppIdConfig(AppIdModuleConfig* config)
 AppIdConfig::~AppIdConfig()
 {
     cleanup();
+}
+
+//FIXIT-M: RELOAD - Move app info table cleanup back 
+//to AppId config destructor - cleanup()
+void AppIdConfig::pterm()
+{
+    AppIdConfig::app_info_mgr.cleanup_appid_info_table();
 }
 
 void AppIdConfig::read_port_detectors(const char* files)
@@ -232,9 +256,9 @@ void AppIdConfig::read_port_detectors(const char* files)
                     udp_port_only[tmp_port->port] = appId;
 
                 snort_free(tmp_port);
-                app_info_mgr.set_app_info_active(appId);
+                AppIdConfig::app_info_mgr.set_app_info_active(appId);
             }
-            app_info_mgr.set_app_info_active(appId);
+            AppIdConfig::app_info_mgr.set_app_info_active(appId);
         }
         else
             ErrorMessage("Missing parameter(s) in port service '%s'\n",globs.gl_pathv[n]);
@@ -291,8 +315,6 @@ void AppIdConfig::configure_analysis_networks(char* toklist[], uint32_t flag)
                 six = ias6->range_max;
                 NetworkSetManager::ntoh_ipv6(&six);
                 inet_ntop(AF_INET6, (struct in6_addr*)&six, max_ip, sizeof(max_ip));
-                DebugFormat(DEBUG_APPID, "Adding %s-%s (0x%08X) with zone %d\n", min_ip, max_ip,
-                    ias6->addr_flags, zone);
                 if (zone >= 0)
                 {
                     if (!(my_net_list = net_list_by_zone[zone]))
@@ -344,8 +366,6 @@ void AppIdConfig::configure_analysis_networks(char* toklist[], uint32_t flag)
                 else
                     zone = -1;
                 ias->addr_flags |= flag;
-                DebugFormat(DEBUG_APPID, "Adding 0x%08X-0x%08X (0x%08X) with zone %d\n",
-                    ias->range_min, ias->range_max, ias->addr_flags, zone);
                 if (zone >= 0)
                 {
                     if (!(my_net_list = net_list_by_zone[zone]))
@@ -641,7 +661,6 @@ int AppIdConfig::load_analysis_config(const char* config_file, int reload, int i
     if (!config_file || (!config_file[0]))
     {
         char addrString[sizeof("0.0.0.0/0")];
-        DebugMessage(DEBUG_APPID, "Defaulting to monitoring all Snort traffic for AppID.\n");
         toklist[1] = nullptr;
         toklist[0] = addrString;
         strcpy(addrString,"0.0.0.0/0");
@@ -654,7 +673,6 @@ int AppIdConfig::load_analysis_config(const char* config_file, int reload, int i
     }
     else
     {
-        DebugFormat(DEBUG_APPID, "Loading configuration file: %s", config_file);
         FILE* fp;
 
         if (!(fp = fopen(config_file, "r")))
@@ -697,7 +715,6 @@ int AppIdConfig::load_analysis_config(const char* config_file, int reload, int i
     {
         char* instance_toklist[2];
         char addrString[sizeof("0.0.0.0/0")];
-        DebugMessage(DEBUG_APPID, "Defaulting to monitoring all Snort traffic for AppID.\n");
         instance_toklist[0] = addrString;
         instance_toklist[1] = nullptr;
         strcpy(addrString,"0.0.0.0/0");
@@ -730,21 +747,40 @@ int AppIdConfig::load_analysis_config(const char* config_file, int reload, int i
 
 void AppIdConfig::set_safe_search_enforcement(bool enabled)
 {
-    DEBUG_WRAP(DebugFormat(DEBUG_APPID,
-        "    Safe Search Enforcement enabled = %d.\n", enabled); );
     mod_config->safe_search_enabled = enabled;
 }
 
-bool AppIdConfig::init_appid( )
+bool AppIdConfig::init_appid(SnortConfig* sc, AppIdInspector *ins)
 {
-    app_info_mgr.init_appid_info_table(mod_config);
+    //FIXIT -M: RELOAD - Get rid of "once" flag
+    //Handle the if condition in AppIdConfig::init_appid
+    static bool once = false;
+    if (!once)
+    {      
+        AppIdConfig::app_info_mgr.init_appid_info_table(mod_config, sc);
+        HostPortCache::initialize();
+        HttpPatternMatchers* http_matchers = HttpPatternMatchers::get_instance();
+        AppIdDiscovery::initialize_plugins(ins);
+        init_length_app_cache();
+        LuaDetectorManager::initialize(*this, 1);
+        PatternServiceDetector::finalize_service_port_patterns();
+        PatternClientDetector::finalize_client_port_patterns();
+        AppIdDiscovery::finalize_plugins();
+        http_matchers->finalize_patterns();
+	    ssl_detector_process_patterns();
+        dns_host_detector_process_patterns();
+        read_port_detectors(ODP_PORT_DETECTORS);
+        read_port_detectors(CUSTOM_PORT_DETECTORS);
+        once = true;
+    }
 #ifdef USE_RNA_CONFIG
     load_analysis_config(mod_config->conf_file, 0, mod_config->instance_id);
 #endif
-    read_port_detectors(ODP_PORT_DETECTORS);
-    read_port_detectors(CUSTOM_PORT_DETECTORS);
-    ThirdPartyAppIDInit(mod_config);
-    map_app_names_to_snort_ids();
+
+#ifdef ENABLE_APPID_THIRD_PARTY
+    TPLibHandler::pinit(mod_config);
+#endif
+    map_app_names_to_snort_ids(sc);
     return true;
 }
 
@@ -762,12 +798,6 @@ static void free_port_exclusion_list(AppIdPortExclusions& pe_list)
 
 void AppIdConfig::cleanup()
 {
-    if (thirdparty_appid_module != nullptr)
-        thirdparty_appid_module->print_stats();
-    ThirdPartyAppIDFini();
-
-    app_info_mgr.cleanup_appid_info_table();
-
 #ifdef USE_RNA_CONFIG
     NetworkSet* net_list;          ///< list of network sets
     while ((net_list = net_list_list))
@@ -821,8 +851,8 @@ void AppIdConfig::show()
 {
     unsigned i;
 
-    if (mod_config->thirdparty_appid_dir)
-        LogMessage("    3rd Party Dir: %s\n", mod_config->thirdparty_appid_dir);
+    if (!mod_config->tp_appid_path.empty())
+        LogMessage("    3rd Party Dir: %s\n", mod_config->tp_appid_path.c_str());
 
 #ifdef USE_RNA_CONFIG
     struct in_addr ia;

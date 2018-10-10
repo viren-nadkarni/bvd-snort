@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,8 +22,6 @@
 #include "config.h"
 #endif
 
-#include "search_engines/hyperscan.h"
-
 #include <string.h>
 
 #include "framework/base_api.h"
@@ -34,10 +32,13 @@
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
+using namespace snort;
+
 //-------------------------------------------------------------------------
 // base stuff
 //-------------------------------------------------------------------------
-
+namespace snort
+{
 Mpse::Mpse(const char*) { }
 
 int Mpse::search(
@@ -54,6 +55,45 @@ int Mpse::search_all(
     return _search(T, n, match, context, current_state);
 }
 
+SnortConfig s_conf;
+THREAD_LOCAL SnortConfig* snort_conf = &s_conf;
+
+static std::vector<void *> s_state;
+
+ScScratchFunc scratch_setup;
+ScScratchFunc scratch_cleanup;
+
+SnortConfig::SnortConfig(const SnortConfig* const)
+{
+    state = &s_state;
+    num_slots = 1;
+}
+
+SnortConfig::~SnortConfig() = default;
+
+int SnortConfig::request_scratch(ScScratchFunc setup, ScScratchFunc cleanup)
+{
+    scratch_setup = setup;
+    scratch_cleanup = cleanup;
+    s_state.resize(1);
+
+    return 0;
+}
+
+SnortConfig* SnortConfig::get_conf()
+{ return snort_conf; }
+
+static unsigned parse_errors = 0;
+void ParseError(const char*, ...)
+{ parse_errors++; }
+
+void LogCount(char const*, uint64_t, FILE*)
+{ }
+
+unsigned get_instance_id()
+{ return 0; }
+
+}
 //-------------------------------------------------------------------------
 // stubs, spies, etc.
 //-------------------------------------------------------------------------
@@ -61,37 +101,10 @@ int Mpse::search_all(
 extern const BaseApi* se_hyperscan;
 
 static unsigned hits = 0;
-static unsigned parse_errors = 0;
-
-void ParseError(const char*, ...)
-{ parse_errors++; }
-
-void LogCount(char const*, uint64_t, FILE*)
-{ }
 
 static int match(
     void* /*user*/, void* /*tree*/, int /*index*/, void* /*context*/, void* /*list*/)
 { ++hits; return 0; }
-
-SnortConfig s_conf;
-THREAD_LOCAL SnortConfig* snort_conf = &s_conf;
-
-static SnortState s_state;
-
-SnortConfig::SnortConfig(SnortConfig*)
-{
-    state = &s_state;
-    memset(state, 0, sizeof(*state));
-    num_slots = 1;
-}
-
-SnortConfig::~SnortConfig() { }
-
-SnortConfig* SnortConfig::get_conf()
-{ return snort_conf; }
-
-unsigned get_instance_id()
-{ return 0; }
 
 static void* s_user = (void*)"user";
 static void* s_tree = (void*)"tree";
@@ -122,7 +135,7 @@ static MpseAgent s_agent =
 
 TEST_GROUP(mpse_hs_base)
 {
-    void setup()
+    void setup() override
     {
         CHECK(se_hyperscan);
     }
@@ -165,7 +178,7 @@ TEST_GROUP(mpse_hs_match)
     Mpse* hs = nullptr;
     const MpseApi* mpse_api = (MpseApi*)se_hyperscan;
 
-    void setup()
+    void setup() override
     {
         // FIXIT-L cpputest hangs or crashes in the leak detector
         MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
@@ -175,10 +188,10 @@ TEST_GROUP(mpse_hs_match)
         hits = 0;
         parse_errors = 0;
     }
-    void teardown()
+    void teardown() override
     {
         mpse_api->dtor(hs);
-        hyperscan_cleanup(snort_conf);
+        scratch_cleanup(snort_conf);
         MemoryLeakWarningPlugin::turnOnNewDeleteOverloads();
     }
 };
@@ -202,7 +215,7 @@ TEST(mpse_hs_match, single)
     CHECK(hs->prep_patterns(snort_conf) == 0);
     CHECK(hs->get_pattern_count() == 1);
 
-    hyperscan_setup(snort_conf);
+    scratch_setup(snort_conf);
 
     int state = 0;
     CHECK(hs->search((uint8_t*)"foo", 3, match, nullptr, &state) == 1);
@@ -217,7 +230,7 @@ TEST(mpse_hs_match, nocase)
     CHECK(hs->prep_patterns(snort_conf) == 0);
     CHECK(hs->get_pattern_count() == 1);
 
-    hyperscan_setup(snort_conf);
+    scratch_setup(snort_conf);
 
     int state = 0;
     CHECK(hs->search((uint8_t*)"foo", 3, match, nullptr, &state) == 1);
@@ -233,7 +246,7 @@ TEST(mpse_hs_match, other)
     CHECK(hs->prep_patterns(snort_conf) == 0);
     CHECK(hs->get_pattern_count() == 1);
 
-    hyperscan_setup(snort_conf);
+    scratch_setup(snort_conf);
 
     int state = 0;
     CHECK(hs->search((uint8_t*)"foo", 3, match, nullptr, &state) == 1);
@@ -251,7 +264,7 @@ TEST(mpse_hs_match, multi)
 
     CHECK(hs->prep_patterns(snort_conf) == 0);
     CHECK(hs->get_pattern_count() == 3);
-    hyperscan_setup(snort_conf);
+    scratch_setup(snort_conf);
 
     int state = 0;
     CHECK(hs->search((uint8_t*)"foo bar baz", 11, match, nullptr, &state) == 3);
@@ -268,7 +281,7 @@ TEST(mpse_hs_match, regex)
 
     CHECK(hs->prep_patterns(snort_conf) == 0);
     CHECK(hs->get_pattern_count() == 1);
-    hyperscan_setup(snort_conf);
+    scratch_setup(snort_conf);
 
     int state = 0;
     CHECK(hs->search((uint8_t*)"foo bar baz", 11, match, nullptr, &state) == 0);
@@ -285,7 +298,7 @@ TEST(mpse_hs_match, pcre)
 
     CHECK(hs->prep_patterns(snort_conf) == 0);
     CHECK(hs->get_pattern_count() == 1);
-    hyperscan_setup(snort_conf);
+    scratch_setup(snort_conf);
 
     int state = 0;
     CHECK(hs->search((uint8_t*)":definition(", 12, match, nullptr, &state) == 0);
@@ -306,7 +319,7 @@ TEST_GROUP(mpse_hs_multi)
     Mpse* hs2 = nullptr;
     const MpseApi* mpse_api = (MpseApi*)se_hyperscan;
 
-    void setup()
+    void setup() override
     {
         // FIXIT-L cpputest hangs or crashes in the leak detector
         MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
@@ -321,11 +334,11 @@ TEST_GROUP(mpse_hs_multi)
         hits = 0;
         parse_errors = 0;
     }
-    void teardown()
+    void teardown() override
     {
         mpse_api->dtor(hs1);
         mpse_api->dtor(hs2);
-        hyperscan_cleanup(snort_conf);
+        scratch_cleanup(snort_conf);
         MemoryLeakWarningPlugin::turnOnNewDeleteOverloads();
     }
 };
@@ -343,7 +356,7 @@ TEST(mpse_hs_multi, single)
     CHECK(hs1->get_pattern_count() == 1);
     CHECK(hs2->get_pattern_count() == 1);
 
-    hyperscan_setup(snort_conf);
+    scratch_setup(snort_conf);
 
     int state = 0;
     CHECK(hs1->search((uint8_t*)"fubar", 5, match, nullptr, &state) == 1 );

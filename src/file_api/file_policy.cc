@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,8 +27,10 @@
 #include "hash/hashes.h"
 
 #include "file_capture.h"
-#include "file_enforcer.h"
+#include "file_lib.h"
 #include "file_service.h"
+
+using namespace snort;
 
 static FileRule emptyRule;
 
@@ -84,26 +86,26 @@ void FilePolicy::insert_file_rule(FileRule& rule)
     }
 
     // Enable file type for all other features
-    FileService::enable_file_type();
+    snort::FileService::enable_file_type();
     type_enabled = true;
 
     if (rule.use.signature_enabled)
-        FileService::enable_file_signature();
+        snort::FileService::enable_file_signature();
 
     if (rule.use.capture_enabled)
-        FileService::enable_file_capture();
+        snort::FileService::enable_file_capture();
 }
 
 void FilePolicy::load()
 {
     if (type_enabled)
-        FileService::enable_file_type();
+        snort::FileService::enable_file_type();
 
     if (signature_enabled)
-        FileService::enable_file_signature();
+        snort::FileService::enable_file_signature();
 
     if (capture_enabled)
-        FileService::enable_file_capture();
+        snort::FileService::enable_file_capture();
 
     // Use default global setting
     emptyRule.use.type_enabled = type_enabled;

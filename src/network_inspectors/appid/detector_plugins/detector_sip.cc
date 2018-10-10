@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,9 +25,12 @@
 
 #include "detector_sip.h"
 
+#include "appid_debug.h"
 #include "appid_inspector.h"
 #include "app_info_table.h"
 #include "protocols/packet.h"
+
+using namespace snort;
 
 static const char SIP_REGISTER_BANNER[] = "REGISTER ";
 static const char SIP_INVITE_BANNER[] = "INVITE ";
@@ -83,7 +86,7 @@ struct DetectorSipConfig
     DetectorAppSipPattern* sip_server_list;
 };
 
-static THREAD_LOCAL DetectorSipConfig detector_sip_config;
+static DetectorSipConfig detector_sip_config;
 
 static void clean_sip_ua()
 {
@@ -175,7 +178,7 @@ int SipUdpClientDetector::validate(AppIdDiscoveryArgs& args)
         fd = new ClientSIPData();
         data_add(args.asd, fd, &clientDataFree);
         fd->owner = this;
-        args.asd->set_session_flags(APPID_SESSION_CLIENT_GETS_SERVER_PACKETS);
+        args.asd.set_session_flags(APPID_SESSION_CLIENT_GETS_SERVER_PACKETS);
     }
 
     return APPID_INPROCESS;
@@ -218,7 +221,7 @@ int SipTcpClientDetector::validate(AppIdDiscoveryArgs& args)
         fd = new ClientSIPData();
         data_add(args.asd, fd, &clientDataFree);
         fd->owner = this;
-        args.asd->set_session_flags(APPID_SESSION_CLIENT_GETS_SERVER_PACKETS);
+        args.asd.set_session_flags(APPID_SESSION_CLIENT_GETS_SERVER_PACKETS);
     }
 
     return APPID_INPROCESS;
@@ -259,23 +262,21 @@ int SipUdpClientDetector::sipServerPatternAdd(AppId ClientAppId, const char* cli
         pattern);
 }
 
-int SipUdpClientDetector::finalize_sip_ua()
+void SipUdpClientDetector::finalize_patterns()
 {
-    const int PATTERN_PART_MAX = 10;
-    static THREAD_LOCAL tMlmpPattern patterns[PATTERN_PART_MAX];
     int num_patterns;
     DetectorAppSipPattern* patternNode;
 
     detector_sip_config.sip_ua_matcher = mlmpCreate();
     if ( !detector_sip_config.sip_ua_matcher )
-        return -1;
+        return;
 
     detector_sip_config.sip_server_matcher = mlmpCreate();
     if ( !detector_sip_config.sip_server_matcher )
     {
         mlmpDestroy((tMlmpTree*)detector_sip_config.sip_ua_matcher);
         detector_sip_config.sip_ua_matcher = nullptr;
-        return -1;
+        return;
     }
 
     for ( patternNode = detector_sip_config.sip_ua_list; patternNode; patternNode =
@@ -300,7 +301,6 @@ int SipUdpClientDetector::finalize_sip_ua()
 
     mlmpProcessPatterns((tMlmpTree*)detector_sip_config.sip_ua_matcher);
     mlmpProcessPatterns((tMlmpTree*)detector_sip_config.sip_server_matcher);
-    return 0;
 }
 
 static int get_sip_client_app(void* patternMatcher, const char* pattern, uint32_t patternLen,
@@ -327,39 +327,38 @@ static int get_sip_client_app(void* patternMatcher, const char* pattern, uint32_
     return 1;
 }
 
-void SipServiceDetector::createRtpFlow(AppIdSession* asd, const Packet* pkt, const SfIp* cliIp,
+void SipServiceDetector::createRtpFlow(AppIdSession& asd, const Packet* pkt, const SfIp* cliIp,
     uint16_t cliPort, const SfIp* srvIp, uint16_t srvPort, IpProtocol proto, int16_t app_id)
 {
-    AppIdSession* fp, * fp2;
-
-    fp = AppIdSession::create_future_session(pkt, cliIp, cliPort, srvIp, srvPort, proto, app_id,
-        APPID_EARLY_SESSION_FLAG_FW_RULE, handler->get_inspector());
+    //  FIXIT-H: Passing app_id instead of SnortProtocolId to create_future_session is incorrect. We need to look up snort_protocol_id.
+    AppIdSession* fp = AppIdSession::create_future_session(pkt, cliIp, cliPort, srvIp, srvPort,
+        proto, app_id, APPID_EARLY_SESSION_FLAG_FW_RULE, handler->get_inspector());
     if ( fp )
     {
-        fp->client.set_id(asd->client.get_id());
-        fp->payload.set_id(asd->payload.get_id());
+        fp->client.set_id(asd.client.get_id());
+        fp->payload.set_id(asd.payload.get_id());
         fp->service.set_id(APP_ID_RTP);
         // FIXIT-H : snort 2.9.x updated the flag to APPID_SESSION_EXPECTED_EVALUATE.
         // Check if it is needed here as well.
         //initialize_expected_session(asd, fp, APPID_SESSION_EXPECTED_EVALUATE);
-        initialize_expected_session(asd, fp, APPID_SESSION_IGNORE_ID_FLAGS, APP_ID_APPID_SESSION_DIRECTION_MAX);
+        initialize_expected_session(asd, *fp, APPID_SESSION_IGNORE_ID_FLAGS, APP_ID_APPID_SESSION_DIRECTION_MAX);
     }
 
     // create an RTCP flow as well
-    fp2 = AppIdSession::create_future_session(pkt, cliIp, cliPort + 1, srvIp, srvPort + 1, proto,
-        app_id, APPID_EARLY_SESSION_FLAG_FW_RULE, handler->get_inspector());
+    AppIdSession* fp2 = AppIdSession::create_future_session(pkt, cliIp, cliPort + 1, srvIp,
+        srvPort + 1, proto, app_id, APPID_EARLY_SESSION_FLAG_FW_RULE, handler->get_inspector());
     if ( fp2 )
     {
-        fp2->client.set_id(asd->client.get_id());
-        fp2->payload.set_id(asd->payload.get_id());
+        fp2->client.set_id(asd.client.get_id());
+        fp2->payload.set_id(asd.payload.get_id());
         fp2->service.set_id(APP_ID_RTCP);
         // FIXIT-H : same comment as above
         //initialize_expected_session(asd, fp2, APPID_SESSION_EXPECTED_EVALUATE);
-        initialize_expected_session(asd, fp2, APPID_SESSION_IGNORE_ID_FLAGS, APP_ID_APPID_SESSION_DIRECTION_MAX);
+        initialize_expected_session(asd, *fp2, APPID_SESSION_IGNORE_ID_FLAGS, APP_ID_APPID_SESSION_DIRECTION_MAX);
     }
 }
 
-void SipServiceDetector::addFutureRtpFlows(SipEvent& event, AppIdSession* asd)
+void SipServiceDetector::addFutureRtpFlows(SipEvent& event, AppIdSession& asd)
 {
     event.begin_media_sessions();
 
@@ -369,9 +368,6 @@ void SipServiceDetector::addFutureRtpFlows(SipEvent& event, AppIdSession* asd)
     if ( !session_a || !session_b )
         return;
 
-    DebugFormat(DEBUG_SIP, "Adding future media sessions ID: %u and %u\n",
-        session_b->get_id(), session_b->get_id());
-
     session_a->begin_media_data();
     session_b->begin_media_data();
 
@@ -380,11 +376,6 @@ void SipServiceDetector::addFutureRtpFlows(SipEvent& event, AppIdSession* asd)
 
     while ( media_a && media_b )
     {
-        DebugFormat(DEBUG_SIP, "Adding future channels Source IP: %s Port: %hu\n",
-            media_a->get_address()->ntoa(), media_a->get_port());
-        DebugFormat(DEBUG_SIP, "Adding future channels Destine IP: %s Port: %hu\n",
-            media_b->get_address()->ntoa(), media_b->get_port());
-
         createRtpFlow(asd, event.get_packet(), media_a->get_address(), media_a->get_port(),
             media_b->get_address(), media_b->get_port(), IpProtocol::UDP, APP_ID_RTP);
         createRtpFlow(asd, event.get_packet(), media_b->get_address(), media_b->get_port(),
@@ -436,14 +427,11 @@ SipServiceDetector::SipServiceDetector(ServiceDiscovery* sd)
 
 int SipServiceDetector::validate(AppIdDiscoveryArgs& args)
 {
-    ServiceSIPData* ss;
-    AppIdSession* asd = args.asd;
-
-    ss = (ServiceSIPData*)data_get(asd);
+    ServiceSIPData* ss = (ServiceSIPData*)data_get(args.asd);
     if (!ss)
     {
         ss = (ServiceSIPData*)snort_calloc(sizeof(ServiceSIPData));
-        data_add(asd, ss, &snort_free);
+        data_add(args.asd, ss, &snort_free);
     }
 
     if (args.size && args.dir == APP_ID_FROM_RESPONDER)
@@ -451,45 +439,48 @@ int SipServiceDetector::validate(AppIdDiscoveryArgs& args)
 
     if (ss->serverPkt > 10)
     {
-        if (!asd->is_service_detected())
+        if (!args.asd.is_service_detected())
         {
-            fail_service(asd, args.pkt, args.dir);
+            fail_service(args.asd, args.pkt, args.dir);
         }
-        asd->clear_session_flags(APPID_SESSION_CONTINUE);
+        args.asd.clear_session_flags(APPID_SESSION_CONTINUE);
         return APPID_NOMATCH;
     }
 
-    if (!asd->is_service_detected())
-        service_inprocess(asd, args.pkt, args.dir);
+    if (!args.asd.is_service_detected())
+        service_inprocess(args.asd, args.pkt, args.dir);
 
     return APPID_INPROCESS;
 }
 
-THREAD_LOCAL SipUdpClientDetector* SipEventHandler::client = nullptr;
-THREAD_LOCAL SipServiceDetector* SipEventHandler::service = nullptr;
+SipUdpClientDetector* SipEventHandler::client = nullptr;
+SipServiceDetector* SipEventHandler::service = nullptr;
 
 void SipEventHandler::handle(DataEvent& event, Flow* flow)
 {
-    AppIdSession* asd = nullptr;
     SipEvent& sip_event = (SipEvent&)event;
+    AppIdSession* asd = nullptr;
 
     if ( flow )
-        asd = appid_api.get_appid_session(flow);
+        asd = appid_api.get_appid_session(*flow);
 
     if ( !asd )
     {
         const Packet* p = sip_event.get_packet();
         IpProtocol protocol = p->is_tcp() ? IpProtocol::TCP : IpProtocol::UDP;
-        int direction = p->is_from_client() ? APP_ID_FROM_INITIATOR : APP_ID_FROM_RESPONDER;
+        AppidSessionDirection direction = p->is_from_client() ? APP_ID_FROM_INITIATOR : APP_ID_FROM_RESPONDER;
         asd = AppIdSession::allocate_session(p, protocol, direction,
             client->get_handler().get_inspector());
     }
 
-    client_handler(sip_event, asd);
-    service_handler(sip_event, asd);
+    AppidChangeBits change_bits;
+    client_handler(sip_event, *asd, change_bits);
+    service_handler(sip_event, *asd, change_bits);
+    AppIdDiscovery::publish_appid_event(change_bits, flow);
 }
 
-void SipEventHandler::client_handler(SipEvent& sip_event, AppIdSession* asd)
+void SipEventHandler::client_handler(SipEvent& sip_event, AppIdSession& asd,
+    AppidChangeBits& change_bits)
 {
     AppId ClientAppId = APP_ID_SIP;
     char* clientVersion = nullptr;
@@ -500,20 +491,24 @@ void SipEventHandler::client_handler(SipEvent& sip_event, AppIdSession* asd)
         fd = new ClientSIPData();
         client->data_add(asd, fd, &clientDataFree);
         fd->owner = client;
-        asd->set_session_flags(APPID_SESSION_CLIENT_GETS_SERVER_PACKETS);
+        asd.set_session_flags(APPID_SESSION_CLIENT_GETS_SERVER_PACKETS);
     }
 
-    int direction = (sip_event.get_packet()->is_from_client()) ?
+    AppidSessionDirection direction = (sip_event.get_packet()->is_from_client()) ?
         APP_ID_FROM_INITIATOR : APP_ID_FROM_RESPONDER;
 
     if ( sip_event.is_invite() && direction == APP_ID_FROM_INITIATOR )
     {
-        if (sip_event.get_from_len())
-            fd->from = sip_event.get_from();
-        if (sip_event.get_user_name_len())
-            fd->user_name = sip_event.get_user_name();
-        if (sip_event.get_user_agent_len())
-            fd->user_agent = sip_event.get_user_agent();
+        size_t len;
+        len = sip_event.get_from_len();
+        if (len > 0)
+            fd->from.assign(sip_event.get_from(), len);
+        len = sip_event.get_user_name_len();
+        if (len > 0)
+            fd->user_name.assign(sip_event.get_user_name(), len);
+        len = sip_event.get_user_agent_len();
+        if (len > 0)
+            fd->user_agent.assign(sip_event.get_user_agent(), len);
     }
 
     if ( !fd->user_agent.empty() )
@@ -536,14 +531,15 @@ void SipEventHandler::client_handler(SipEvent& sip_event, AppIdSession* asd)
         return;
 
 success:
-    if( !asd->is_client_detected() )
-        client->add_app(asd, APP_ID_SIP, ClientAppId, clientVersion);
+    if( !asd.is_client_detected() )
+        client->add_app(asd, APP_ID_SIP, ClientAppId, clientVersion, change_bits);
 
     if ( !fd->user_name.empty() )
         client->add_user(asd, fd->user_name.c_str(), APP_ID_SIP, true);
 }
 
-void SipEventHandler::service_handler(SipEvent& sip_event, AppIdSession* asd)
+void SipEventHandler::service_handler(SipEvent& sip_event, AppIdSession& asd,
+    AppidChangeBits& change_bits)
 {
     ServiceSIPData* ss = (ServiceSIPData*)service->data_get(asd);
     if ( !ss )
@@ -553,7 +549,7 @@ void SipEventHandler::service_handler(SipEvent& sip_event, AppIdSession* asd)
     }
 
     ss->serverPkt = 0;
-    int direction = sip_event.get_packet()->is_from_client() ? APP_ID_FROM_INITIATOR :
+    AppidSessionDirection direction = sip_event.get_packet()->is_from_client() ? APP_ID_FROM_INITIATOR :
         APP_ID_FROM_RESPONDER;
 
     if ( direction == APP_ID_FROM_RESPONDER )
@@ -580,11 +576,14 @@ void SipEventHandler::service_handler(SipEvent& sip_event, AppIdSession* asd)
 
     if ( sip_event.is_dialog_established() )
     {
-        if ( !asd->is_service_detected() )
+        if ( !asd.is_service_detected() )
         {
-            asd->set_session_flags(APPID_SESSION_CONTINUE);
-            service->add_service(asd, sip_event.get_packet(), direction, APP_ID_SIP,
+            asd.set_session_flags(APPID_SESSION_CONTINUE);
+            service->add_service(change_bits, asd, sip_event.get_packet(), direction, APP_ID_SIP,
                 ss->vendor[0] ? ss->vendor : nullptr);
+            if (appidDebug->is_active())
+                LogMessage("AppIdDbg %s Sip service detected. Setting APPID_SESSION_CONTINUE flag\n",
+                            appidDebug->get_debug_session());
         }
     }
 }

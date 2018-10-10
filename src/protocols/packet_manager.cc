@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,7 +30,6 @@
 #include "detection/detection_engine.h"
 #include "log/text_log.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "packet_io/active.h"
 #include "packet_io/sfdaq.h"
 #include "profiler/profiler_defs.h"
@@ -39,6 +38,8 @@
 #include "eth.h"
 #include "icmp4.h"
 #include "icmp6.h"
+
+using namespace snort;
 
 THREAD_LOCAL ProfileStats decodePerfStats;
 
@@ -66,7 +67,17 @@ const std::array<const char*, PacketManager::stat_offset> PacketManager::stat_na
 
 // Encoder Foo
 static THREAD_LOCAL PegCount total_rebuilt_pkts = 0;
-static THREAD_LOCAL std::array<uint8_t, Codec::PKT_MAX> s_pkt { { 0 } };
+static THREAD_LOCAL std::array<uint8_t, Codec::PKT_MAX>* s_pkt;
+
+void PacketManager::thread_init()
+{
+    s_pkt = new std::array<uint8_t, Codec::PKT_MAX>{ {0} };
+}
+
+void PacketManager::thread_term()
+{
+    delete s_pkt;
+}
 
 //-------------------------------------------------------------------------
 // Private helper functions
@@ -149,7 +160,7 @@ void PacketManager::decode(
     // loop until the protocol id is no longer valid
     while (CodecManager::s_protocols[mapped_prot]->decode(raw, codec_data, p->ptrs))
     {
-        DebugFormat(DEBUG_DECODE, "Codec %s (protocol_id: %hu:"
+        trace_logf(decode, "Codec %s (protocol_id: %hu) "
             "ip header starts at: %p, length is %d\n",
             CodecManager::s_protocols[mapped_prot]->get_name(),
             static_cast<uint16_t>(codec_data.next_prot_id), pkt, codec_data.lyr_len);
@@ -227,7 +238,7 @@ void PacketManager::decode(
         codec_data.proto_bits = 0;
     }
 
-    DebugFormat(DEBUG_DECODE, "Codec %s (protocol_id: %hu: ip header"
+    trace_logf(decode, "Codec %s (protocol_id: %hu) ip header"
         " starts at: %p, length is %lu\n",
         CodecManager::s_protocols[mapped_prot]->get_name(),
         static_cast<uint16_t>(prev_prot_id), pkt, (unsigned long)codec_data.lyr_len);
@@ -416,7 +427,7 @@ const uint8_t* PacketManager::encode_response(
     TcpResponse type, EncodeFlags flags, const Packet* p, uint32_t& len,
     const uint8_t* const payload, uint32_t payload_len)
 {
-    Buffer buf(s_pkt.data(), s_pkt.size());
+    Buffer buf(s_pkt->data(), s_pkt->size());
 
     switch (type)
     {
@@ -463,7 +474,7 @@ const uint8_t* PacketManager::encode_response(
 const uint8_t* PacketManager::encode_reject(UnreachResponse type,
     EncodeFlags flags, const Packet* p, uint32_t& len)
 {
-    Buffer buf(s_pkt.data(), s_pkt.size());
+    Buffer buf(s_pkt->data(), s_pkt->size());
 
     if (p->is_ip4())
     {
@@ -497,16 +508,16 @@ const uint8_t* PacketManager::encode_reject(UnreachResponse type,
 
         switch (type)
         {
-        case UnreachResponse::NET:
+        case snort::UnreachResponse::NET:
             icmph->code = icmp::IcmpCode::NET_UNREACH;
             break;
-        case UnreachResponse::HOST:
+        case snort::UnreachResponse::HOST:
             icmph->code = icmp::IcmpCode::HOST_UNREACH;
             break;
-        case UnreachResponse::PORT:
+        case snort::UnreachResponse::PORT:
             icmph->code = icmp::IcmpCode::PORT_UNREACH;
             break;
-        case UnreachResponse::FWD:
+        case snort::UnreachResponse::FWD:
             icmph->code = icmp::IcmpCode::PKT_FILTERED;
             break;
         default:     // future proofing
@@ -553,16 +564,16 @@ const uint8_t* PacketManager::encode_reject(UnreachResponse type,
 
         switch (type)
         {
-        case UnreachResponse::NET:
+        case snort::UnreachResponse::NET:
             icmph->code = icmp::Icmp6Code::UNREACH_NET;
             break;
-        case UnreachResponse::HOST:
+        case snort::UnreachResponse::HOST:
             icmph->code = icmp::Icmp6Code::UNREACH_HOST;
             break;
-        case UnreachResponse::PORT:
+        case snort::UnreachResponse::PORT:
             icmph->code = icmp::Icmp6Code::UNREACH_PORT;
             break;
-        case UnreachResponse::FWD:
+        case snort::UnreachResponse::FWD:
             icmph->code = icmp::Icmp6Code::UNREACH_FILTER_PROHIB;
             break;
         default:     // future proofing

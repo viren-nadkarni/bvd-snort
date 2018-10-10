@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,11 +25,11 @@
 
 #include <unordered_map>
 
-#include "binder/binder.h"
 #include "flow/flow_key.h"
-#include "main/snort_debug.h"
 #include "managers/inspector_manager.h"
 #include "stream/stream.h"
+
+using namespace snort;
 
 // HA Session flags helper macros
 #define HA_IGNORED_SESSION_FLAGS \
@@ -89,8 +89,6 @@ static bool is_client_lower(Flow* flow)
 
 bool StreamHAClient::consume(Flow*& flow, FlowKey* key, HAMessage* msg)
 {
-    DebugMessage(DEBUG_HA,"StreamHAClient::consume()\n");
-
     assert(key);
     assert(msg);
 
@@ -108,9 +106,10 @@ bool StreamHAClient::consume(Flow*& flow, FlowKey* key, HAMessage* msg)
         // A nullptr indicates that the protocol has no handler
         if ( (flow = protocol_create_session(key)) == nullptr )
             return false;
-        Inspector* b = InspectorManager::get_binder();
-        if ( b != nullptr )
-            b->exec(BinderSpace::ExecOperation::EVAL_STANDBY_FLOW,(void*)flow);
+
+        BareDataEvent event;
+        DataBus::publish(STREAM_HA_NEW_FLOW_EVENT, event, flow);
+
         flow->ha_state->clear(FlowHAState::NEW);
         int family = (hac->flags & SessionHAContent::FLAG_IP6) ? AF_INET6 : AF_INET;
         if ( hac->flags & SessionHAContent::FLAG_LOW )
@@ -143,7 +142,6 @@ bool StreamHAClient::consume(Flow*& flow, FlowKey* key, HAMessage* msg)
 
 bool StreamHAClient::produce(Flow* flow, HAMessage* msg)
 {
-    DebugMessage(DEBUG_HA,"StreamHAClient::produce()\n");
     assert(flow);
     assert(msg);
 
@@ -209,7 +207,7 @@ static void update_flags(Flow* flow)
         }
 
         if( ( old_state->ipprotocol != cur_state->ipprotocol ) ||
-            ( old_state->application_protocol != cur_state->application_protocol ) ||
+            ( old_state->snort_protocol_id != cur_state->snort_protocol_id ) ||
             ( old_state->direction != cur_state->direction ) )
         {
             flow->ha_state->add(FlowHAState::MODIFIED);
@@ -227,8 +225,6 @@ static void update_flags(Flow* flow)
 
 bool StreamHAClient::is_update_required(Flow* flow)
 {
-    DebugMessage(DEBUG_HA,"StreamHAClient::update_required()\n");
-
     assert(flow);
     assert(flow->ha_state);
 
@@ -251,14 +247,11 @@ bool StreamHAClient::is_update_required(Flow* flow)
 
 bool StreamHAClient::is_delete_required(Flow*)
 {
-    DebugMessage(DEBUG_HA,"StreamHAClient::update_required()\n");
     return true;
 }
 
 ProtocolHA::ProtocolHA(PktType protocol)
 {
-    DebugFormat(DEBUG_HA,"ProtocolHA::ProtocolHA(): protocol: %d\n",(int)protocol);
-
     if ( proto_map == nullptr )
         proto_map = new ProtocolMap;
 

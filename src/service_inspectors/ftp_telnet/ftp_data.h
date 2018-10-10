@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,7 +21,7 @@
 
 #include "framework/inspector.h"
 
-extern const InspectApi fd_api;
+extern const snort::InspectApi fd_api;
 
 #endif
 

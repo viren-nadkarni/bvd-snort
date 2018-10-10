@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,7 +27,8 @@
 #include "main/snort_config.h"
 #include "packet_io/sfdaq.h"
 #include "protocols/packet_manager.h"
-#include "utils/dnet_header.h"
+
+using namespace snort;
 
 struct CodecManager::CodecApiWrapper
 {
@@ -52,13 +53,6 @@ THREAD_LOCAL uint8_t CodecManager::max_layers = DEFAULT_LAYERMAX;
 
 // This is hardcoded into Snort++
 extern const CodecApi* default_codec;
-
-// Local variables for various tasks
-static const uint16_t IP_ID_COUNT = 8192;
-static THREAD_LOCAL std::array<uint16_t, IP_ID_COUNT> s_id_pool {
-    { 0 }
-};
-static THREAD_LOCAL rand_t* s_rand = nullptr;
 
 /*
  * Begin search from index 1.  0 is a special case in that it is the default
@@ -232,19 +226,6 @@ void CodecManager::thread_init(SnortConfig* sc)
 
     if (!grinder)
         ParseError("Unable to find a Codec with data link type %d", daq_dlt);
-
-    if ( s_rand )
-        rand_close(s_rand);
-
-    // rand_open() can yield valgrind errors because the
-    // starting seed may come from "random stack contents"
-    // (see man 3 dnet)
-    s_rand = rand_open();
-
-    if ( !s_rand )
-        ParseError("rand_open() failed.");
-
-    rand_get(s_rand, s_id_pool.data(), s_id_pool.size());
 }
 
 void CodecManager::thread_term()
@@ -255,12 +236,6 @@ void CodecManager::thread_term()
     {
         if (wrap.api->tterm)
             wrap.api->tterm();
-    }
-
-    if ( s_rand )
-    {
-        rand_close(s_rand);
-        s_rand = nullptr;
     }
 }
 

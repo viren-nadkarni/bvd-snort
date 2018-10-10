@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -88,6 +88,7 @@
 
 #include "extract.h"
 
+using namespace snort;
 using namespace std;
 
 static THREAD_LOCAL ProfileStats byteJumpPerfStats;
@@ -109,6 +110,7 @@ typedef struct _ByteJumpData
     uint32_t bitmask_val;
     int8_t offset_var;
     uint8_t from_end_flag;
+    int8_t post_offset_var;
 } ByteJumpData;
 
 class ByteJumpOption : public IpsOption
@@ -158,7 +160,7 @@ uint32_t ByteJumpOption::hash() const
     mix(a,b,c);
 
     a += data->post_offset;
-    b += data->from_end_flag << 8 | data->offset_var;
+    b += data->from_end_flag << 16 | (uint32_t) data->offset_var << 8 | data->post_offset_var;
     c += data->bitmask_val;
 
     mix(a,b,c);
@@ -190,7 +192,8 @@ bool ByteJumpOption::operator==(const IpsOption& ips) const
         ( left->multiplier == right->multiplier) &&
         ( left->post_offset == right->post_offset) &&
         ( left->bitmask_val == right->bitmask_val) &&
-        ( left->from_end_flag == right->from_end_flag))
+        ( left->from_end_flag == right->from_end_flag) &&
+        ( left->post_offset_var == right->post_offset_var))
     {
         return true;
     }
@@ -205,6 +208,7 @@ IpsOption::EvalStatus ByteJumpOption::eval(Cursor& c, Packet* p)
     ByteJumpData* bjd = (ByteJumpData*)&config;
 
     int32_t offset = 0;
+    int32_t post_offset = 0;
 
     // Get values from byte_extract variables, if present.
     if (bjd->offset_var >= 0 && bjd->offset_var < NUM_IPS_OPTIONS_VARS)
@@ -217,10 +221,19 @@ IpsOption::EvalStatus ByteJumpOption::eval(Cursor& c, Packet* p)
     {
         offset = bjd->offset;
     }
+    if (bjd->post_offset_var >= 0 && bjd->post_offset_var < NUM_IPS_OPTIONS_VARS)
+    {
+        uint32_t extract_post_offset;
+        GetVarValueByIndex(&extract_post_offset, bjd->post_offset_var);
+        post_offset = (int32_t)extract_post_offset;
+    }
+    else
+    {
+        post_offset = bjd->post_offset;
+    }
 
     const uint8_t* const start_ptr = c.buffer();
-    const int dsize = c.size();
-    const uint8_t* const end_ptr = start_ptr + dsize;
+    const uint8_t* const end_ptr = start_ptr + c.size();
     const uint8_t* const base_ptr = offset +
         ((bjd->relative_flag) ? c.start() : start_ptr);
 
@@ -287,20 +300,20 @@ IpsOption::EvalStatus ByteJumpOption::eval(Cursor& c, Packet* p)
         }
     }
 
-    if (!bjd->from_beginning_flag && !bjd->from_end_flag)
-    {
-        jump += payload_bytes_grabbed;
-        jump += c.get_pos();
-    }
+    uint32_t pos;
 
-    if (bjd->from_end_flag)
-        jump += dsize;
+    if ( bjd->from_beginning_flag )
+        pos = jump;
+
+    else if ( bjd->from_end_flag )
+        pos = c.size() + jump;
+
     else
-        jump += offset;
+        pos = c.get_pos() + offset + payload_bytes_grabbed + jump;
 
-    jump += bjd->post_offset;
+    pos += post_offset;
 
-    if ( !c.set_pos(jump) )
+    if ( !c.set_pos(pos) )
         return NO_MATCH;
 
     return MATCH;
@@ -333,8 +346,9 @@ static const Parameter s_params[] =
     { "align", Parameter::PT_INT, "0:4", "0",
       "round the number of converted bytes up to the next 2- or 4-byte boundary" },
 
-    { "post_offset", Parameter::PT_INT, "-65535:65535", "0",
-      "also skip forward or backwards (positive of negative value) this number of bytes" },
+    { "post_offset", Parameter::PT_STRING, nullptr, nullptr,
+      "skip forward or backward (positive or negative value) by variable name or number of " \
+      "bytes after the other jump options have been applied" },
 
     { "big", Parameter::PT_IMPLIED, nullptr, nullptr,
       "big endian" },
@@ -384,12 +398,14 @@ public:
 public:
     ByteJumpData data;
     string var;
+    string post_var;
 };
 
 bool ByteJumpModule::begin(const char*, int, SnortConfig*)
 {
     memset(&data, 0, sizeof(data));
     var.clear();
+    post_var.clear();
     data.multiplier = 1;
     return true;
 }
@@ -405,6 +421,18 @@ bool ByteJumpModule::end(const char*, int, SnortConfig*)
         if (data.offset_var == IPS_OPTIONS_NO_VAR)
         {
             ParseError(INVALID_VAR_ERR_STR, "byte_jump", var.c_str());
+            return false;
+        }
+    }
+    if ( post_var.empty() )
+        data.post_offset_var = IPS_OPTIONS_NO_VAR;
+    else
+    {
+        data.post_offset_var = GetVarByName(post_var.c_str());
+
+        if (data.post_offset_var == IPS_OPTIONS_NO_VAR)
+        {
+            ParseError(INVALID_VAR_ERR_STR, "byte_jump", post_var.c_str());
             return false;
         }
     }
@@ -460,8 +488,13 @@ bool ByteJumpModule::set(const char*, Value& v, SnortConfig*)
         data.multiplier = v.get_long();
 
     else if ( v.is("post_offset") )
-        data.post_offset = v.get_long();
-
+    {
+        long n;
+        if ( v.strtol(n) )
+            data.post_offset = n;
+        else
+            post_var = v.get_string();
+    }
     else if ( v.is("big") )
         set_byte_order(data.endianness, ENDIAN_BIG, "byte_jump");
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,8 +30,11 @@
 #include "main/snort_types.h"
 #include "sfip/sf_returns.h"
 
-struct SfCidr;
+namespace snort
+{
+using SfIpString = char[INET6_ADDRSTRLEN];
 
+struct SfCidr;
 struct SO_PUBLIC SfIp
 {
     /*
@@ -48,6 +51,9 @@ struct SO_PUBLIC SfIp
     SfIpRet set(const char* src, uint16_t* srcBits = nullptr);
     /* Sets to a raw source IP (4 or 16 bytes, according to family) */
     SfIpRet set(const void* src, int fam);
+    /* Sets to a raw source IP, source must be a 128 bit IPv6 (detects IPv4 mapped IPv6)
+     * This is specifically for conversion of Flow_Stats_t ipv4 mapped ipv6 addresses */
+    SfIpRet set(const void* src);
     /* Converts string IP format to an array of values. Also checks IP address format. */
     SfIpRet pton(const int fam, const char* ip);
 
@@ -85,7 +91,7 @@ struct SO_PUBLIC SfIp
     bool is_private() const;
 
     const char* ntop(char* buf, int bufsize) const;
-    const char* ntoa() const;
+    const char* ntop(SfIpString) const;
 
     void obfuscate(SfCidr* ob);
 
@@ -459,14 +465,12 @@ SO_PUBLIC const char* sfip_ntop(const SfIp* ip, char* buf, int bufsize);
 
 inline std::ostream& operator<<(std::ostream& os, const SfIp* addr)
 {
-    char str[INET6_ADDRSTRLEN];
-    sfip_ntop(addr, str, sizeof(str));
-    os << str;
-    return os;
+    SfIpString str;
+    return os << addr->ntop(str);
 }
 
 // FIXIT-L X This should be in utils_net if anywhere, but that makes it way harder to link into unit tests
 SO_PUBLIC const char* snort_inet_ntop(int family, const void* ip_raw, char* buf, int bufsize);
-
+} // namespace snort
 #endif
 

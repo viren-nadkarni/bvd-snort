@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,8 @@
 
 #include "service_inspectors/http_inspect/http_msg_header.h"
 #include "service_inspectors/http_inspect/http_msg_request.h"
+
+using namespace snort;
 
 const uint8_t* HttpEvent::get_header(unsigned id, uint64_t sub_id, int32_t& length)
 {

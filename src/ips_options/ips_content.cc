@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -35,6 +35,8 @@
 #include "utils/stats.h"
 
 #include "extract.h"
+
+using namespace snort;
 
 #define MAX_PATTERN_SIZE 2048
 
@@ -73,7 +75,7 @@ void ContentData::init()
 
 void ContentData::setup_bm()
 {
-    skip_stride = make_skip(pmd.pattern_buf, pmd.pattern_size);
+    skip_stride = snort::make_skip(pmd.pattern_buf, pmd.pattern_size);
     shift_stride = make_shift(pmd.pattern_buf, pmd.pattern_size);
 }
 
@@ -133,7 +135,7 @@ public:
     EvalStatus eval(Cursor& c, Packet*) override
     { return CheckANDPatternMatch(config, c); }
 
-    PatternMatchData* get_pattern(int, RuleDirection) override
+    PatternMatchData* get_pattern(SnortProtocolId, RuleDirection) override
     { return &config->pmd; }
 
 protected:
@@ -376,8 +378,6 @@ static IpsOption::EvalStatus CheckANDPatternMatch(ContentData* idx, Cursor& c)
 {
     Profile profile(contentPerfStats);
 
-    DebugMessage(DEBUG_PATTERN_MATCH, "CheckPatternANDMatch: ");
-
     int found = uniSearchReal(idx, c);
 
     if ( found == -1 )
@@ -395,12 +395,10 @@ static IpsOption::EvalStatus CheckANDPatternMatch(ContentData* idx, Cursor& c)
 
     if ( found )
     {
-        DebugMessage(DEBUG_PATTERN_MATCH, "Pattern match found\n");
         return IpsOption::MATCH;
     }
     else
     {
-        DebugMessage(DEBUG_PATTERN_MATCH, "Pattern match failed\n");
         return IpsOption::NO_MATCH;
     }
 }
@@ -488,7 +486,6 @@ static void parse_offset(ContentData* cd, const char* data)
         }
     }
 
-    DebugFormat(DEBUG_PARSER, "Pattern offset = %d\n", cd->pmd.offset);
 }
 
 static void parse_depth(ContentData* cd, const char* data)
@@ -528,7 +525,6 @@ static void parse_depth(ContentData* cd, const char* data)
         }
     }
 
-    DebugFormat(DEBUG_PATTERN_MATCH, "Pattern depth = %d\n", cd->pmd.depth);
 }
 
 static void parse_distance(ContentData* cd, const char* data)
@@ -598,7 +594,6 @@ static void parse_within(ContentData* cd, const char* data)
         }
     }
 
-    DebugFormat(DEBUG_PATTERN_MATCH, "Pattern within = %d\n", cd->pmd.depth);
 
     cd->pmd.set_relative();
 }

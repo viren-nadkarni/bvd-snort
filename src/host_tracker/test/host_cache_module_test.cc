@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,31 +25,30 @@
 
 #include "host_tracker/host_cache_module.h"
 #include "host_tracker/host_cache.h"
+#include "main/snort_config.h"
 
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
 #include "sfip/sf_ip.h"
 
-//  Fake AddProtocolReference to avoid bringing in a ton of dependencies.
-int16_t AddProtocolReference(const char* protocol)
+using namespace snort;
+
+namespace snort
 {
-    if (!strcmp("servicename", protocol))
-        return 3;
-    if (!strcmp("tcp", protocol))
-        return 2;
-    return 1;
+//  Fakes to avoid bringing in a ton of dependencies.
+SnortProtocolId ProtocolReference::add(char const*) { return 0; }
+SnortProtocolId ProtocolReference::find(char const*) { return 0; }
+SnortConfig* SnortConfig::get_conf() { return nullptr; }
+char* snort_strdup(const char* s)
+{ return strdup(s); }
 }
 
-//  Fake show_stats to avoid bringing in a ton of dependencies.
 void show_stats(PegCount*, const PegInfo*, unsigned, const char*)
 { }
 
 void show_stats(PegCount*, const PegInfo*, IndexVec&, const char*, FILE*)
 { }
-
-char* snort_strdup(const char* s)
-{ return strdup(s); }
 
 #define FRAG_POLICY 33
 #define STREAM_POLICY 100

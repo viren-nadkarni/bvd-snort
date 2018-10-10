@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -44,11 +44,13 @@
 #include "file_api.h"
 #include "file_capture.h"
 #include "file_config.h"
-#include "file_enforcer.h"
+#include "file_cache.h"
 #include "file_flows.h"
 #include "file_service.h"
 #include "file_segment.h"
 #include "file_stats.h"
+
+using namespace snort;
 
 // Convert UTF16-LE file name to UTF-8.
 // Returns allocated name. Caller responsible for freeing the buffer.
@@ -104,6 +106,7 @@ void FileInfo::copy(const FileInfo& other)
     file_type_id = other.file_type_id;
     file_id = other.file_id;
     file_name = other.file_name;
+    file_name_set = other.file_name_set;
     verdict = other.verdict;
     file_type_enabled = other.file_type_enabled;
     file_signature_enabled = other.file_signature_enabled;
@@ -160,12 +163,12 @@ uint32_t FileInfo::get_file_type() const
     return file_type_id;
 }
 
-void FileInfo::set_file_id(size_t id)
+void FileInfo::set_file_id(uint64_t id)
 {
     file_id = id;
 }
 
-size_t FileInfo::get_file_id() const
+uint64_t FileInfo::get_file_id() const
 {
     return file_id;
 }
@@ -268,31 +271,6 @@ FileContext::~FileContext ()
     InspectorManager::release(inspector);
 }
 
-inline int FileContext::get_data_size_from_depth_limit(FileProcessType type, int
-    data_size)
-{
-    uint64_t max_depth;
-
-    switch (type)
-    {
-    case SNORT_FILE_TYPE_ID:
-        max_depth = config->file_type_depth;
-        break;
-    case SNORT_FILE_SHA256:
-        max_depth = config->file_signature_depth;
-        break;
-    default:
-        return data_size;
-    }
-
-    if (processed_bytes > max_depth)
-        data_size = -1;
-    else if (processed_bytes + data_size > max_depth)
-        data_size = (int)(max_depth - processed_bytes);
-
-    return data_size;
-}
-
 /* stop file type identification */
 inline void FileContext::finalize_file_type()
 {
@@ -356,12 +334,14 @@ void FileContext::finish_signature_lookup(Flow* flow, bool final_lookup, FilePol
         verdict = policy->signature_lookup(flow, this);
         if ( verdict != FILE_VERDICT_UNKNOWN || final_lookup )
         {
-            FileEnforcer* file_enforcer = FileService::get_file_enforcer();
-            if (file_enforcer)
-                file_enforcer->apply_verdict(flow, this, verdict, false, policy);
+            FileCache* file_cache = FileService::get_file_cache();
+            if (file_cache)
+                file_cache->apply_verdict(flow, this, verdict, false, policy);
             log_file_event(flow, policy);
             config_file_signature(false);
             file_stats->signatures_processed[get_file_type()][get_file_direction()]++;
+            if ( verdict == FILE_VERDICT_REJECT or verdict == FILE_VERDICT_BLOCK)
+                flow->disable_inspection();
         }
         else
         {
@@ -417,7 +397,7 @@ bool FileContext::process(Flow* flow, const uint8_t* file_data, int data_size,
         return false;
     }
 
-    if ((FileService::get_file_enforcer()->cached_verdict_lookup(flow, this,
+    if ((FileService::get_file_cache()->cached_verdict_lookup(flow, this,
         policy) != FILE_VERDICT_UNKNOWN))
         return true;
 
@@ -444,9 +424,9 @@ bool FileContext::process(Flow* flow, const uint8_t* file_data, int data_size,
             FileVerdict v = policy->type_lookup(flow, this);
             if ( v != FILE_VERDICT_UNKNOWN )
             {
-                FileEnforcer* file_enforcer = FileService::get_file_enforcer();
-                if (file_enforcer)
-                    file_enforcer->apply_verdict(flow, this, v, false, policy);
+                FileCache* file_cache = FileService::get_file_cache();
+                if (file_cache)
+                    file_cache->apply_verdict(flow, this, v, false, policy);
             }
 
             log_file_event(flow, policy);
@@ -501,40 +481,33 @@ bool FileContext::process(Flow* flow, const uint8_t* file_data, int data_size,
  * 3) file magics are exhausted in depth
  *
  */
-void FileContext::process_file_type(const uint8_t* file_data, int size, FilePosition position)
+void FileContext::process_file_type(const uint8_t* file_data, int data_size, FilePosition position)
 {
-    int data_size;
-
-    /* file type already found and no magics to continue*/
+    /* file type already found and no magics to continue */
     if (file_type_id && !file_type_context)
         return;
 
-    /* Check whether file type depth is reached*/
-    data_size = get_data_size_from_depth_limit(SNORT_FILE_TYPE_ID, size);
+    bool depth_exhausted = false;
 
-    if (data_size < 0)
+    if ((int64_t)processed_bytes + data_size >= config->file_type_depth)
     {
-        finalize_file_type();
-        return;
+        data_size = config->file_type_depth - processed_bytes;
+        assert(data_size > 0);
+        depth_exhausted = true;
     }
 
     file_type_id =
         config->find_file_type_id(file_data, data_size, processed_bytes, &file_type_context);
 
-    /* Check whether file transfer is done or type depth is reached*/
-    if ( (position == SNORT_FILE_END)  || (position == SNORT_FILE_FULL) ||
-        (data_size != size) )
-    {
+    /* Check whether file transfer is done or type depth is reached */
+    if ( (position == SNORT_FILE_END) || (position == SNORT_FILE_FULL) || depth_exhausted )
         finalize_file_type();
-    }
 }
 
-void FileContext::process_file_signature_sha256(const uint8_t* file_data, int size,
+void FileContext::process_file_signature_sha256(const uint8_t* file_data, int data_size,
     FilePosition position)
 {
-    int data_size = get_data_size_from_depth_limit(SNORT_FILE_SHA256, size);
-
-    if (data_size != size)
+    if ((int64_t)processed_bytes + data_size > config->file_signature_depth)
     {
         file_state.sig_state = FILE_SIG_DEPTH_FAIL;
         return;
@@ -797,4 +770,3 @@ bool file_IDs_from_group(const void *conf, const char *group,
     return get_ids_from_group(conf, group, ids, count);
 }
  **/
-

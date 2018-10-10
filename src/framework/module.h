@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -49,7 +49,16 @@
 #include "main/snort_types.h"
 #include "utils/stats.h"
 
-using LuaCFunction = int(*)(struct lua_State*);
+struct lua_State;
+
+class ModuleManager;
+
+namespace snort
+{
+struct ProfileStats;
+struct SnortConfig;
+
+using LuaCFunction = int(*)(lua_State*);
 
 struct Command
 {
@@ -66,9 +75,6 @@ struct RuleMap
     unsigned sid;
     const char* msg;
 };
-
-struct ProfileStats;
-struct SnortConfig;
 
 class SO_PUBLIC Module
 {
@@ -128,9 +134,16 @@ public:
     virtual const PegInfo* get_pegs() const
     { return nullptr; }
 
+    virtual bool counts_need_prep() const
+    { return false; }
+
+    virtual void prep_counts() { }
+
     // counts and profile are thread local
     virtual PegCount* get_counts() const
     { return nullptr; }
+
+    virtual PegCount get_global_count(const char* name) const;
 
     virtual int get_num_counts() const
     { return num_counts; }
@@ -153,6 +166,7 @@ public:
     virtual void show_interval_stats(IndexVec&, FILE*);
     virtual void show_stats();
     virtual void reset_stats();
+    virtual void show_dynamic_stats() {}
 
     // Wrappers to check that lists are not tables
     bool verified_begin(const char*, int, SnortConfig*);
@@ -170,13 +184,15 @@ public:
     virtual Usage get_usage() const
     { return CONTEXT; }
 
+    void enable_trace();
+
 protected:
     Module(const char* name, const char* help);
     Module(const char* name, const char* help, const Parameter*,
         bool is_list = false, Trace* = nullptr);
 
 private:
-    friend class ModuleManager;
+    friend ModuleManager;
     void init(const char*, const char* = nullptr);
 
     std::vector<PegCount> counts;
@@ -211,6 +227,6 @@ private:
         counts[index] += value;
     }
 };
-
+}
 #endif
 

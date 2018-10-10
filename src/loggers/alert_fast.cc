@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 // Copyright (C) 2000,2001 Andrew R. Baker <andrewb@uab.edu>
@@ -54,6 +54,7 @@
 #include "packet_io/sfdaq.h"
 #include "service_inspectors/http_inspect/http_enum.h"
 
+using namespace snort;
 using namespace std;
 
 /* full buf was chosen to allow printing max size packets

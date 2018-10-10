@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -19,6 +19,8 @@
 
 #ifndef ANALYZER_COMMANDS_H
 #define ANALYZER_COMMANDS_H
+
+#include "main/snort_types.h"
 
 class Analyzer;
 class Swapper;
@@ -108,6 +110,11 @@ public:
     const char* stringify() override { return "DAQ_SWAP"; }
     ~ACDAQSwap() override;
 };
+
+namespace snort
+{
+SO_PUBLIC void main_broadcast_command(AnalyzerCommand* ac, bool from_shell = false);   // From main.cc
+}
 
 #endif
 

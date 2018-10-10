@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,7 +28,11 @@
 #include <map>
 
 #include "log/messages.h"
+#include "main/thread.h"
+#include "sfip/sf_ip.h"
 #include "utils/cpp_macros.h"
+
+using namespace snort;
 
 PADDING_GUARD_BEGIN
 struct HostPortKey
@@ -67,7 +71,7 @@ struct HostPortKey
 };
 PADDING_GUARD_END
 
-static THREAD_LOCAL std::map<HostPortKey, HostPortVal>* host_port_cache = nullptr;
+static std::map<HostPortKey, HostPortVal>* host_port_cache = nullptr;
 
 void HostPortCache::initialize()
 {
@@ -78,7 +82,7 @@ void HostPortCache::terminate()
 {
     if (host_port_cache)
     {
-        host_port_cache->empty();
+        host_port_cache->clear();
         delete host_port_cache;
         host_port_cache = nullptr;
     }

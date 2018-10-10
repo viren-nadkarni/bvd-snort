@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,9 +22,11 @@
 #endif
 
 #include "http_inspect.h"
+#include "http_module.h"
 #include "http_stream_splitter.h"
 #include "http_test_input.h"
 
+using namespace snort;
 using namespace HttpEnums;
 
 // Convenience function. All housekeeping that must be done before we can return FLUSH to stream.
@@ -80,6 +82,8 @@ HttpCutter* HttpStreamSplitter::get_cutter(SectionType type,
 StreamSplitter::Status HttpStreamSplitter::scan(Flow* flow, const uint8_t* data, uint32_t length,
     uint32_t, uint32_t* flush_offset)
 {
+    snort::Profile profile(HttpModule::get_profile_stats());
+
     assert(length <= MAX_OCTETS);
 
     // This is the session state information we share with HttpInspect and store with stream. A
@@ -128,6 +132,19 @@ StreamSplitter::Status HttpStreamSplitter::scan(Flow* flow, const uint8_t* data,
 
     HttpModule::increment_peg_counts(PEG_SCAN);
 
+    if (session_data->detection_status[source_id] == DET_REACTIVATING)
+    {
+        if (source_id == SRC_CLIENT)
+        {
+            flow->set_to_server_detection(true);
+        }
+        else
+        {
+            flow->set_to_client_detection(true);
+        }
+        session_data->detection_status[source_id] = DET_ON;
+    }
+
     // Check for 0.9 response message
     if ((type == SEC_STATUS) &&
         (session_data->expected_trans_num[SRC_SERVER] == session_data->zero_nine_expected))
@@ -150,10 +167,11 @@ StreamSplitter::Status HttpStreamSplitter::scan(Flow* flow, const uint8_t* data,
     const uint32_t max_length = MAX_OCTETS - cutter->get_octets_seen();
     const ScanResult cut_result = cutter->cut(data, (length <= max_length) ? length :
         max_length, session_data->get_infractions(source_id), session_data->get_events(source_id),
-        session_data->section_size_target[source_id], session_data->section_size_max[source_id]);
+        session_data->section_size_target[source_id],
+        session_data->stretch_section_to_packet[source_id]);
     switch (cut_result)
     {
-    case SCAN_NOTFOUND:
+    case SCAN_NOT_FOUND:
         if (cutter->get_octets_seen() == MAX_OCTETS)
         {
             *session_data->get_infractions(source_id) += INF_ENDLESS_HEADER;
@@ -174,7 +192,6 @@ StreamSplitter::Status HttpStreamSplitter::scan(Flow* flow, const uint8_t* data,
 #endif
         return StreamSplitter::SEARCH;
     case SCAN_ABORT:
-    case SCAN_END: // FIXIT-H need StreamSplitter::END
         session_data->type_expected[source_id] = SEC_ABORT;
         delete cutter;
         cutter = nullptr;
@@ -188,6 +205,8 @@ StreamSplitter::Status HttpStreamSplitter::scan(Flow* flow, const uint8_t* data,
             delete cutter;
             cutter = nullptr;
         }
+        else
+            cutter->soft_reset();
         return StreamSplitter::FLUSH;
     case SCAN_FOUND:
     case SCAN_FOUND_PIECE:
@@ -202,6 +221,8 @@ StreamSplitter::Status HttpStreamSplitter::scan(Flow* flow, const uint8_t* data,
             delete cutter;
             cutter = nullptr;
         }
+        else
+            cutter->soft_reset();
         return StreamSplitter::FLUSH;
       }
     default:

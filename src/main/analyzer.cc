@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -33,9 +33,9 @@
 
 #include "analyzer_command.h"
 #include "snort.h"
-#include "snort_debug.h"
 #include "thread.h"
 
+using namespace snort;
 using namespace std;
 
 typedef DAQ_Verdict
@@ -147,6 +147,11 @@ void Analyzer::analyze()
     // The main analyzer loop is terminated by a command returning false or an error during acquire
     while (!exit_requested)
     {
+        if ( Snort::get_pause())
+        {
+            pause();
+            Snort::clear_pause();
+        }
         if (handle_command())
             continue;
 
@@ -158,9 +163,9 @@ void Analyzer::analyze()
             this_thread::sleep_for(ms);
             continue;
         }
-        if (daq_instance->acquire(0, main_func)){
+        if (daq_instance->acquire(0, main_func))
             break;
-		}
+
         // FIXIT-L acquire(0) makes idle processing unlikely under high traffic
         // because it won't return until no packets, signal, etc.  that means
         // the idle processing may not be useful or that we need a hook to do
@@ -179,7 +184,6 @@ void Analyzer::start()
         exit_requested = true;
     }
     set_state(State::STARTED);
-    DebugMessage(DEBUG_ANALYZER, "Handled START command\n");
 }
 
 void Analyzer::run(bool paused)
@@ -190,13 +194,11 @@ void Analyzer::run(bool paused)
         set_state(State::PAUSED);
     else
         set_state(State::RUNNING);
-    DebugMessage(DEBUG_ANALYZER, "Handled RUN command\n");
 }
 
 void Analyzer::stop()
 {
     exit_requested = true;
-    DebugMessage(DEBUG_ANALYZER, "Handled STOP command\n");
 }
 
 void Analyzer::pause()
@@ -205,7 +207,7 @@ void Analyzer::pause()
         set_state(State::PAUSED);
     else
         ErrorMessage("Analyzer: Received PAUSE command while in state %s\n",
-                get_state_string());
+            get_state_string());
 }
 
 void Analyzer::resume()
@@ -214,13 +216,12 @@ void Analyzer::resume()
         set_state(State::RUNNING);
     else
         ErrorMessage("Analyzer: Received RESUME command while in state %s\n",
-                get_state_string());
+            get_state_string());
 }
 
 void Analyzer::reload_daq()
 {
     if (daq_instance)
         daq_instance->reload();
-    DebugMessage(DEBUG_ANALYZER, "Handled RELOAD command\n");
 }
 

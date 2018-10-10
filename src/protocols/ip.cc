@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,8 @@
 
 #include "layer.h"
 
+namespace snort
+{
 namespace ip
 {
 void IpApi::reset()
@@ -315,4 +317,5 @@ bool IpApi::is_dst_loopback() const
     return false;
 }
 } // namespace ip
+} // namespace snort
 

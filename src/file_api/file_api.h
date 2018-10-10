@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,8 +26,9 @@
 // Currently, it provides three sets of APIs: file processing, MIME processing,
 // and configurations.
 
-#include <string>
+#include <bitset>
 #include <cstring>
+#include <string>
 
 #include "main/snort_types.h"
 
@@ -110,10 +111,17 @@ struct FileState
     FileSigState sig_state;
 };
 
-class FileContext;
 struct FileCaptureInfo;
-class Flow;
+
+namespace snort
+{
+#define FILE_ID_MAX          1024
+typedef std::bitset<FILE_ID_MAX> FileTypeBitSet;
+
+class FileContext;
 class FileInfo;
+class Flow;
+struct Packet;
 
 class SO_PUBLIC FilePolicyBase
 {
@@ -183,8 +191,10 @@ inline FileCharEncoding get_character_encoding(const char* file_name, size_t len
     return encoding;
 }
 
-SO_PUBLIC uint64_t get_file_processed_size(class Flow* flow);
-FilePosition get_file_position(struct Packet* pkt);
-
+SO_PUBLIC uint64_t get_file_processed_size(Flow* flow);
+SO_PUBLIC FilePosition get_file_position(Packet* pkt);
+SO_PUBLIC void get_magic_rule_ids_from_type(const std::string& type,
+    const std::string& version, FileTypeBitSet& ids_set);
+}
 #endif
 

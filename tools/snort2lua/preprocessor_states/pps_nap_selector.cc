@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 #include "conversion_state.h"
@@ -36,8 +37,8 @@ class NapRulesState : public ConversionState
 public:
     NapRulesState(Converter& c) : ConversionState(c) { }
 
-// We only care about rules. Format:
-// <rule id> <action> <in_zone> <src_net> <src_port> <out_zone> <dst_zone> <dst_port> <vlan> <proto>
+    // We only care about rules. Format:
+    // <id> <action> <zone> <net <netmask>> <port> <zone> <net <netmask>> <port> <vlan> <proto>
     bool convert(std::istringstream& data_stream) override
     {
 #define TRY_FIELD(field) \
@@ -48,11 +49,11 @@ public:
         }
 
         unsigned rule_id;
-        if ( data_stream >> rule_id ) // is this a or config
+        if ( data_stream >> rule_id ) // is this a comment or config
         {
             std::string action;
-            std::string src_zone, src_net, src_port;
-            std::string dst_zone, dst_net, dst_port;
+            std::string src_zone, src_net, src_netmask, src_port;
+            std::string dst_zone, dst_net, dst_netmask, dst_port;
             std::string vlan;
             std::string protocol;
             std::string ips_policy;
@@ -60,9 +61,15 @@ public:
             TRY_FIELD(action);   // ignore since nap rules don't drop
             TRY_FIELD(src_zone);
             TRY_FIELD(src_net);
+            if ( src_net != "any" )
+                TRY_FIELD(src_netmask);
+
             TRY_FIELD(src_port);
             TRY_FIELD(dst_zone);
             TRY_FIELD(dst_net);
+            if ( dst_net != "any" )
+                TRY_FIELD(dst_netmask);
+
             TRY_FIELD(dst_port);
             TRY_FIELD(vlan);
             TRY_FIELD(protocol);
@@ -98,7 +105,8 @@ public:
                 return false;
             }
 
-            auto& bind = cv.make_pending_binder(policy_id);
+            auto seen = rule_map.find(rule_id);
+            auto& bind = seen == rule_map.end() ? cv.make_pending_binder(policy_id) : *seen->second;
 
             bind.set_priority(order++);
 
@@ -106,7 +114,7 @@ public:
                 bind.set_when_src_zone(src_zone);
 
             if ( src_net != "any" )
-                bind.add_when_src_net(src_net);
+                bind.add_when_src_net(src_net + '/' + src_netmask);
 
             if ( src_port != "any" )
                 bind.add_when_src_port(src_port);
@@ -115,7 +123,7 @@ public:
                 bind.set_when_dst_zone(dst_zone);
 
             if ( dst_net != "any" )
-                bind.add_when_dst_net(dst_net);
+                bind.add_when_dst_net(dst_net + '/' + dst_netmask);
 
             if ( dst_port != "any" )
                 bind.add_when_dst_port(dst_port);
@@ -125,6 +133,8 @@ public:
 
             if ( protocol != "any" )
                 bind.set_when_proto(protocol);
+
+            rule_map[rule_id] = &bind;
         }
         else
         {
@@ -146,6 +156,7 @@ public:
 
 private:
     unsigned order = 0;
+    std::unordered_map<unsigned, Binder*> rule_map;
 };
 
 class NapSelectorState : public ConversionState
@@ -177,7 +188,7 @@ public:
                         cv.set_state(s, false);
                         // FIXIT-L if there is an error on this line after nap_rule_path
                         // the error message will reference path, not this conf file
-                        tmpval = (cv.parse_file(path, false) == 0);
+                        tmpval = (cv.parse_file(path, nullptr, false) == 0);
                         cv.set_state(this);
 
                         cv.get_table_api().open_top_level_table("binder");
@@ -199,6 +210,12 @@ public:
                 cv.get_table_api().add_deleted_comment("nap_stats_time");
                 cv.get_table_api().close_table();
                 tmpval = eat_option(data_stream);
+            }
+            else if ( keyword == "fw_required" )
+            {
+                cv.get_table_api().open_top_level_table("binder");
+                cv.get_table_api().add_deleted_comment("fw_required");
+                cv.get_table_api().close_table();
             }
             else
                 tmpval = false;

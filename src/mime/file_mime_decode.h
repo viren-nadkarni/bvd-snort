@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -51,7 +51,7 @@ struct MimeStats
 class MimeDecode
 {
 public:
-    MimeDecode(DecodeConfig* conf);
+    MimeDecode(snort::DecodeConfig* conf);
     ~MimeDecode();
 
     // get the decode type from buffer
@@ -73,7 +73,7 @@ public:
 
 private:
     DecodeType decode_type = DECODE_NONE;
-    DecodeConfig* config;
+    snort::DecodeConfig* config;
     DataDecode* decoder = nullptr;
 };
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -54,6 +54,8 @@
 
 #include "ftpp_return_codes.h"
 #include "telnet_module.h"
+
+using namespace snort;
 
 #define NUL 0x00
 #define CR 0x0d
@@ -167,7 +169,6 @@ int normalize_telnet(
 
     if (!normalization_required)
     {
-        DebugMessage(DEBUG_FTPTELNET, "Nothing to process!\n");
         if (tnssn && iMode == FTPP_SI_CLIENT_MODE)
             tnssn->consec_ayt = 0;
         return FTPP_SUCCESS;
@@ -405,11 +406,6 @@ int normalize_telnet(
         }
         else
         {
-            DebugFormat(DEBUG_FTPTELNET,
-                "overwriting %2X(%c) with %2X(%c)\n",
-                (unsigned char)(*write_ptr&0xFF), *write_ptr,
-                (unsigned char)(*read_ptr & 0xFF), *read_ptr);
-
             /* overwrite the negotiation bytes with the follow-on bytes */
             switch (*((const unsigned char*)(read_ptr)))
             {

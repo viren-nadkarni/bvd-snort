@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -25,21 +25,23 @@
 
 #include "main/snort_types.h"
 
+namespace snort
+{
 #define ALERT_SPACES_EXCEEDED   0x1
 #define ALERT_LEVELS_EXCEEDED   0x2
 #define ALERT_MIXED_ENCODINGS   0x4
 
 #define MAX_ALLOWED_OBFUSCATION 1
 
-typedef struct
+struct JSState
 {
     int allowed_spaces;
     int allowed_levels;
     uint16_t alerts;
-} JSState;
+};
 
 SO_PUBLIC int JSNormalizeDecode(
     const char*, uint16_t, char*, uint16_t destlen, const char**, int*, JSState*, uint8_t*);
-
+}
 #endif
 

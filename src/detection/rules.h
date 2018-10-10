@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2018 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -37,23 +37,26 @@
 #define ANY_SRC_IP      0x0100
 #define ANY_DST_IP      0x0200
 
-#define GENERATOR_SNORT_ENGINE        1
-#define GENERATOR_SNORT_SHARED        3
+#define GID_DEFAULT          1
+#define GID_SESSION        135
 
-#define GENERATOR_INTERNAL          135
-#define INTERNAL_EVENT_SYN_RECEIVED   1
-#define INTERNAL_EVENT_SESSION_ADD    2
-#define INTERNAL_EVENT_SESSION_DEL    3
+#define SESSION_EVENT_SYN_RX 1
+#define SESSION_EVENT_SETUP  2
+#define SESSION_EVENT_CLEAR  3
 
-#define EventIsInternal(gid) ((gid) == GENERATOR_INTERNAL)
+#define EventIsInternal(gid) ((gid) == GID_SESSION)
 
+namespace snort
+{
+    class IpsAction;
+}
 struct OutputSet;
 
 struct ListHead
 {
     OutputSet* LogList;
     OutputSet* AlertList;
-    class IpsAction* action;
+    snort::IpsAction* action;
     struct RuleListNode* ruleListNode;
 };
 
@@ -61,7 +64,7 @@ struct ListHead
 struct RuleListNode
 {
     ListHead* RuleList;   /* The rule list associated with this node */
-    RuleType mode;        /* the rule mode */
+    snort::Actions::Type mode;        /* the rule mode */
     int evalIndex;        /* eval index for this rule set */
     char* name;           /* name of this rule list */
     RuleListNode* next;   /* the next RuleListNode */

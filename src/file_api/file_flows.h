@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2017 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2018 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,6 +30,9 @@
 #include "file_module.h"
 #include "file_policy.h"
 
+
+namespace snort
+{
 class FileContext;
 class Flow;
 
@@ -39,7 +42,7 @@ public:
     FileInspect(FileIdModule*);
     ~FileInspect() override;
     void eval(Packet*) override { }
-
+    bool configure(SnortConfig*) override;
     FileConfig* config;
 };
 
@@ -65,7 +68,7 @@ public:
     // Get file context based on file id, create it if not existed
     FileContext* get_file_context(uint64_t file_id, bool to_create);
 
-    uint32_t get_new_file_instance();
+    uint64_t get_new_file_instance();
 
     void set_file_name(const uint8_t* fname, uint32_t name_size);
 
@@ -73,6 +76,8 @@ public:
     {
         gen_signature = enable;
     }
+
+    void add_pending_file(uint64_t file_id);
 
     // This is used when there is only one file per session
     bool file_process(const uint8_t* file_data, int data_size, FilePosition,
@@ -82,7 +87,6 @@ public:
     bool file_process(uint64_t file_id, const uint8_t* file_data,
         int data_size, uint64_t offset, FileDirection);
 
-    //void handle_retransmit(Packet*) override;
     static unsigned file_flow_data_id;
 
     void set_file_policy(FilePolicyBase* fp) { file_policy = fp; }
@@ -92,14 +96,13 @@ private:
     void init_file_context(FileDirection, FileContext*);
     FileContext* find_main_file_context(FilePosition, FileDirection, size_t id = 0);
     FileContext* main_context = nullptr;
-    FileContext* pending_context = nullptr;
     FileContext* current_context = nullptr;
-    uint32_t max_file_id = 0;
     uint64_t current_file_id = 0;
+    uint64_t pending_file_id = 0;
     bool gen_signature = false;
     Flow* flow = nullptr;
     FilePolicyBase* file_policy = nullptr;
 };
-
+}
 #endif
 
