@@ -5,7 +5,7 @@ set (SEARCH_ENGINE_INCLUDES
 )
 
 set (ACSMX_SOURCES
-    ac_std.cc 
+    ac_std.cc
     acsmx.cc
     acsmx.h
 )
@@ -18,6 +18,12 @@ set (ACSMX2_SOURCES
     acsmx2.cc
     acsmx2.h
     acsmx2_api.cc
+)
+
+set (ACSMX3_SOURCES
+    ac_gpu.cc
+    acsmx3.cc
+    acsmx3.h
 )
 
 set (BNFA_SOURCES
@@ -44,6 +50,7 @@ if ( STATIC_SEARCH_ENGINES )
     add_library(search_engines OBJECT
         ${ACSMX_SOURCES}
         ${ACSMX2_SOURCES}
+        ${ACSMX3_SOURCES}
         ${HYPER_SOURCES}
         ${INTEL_SOURCES}
         ${SEARCH_ENGINE_SOURCES}
@@ -58,6 +65,7 @@ else ( STATIC_SEARCH_ENGINES)
 
     add_dynamic_module(acsmx search_engines ${ACSMX_SOURCES})
     add_dynamic_module(acsmx2 search_engines ${ACSMX2_SOURCES})
+    add_dynamic_module(acsmx3 search_engines ${ACSMX3_SOURCES})
 if ( HAVE_HYPERSCAN )
     add_dynamic_module(hyperscan search_engines ${HYPER_SOURCES})
 endif ()

@@ -1,5 +1,1 @@
 alert tcp any any -> any any ( msg:"any alert"; content:"0"; )
-# pkt no. 1347318 in testbed-12jun_1.pcap
-#alert tcp any any -> any any ( msg:"Sample alert for pkt no. 1347318 in testbed-12jun_1.pcap"; content:"AF4246AD8759196B1B5439331BDFBE";)
-# pkg no. 180 in small.pcap
-#alert tcp any 57011 -> any 80 ( msg:"Sample alert for small.pcap"; content:"WCwS7OYnEonavdReiTgZ_3JalcPyInxYbHG668hbhfVRxCHWraC";)

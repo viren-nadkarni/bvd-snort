@@ -31,6 +31,7 @@ extern const BaseApi* se_ac_bnfa[];
 #ifdef STATIC_SEARCH_ENGINES
 extern const BaseApi* se_ac_std[];
 extern const BaseApi* se_acsmx2[];
+extern const BaseApi* se_ac_gpu[];
 #ifdef HAVE_HYPERSCAN
 extern const BaseApi* se_hyperscan[];
 #endif
@@ -43,6 +44,7 @@ void load_search_engines()
 #ifdef STATIC_SEARCH_ENGINES
     PluginManager::load_plugins(se_ac_std);
     PluginManager::load_plugins(se_acsmx2);
+    PluginManager::load_plugins(se_ac_gpu);
 #ifdef HAVE_HYPERSCAN
     PluginManager::load_plugins(se_hyperscan);
 #endif

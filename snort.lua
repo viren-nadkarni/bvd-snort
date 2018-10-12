@@ -17,4 +17,6 @@ latency =
 references = default_references
 classifications = default_classifications
 
-search_engine = { search_method = 'ac_full' }
+--search_engine = { search_method = 'ac_full' }
+--search_engine = { search_method = 'ac_std' }
+search_engine = { search_method = 'ac_gpu' }

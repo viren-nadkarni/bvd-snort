@@ -2,6 +2,6 @@
 
 set -euxo pipefail
 
-./configure_cmake.sh --prefix=$build_path
+./configure_cmake.sh --enable-gdb --prefix=$build_path
 cd build
 make -j $(nproc) install
