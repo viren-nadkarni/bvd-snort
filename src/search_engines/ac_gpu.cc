@@ -8,17 +8,17 @@
 
 using namespace snort;
 
-class AcMpse : public Mpse
+class Ac3Mpse : public Mpse
 {
 private:
-    ACSM_STRUCT* obj;
+    ACSM3_STRUCT* obj;
 
 public:
-    AcMpse(SnortConfig*, const MpseAgent* agent)
+    Ac3Mpse(SnortConfig*, const MpseAgent* agent)
         : Mpse("ac_gpu")
     { obj = acsm3New(agent); }
 
-    ~AcMpse() override
+    ~Ac3Mpse() override
     { acsm3Free(obj); }
 
     int add_pattern(
@@ -48,7 +48,7 @@ public:
 static Mpse* ac_ctor(
     SnortConfig* sc, class Module*, const MpseAgent* agent)
 {
-    return new AcMpse(sc, agent);
+    return new Ac3Mpse(sc, agent);
 }
 
 static void ac_dtor(Mpse* p)
@@ -66,7 +66,7 @@ static void ac_print()
     acsm3PrintSummaryInfo();
 }
 
-static const MpseApi ac_api =
+static const MpseApi ac3_api =
 {
     {
         PT_SEARCH_ENGINE,
@@ -98,7 +98,7 @@ const BaseApi* se_ac_gpu[] =
 #endif
 
 {
-    &ac_api.base,
+    &ac3_api.base,
     nullptr
 };
 
