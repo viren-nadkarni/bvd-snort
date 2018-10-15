@@ -2,8 +2,11 @@
 #define ACSMX3_H
 
 #include <cstdint>
+#include <vector>
 
 #include "search_common.h"
+#include "CL/cl.hpp"
+#include "main.h"
 
 namespace snort
 {
@@ -63,6 +66,24 @@ struct ACSM3_STRUCT
 
     int numPatterns;
     const MpseAgent* agent;
+
+    char* packet_buffer;
+
+    cl::Buffer cl_packet;
+    cl::Buffer cl_state_table;
+    cl::Buffer cl_packet_length;
+    cl::Buffer cl_nfound;
+
+    cl::Platform default_platform;
+    cl::Device default_device;
+
+    cl::Context context;
+    cl::Program::Sources sources;
+    cl::Program program;
+
+    cl::CommandQueue queue;
+
+    cl::Kernel kernel;
 };
 
 /*

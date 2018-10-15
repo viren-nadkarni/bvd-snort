@@ -23,6 +23,7 @@
 
 #include "main.h"
 
+#include <iostream>
 #include <thread>
 
 #include "control/idle_processing.h"
@@ -66,6 +67,8 @@
 //-------------------------------------------------------------------------
 
 using namespace snort;
+
+unsigned long foocount1 = 0;
 
 static bool exit_requested = false;
 static int main_exit_code = 0;
@@ -925,6 +928,8 @@ int main(int argc, char* argv[])
         snort_main();
 
     Snort::cleanup();
+
+    std::cout << "foocount1=" << foocount1 << std::endl;
 
     return main_exit_code;
 }

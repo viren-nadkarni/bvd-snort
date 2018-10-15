@@ -4,26 +4,10 @@
 
 #include "cl.hpp"
 
+/*
 std::vector<long> factorise(double);
 
 std::vector<long> factorise(double n) {
-    /*
-       define factors(n)
-
-    z = 2
-
-    while (z * z <= n)
-
-        if (n % z == 0)
-            output z
-            n /= z
-
-        else
-            z++
-
-    if n > 1
-        output n
-        */
     long z = 2;
     std::vector<long> factors;
 
@@ -42,6 +26,7 @@ std::vector<long> factorise(double n) {
 
     return factors;
 }
+*/
 
 int main(int argc, char* argv[]) {
     /*
@@ -81,10 +66,11 @@ int main(int argc, char* argv[]) {
 
     cl::Program::Sources sources;
 
-    std::string kernel_code =
-        "void kernel meaning_of_life(global int* A) { "
-        "   A[get_global_id(0)] = 42;"
-        "}";
+    std::string kernel_code = R"SIMONGOBACK(
+        void kernel meaning_of_life(global int* A) {
+            A[get_global_id(0)] = 42;
+        }
+        )SIMONGOBACK";
 
     sources.push_back({kernel_code.c_str(), kernel_code.length()});
 

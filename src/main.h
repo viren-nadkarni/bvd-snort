@@ -47,5 +47,7 @@ int main_detach(lua_State* = nullptr);
 
 void main_poke(unsigned);
 
+extern unsigned long foocount1;
+
 #endif
 

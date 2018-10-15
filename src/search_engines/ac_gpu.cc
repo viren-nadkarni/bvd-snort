@@ -16,10 +16,14 @@ private:
 public:
     Ac3Mpse(SnortConfig*, const MpseAgent* agent)
         : Mpse("ac_gpu")
-    { obj = acsm3New(agent); }
+    {
+        obj = acsm3New(agent);
+    }
 
     ~Ac3Mpse() override
-    { acsm3Free(obj); }
+    {
+        acsm3Free(obj);
+    }
 
     int add_pattern(
         SnortConfig*, const uint8_t* P, unsigned m,
@@ -29,7 +33,9 @@ public:
     }
 
     int prep_patterns(SnortConfig* sc) override
-    { return acsm3Compile(sc, obj); }
+    {
+        return acsm3Compile(sc, obj);
+    }
 
     int _search(
         const uint8_t* T, int n, MpseMatch match,
@@ -39,10 +45,14 @@ public:
     }
 
     int print_info() override
-    { return acsm3PrintDetailInfo(obj); }
+    {
+        return acsm3PrintDetailInfo(obj);
+    }
 
     int get_pattern_count() override
-    { return acsm3PatternCount(obj); }
+    {
+        return acsm3PatternCount(obj);
+    }
 };
 
 static Mpse* ac_ctor(
@@ -96,9 +106,7 @@ SO_PUBLIC const BaseApi* snort_plugins[] =
 #else
 const BaseApi* se_ac_gpu[] =
 #endif
-
 {
     &ac3_api.base,
     nullptr
 };
-
