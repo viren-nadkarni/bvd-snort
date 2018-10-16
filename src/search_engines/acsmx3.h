@@ -6,6 +6,7 @@
 
 #include "search_common.h"
 #include "CL/cl.hpp"
+#include "CL/cl_ext.h"
 #include "main.h"
 
 namespace snort
@@ -107,6 +108,8 @@ int acsm3PatternCount(ACSM3_STRUCT* acsm);
 int acsm3PrintDetailInfo(ACSM3_STRUCT*);
 
 int acsm3PrintSummaryInfo();
+
+void cl_printf_callback(const char *, size_t, size_t final, void *);
 
 #endif
 

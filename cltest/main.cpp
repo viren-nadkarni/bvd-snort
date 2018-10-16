@@ -27,6 +27,10 @@ std::vector<long> factorise(double n) {
     return factors;
 }
 */
+struct X {
+    int number;
+    int array[10];
+};
 
 int main(int argc, char* argv[]) {
     /*
@@ -67,10 +71,15 @@ int main(int argc, char* argv[]) {
     cl::Program::Sources sources;
 
     std::string kernel_code = R"SIMONGOBACK(
-        void kernel meaning_of_life(global int* A) {
-            A[get_global_id(0)] = 42;
-        }
-        )SIMONGOBACK";
+    struct X {
+        int number;
+        int array[10];
+    };
+
+    void kernel meaning_of_life(global struct X* x, global int* resp) {
+        *resp = x[0].array[4];
+    }
+    )SIMONGOBACK";
 
     sources.push_back({kernel_code.c_str(), kernel_code.length()});
 
@@ -84,17 +93,26 @@ int main(int argc, char* argv[]) {
     }
 
     int A[10] = {0};
+    X x[2] = {{0, {0, 0, 0, 0, 42, 0, 0, 0, 0, 0}},
+              {0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}};
+    int resp;
 
-    cl::Buffer buffer_A(context, CL_MEM_READ_WRITE, sizeof(int) * 10);
+    std::cout << "Magic: " << x[0].array[4] << std::endl;
+
+    cl::Buffer buffer_A(context, CL_MEM_READ_WRITE, sizeof(X)*2);
+    cl::Buffer buffer_B(context, CL_MEM_READ_WRITE, sizeof(int));
+
     cl::CommandQueue queue(context, default_device);
 
-    queue.enqueueWriteBuffer(buffer_A, CL_TRUE, 0, sizeof(int) * 10, A);
+    queue.enqueueWriteBuffer(buffer_A, CL_TRUE, 0, sizeof(X)*2, x);
+    queue.enqueueWriteBuffer(buffer_B, CL_TRUE, 0, sizeof(int), &resp);
 
     cl::NDRange global(10);
     cl::NDRange local(1);
 
     cl::Kernel kernel = cl::Kernel(program, "meaning_of_life");
     kernel.setArg(0, buffer_A);
+    kernel.setArg(1, buffer_B);
 
     queue.enqueueNDRangeKernel(
             kernel,
@@ -107,12 +125,15 @@ int main(int argc, char* argv[]) {
 
     int Z[10] = {0};
 
-    queue.enqueueReadBuffer(buffer_A, CL_TRUE, 0, sizeof(int) * 10, Z);
+    queue.enqueueReadBuffer(buffer_B, CL_TRUE, 0, sizeof(int), &resp);
 
-    std::cout << "Meaning of life: " << std::endl;
+    std::cout << "Meaning of life:\n";
 
+    /*
     for(auto i: Z)
         std::cout << i << ' ';
+        */
+    std::cout << resp << std::endl;
 
     return 0;
 }

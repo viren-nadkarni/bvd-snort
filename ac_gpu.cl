@@ -26,27 +26,26 @@ struct ACSM3_STATETABLE {
 };
 
 void kernel ac_gpu(
-        global uchar* T,                     // text body
+        global uchar* T,                    // text body
         global int* n,                      // text length
         global struct ACSM3_STATETABLE* StateTable,
-        global int* nfound                  // number of matched bytes
+        global int* nfound                 // number of matched bytes
         ) {
 
     *nfound = 0;
 
-    __global uchar* Tend = T + *n;
+    global uchar* Tend = T + *n;
 
     int state = 0;
 
     for (; T < Tend; T++)
     {
         state = StateTable[state].NextState[*T];
+        printf("%c %d %p\n", *T, state, StateTable[state].MatchList);
 
         if ( StateTable[state].MatchList != 0 )
         {
             (*nfound)++;
-
-            return;
         }
     }
     return;

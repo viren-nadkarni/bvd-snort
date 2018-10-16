@@ -25,6 +25,12 @@
 #define CL_GLOBAL_SIZE 256 /* total number of work-items */
 #define CL_LOCAL_SIZE 32 /* number of work-items in each work-group */
 
+
+void cl_printf_callback(
+        const char *buffer, size_t length, size_t final, void *user_data) {
+     fwrite(buffer, 1, length, stdout);
+}
+
 static int max_memory = 0;
 
 static void* AC3_MALLOC(int n)
@@ -272,8 +278,12 @@ ACSM3_STRUCT* acsm3New(const MpseAgent* agent)
     std::cout << "Device: " << p->default_device.getInfo<CL_DEVICE_NAME>()
         << std::endl;
 
-    /* Create context and command queue for default device */
-    p->context = cl::Context({p->default_device});
+    cl_context_properties context_properties[] = {
+        CL_PRINTF_CALLBACK_ARM, (cl_context_properties)cl_printf_callback,
+        CL_PRINTF_BUFFERSIZE_ARM, (cl_context_properties)0x100000,
+        0
+    };
+    p->context = cl::Context(p->default_device, context_properties, NULL, NULL, NULL);
     p->queue = cl::CommandQueue(p->context, p->default_device);
 
     /* Kernel source */
@@ -434,7 +444,7 @@ int acsm3Compile(snort::SnortConfig* sc, ACSM3_STRUCT* acsm)
     acsm->cl_packet_length = cl::Buffer(
             acsm->context, CL_MEM_READ_ONLY, sizeof(int));
 
-    std::cout << "ACSM States: " << acsm->acsmMaxStates << std::endl;
+    std::cout << "States: " << acsm->acsmMaxStates << std::endl;
 
     acsm->cl_state_table = cl::Buffer(
             acsm->context, CL_MEM_READ_ONLY,
@@ -481,19 +491,25 @@ int acsm3Search(
         for (; T < Tend; T++) {
             state = StateTable[state].NextState[*T];
 
+            std::cout << *T << " " << state << " " << StateTable[state].MatchList << "\n";
             if ( StateTable[state].MatchList != nullptr ) {
-                mlist = StateTable[state].MatchList;
-                index = T + 1 - Tc;
+                //mlist = StateTable[state].MatchList;
+                //index = T + 1 - Tc;
                 nfound++;
+                /*
                 if (match(mlist->udata->id, mlist->rule_option_tree, index, context,
                         mlist->neg_list) > 0) {
                     *current_state = state;
 
                     return nfound;
                 }
+                */
             }
         }
         *current_state = state;
+
+        if(nfound)
+        foocount1 += 1;
 
         return nfound;
     }
