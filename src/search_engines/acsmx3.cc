@@ -13,17 +13,10 @@
 
 #define MEMASSERT(p,s) if (!(p)) { fprintf(stderr,"ACSM-No Memory: %s\n",s); exit(0); }
 
-#define BUFFER_SIZE 256 /* max number of packets in the buffer */
-#define MAX_PACKET_SIZE 64*1024
-/* tests run on smallFlows gave:
- * max: 1460 bytes
- * mean: 1106.87
- * min: 2
- * count: 7569 packets
- * besides, ethernet has mtu of 1500 bytes
- */
-#define CL_GLOBAL_SIZE 256 /* total number of work-items */
-#define CL_LOCAL_SIZE 32 /* number of work-items in each work-group */
+#define MAX_PACKET_SIZE 64*1024 /* max theoretical size of packet. can also be set to
+                                   1500, the max eth mtu */
+#define CL_GLOBAL_SIZE 1        /* total number of work-items */
+#define CL_LOCAL_SIZE 1         /* number of work-items in each work-group */
 
 
 void cl_printf_callback(
@@ -279,8 +272,8 @@ ACSM3_STRUCT* acsm3New(const MpseAgent* agent)
         << std::endl;
 
     cl_context_properties context_properties[] = {
-        CL_PRINTF_CALLBACK_ARM, (cl_context_properties)cl_printf_callback,
-        CL_PRINTF_BUFFERSIZE_ARM, (cl_context_properties)0x100000,
+        CL_PRINTF_CALLBACK_ARM, (cl_context_properties) cl_printf_callback,
+        CL_PRINTF_BUFFERSIZE_ARM, (cl_context_properties) 0x100000,
         0
     };
     p->context = cl::Context(p->default_device, context_properties, NULL, NULL, NULL);
@@ -444,14 +437,16 @@ int acsm3Compile(snort::SnortConfig* sc, ACSM3_STRUCT* acsm)
     acsm->cl_packet_length = cl::Buffer(
             acsm->context, CL_MEM_READ_ONLY, sizeof(int));
 
-    std::cout << "States: " << acsm->acsmMaxStates << std::endl;
-
     acsm->cl_state_table = cl::Buffer(
             acsm->context, CL_MEM_READ_ONLY,
             sizeof(ACSM3_STATETABLE) * acsm->acsmMaxStates);
 
     acsm->cl_nfound = cl::Buffer(
             acsm->context, CL_MEM_READ_WRITE, sizeof(int));
+
+    /* TODO add more info prints */
+    std::cout << "States: " << acsm->acsmMaxStates << std::endl;
+    //acsm3PrintDetailInfo(acsm);
 
     return 0;
 }
@@ -475,6 +470,12 @@ int acsm3Search(
     ConvertCaseEx(Tc, Tx, n);
     T = Tc;
 
+    /*
+    std::cout << "hostsizeof ACSM3_STATETABLE=" << sizeof(ACSM3_STATETABLE) << std::endl;
+    std::cout << "hostsizeof ACSM3_USERDATA=" << sizeof(ACSM3_USERDATA) << std::endl;
+    std::cout << "hostsizeof ACSM3_PATTERN=" << sizeof(ACSM3_PATTERN) << std::endl;
+    */
+
     if(false) {
         ACSM3_PATTERN* mlist;
         ACSM3_STATETABLE* StateTable = acsm->acsmStateTable;
@@ -491,7 +492,7 @@ int acsm3Search(
         for (; T < Tend; T++) {
             state = StateTable[state].NextState[*T];
 
-            std::cout << *T << " " << state << " " << StateTable[state].MatchList << "\n";
+            //std::cout << *T << " " << state << " " << StateTable[state].MatchList << "\n";
             if ( StateTable[state].MatchList != nullptr ) {
                 //mlist = StateTable[state].MatchList;
                 //index = T + 1 - Tc;
@@ -521,7 +522,17 @@ int acsm3Search(
             sizeof(int), &n);
 
     acsm->queue.enqueueWriteBuffer(acsm->cl_state_table, CL_TRUE, 0,
-            sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates, &(acsm->acsmStateTable));
+            sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates, acsm->acsmStateTable);
+
+    /*
+    ACSM3_STATETABLE* st = (ACSM3_STATETABLE*) acsm->queue.enqueueMapBuffer(
+            acsm->cl_state_table, CL_TRUE, CL_MAP_WRITE, 0,
+            sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates);
+    memcpy(st, acsm->acsmStateTable, sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates);
+    acsm->queue.enqueueUnmapMemObject(acsm->cl_state_table, st);
+    */
+
+
 
     acsm->queue.enqueueWriteBuffer(acsm->cl_nfound, CL_TRUE, 0,
             sizeof(int), &nfound);
@@ -539,8 +550,8 @@ int acsm3Search(
     acsm->queue.enqueueNDRangeKernel(
             acsm->kernel,
             cl::NullRange,
-            cl::NDRange(10),
-            cl::NDRange(1)
+            cl::NDRange(CL_GLOBAL_SIZE),
+            cl::NDRange(CL_LOCAL_SIZE)
     );
 
     /* Fetch results */
@@ -548,7 +559,6 @@ int acsm3Search(
             sizeof(int), &nfound);
 
     foocount1 += nfound;
-
 }
 
 /*

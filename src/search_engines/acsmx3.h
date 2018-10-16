@@ -21,34 +21,49 @@ struct ACSM3_USERDATA
 {
     void* id;
     uint32_t ref_count;
+
+    uint64_t _padding0;
 };
 
 struct ACSM3_PATTERN
 {
-    ACSM3_PATTERN* next;
-    ACSM3_USERDATA* udata;
+    ACSM3_PATTERN* next;        // 4 bytes
+    void* _padding0;
 
-    uint8_t* patrn;
-    uint8_t* casepatrn;
+    ACSM3_USERDATA* udata;      // 4
+    void* _padding1;
 
-    void* rule_option_tree;
-    void* neg_list;
+    uint8_t* patrn;             // 4
+    void* _padding2;
 
-    int n;
-    int nocase;
-    int negative;
+    uint8_t* casepatrn;         // 4
+    void* _padding3;
+
+    void* rule_option_tree;     // 4
+    void* _padding4;
+
+    void* neg_list;             // 4
+    void* _padding5;
+
+    uint32_t n;                 // 4
+    uint32_t nocase;            // 4
+    uint32_t negative;          // 4
+
+    uint32_t _padding6;
 };
 
 struct ACSM3_STATETABLE
 {
     /* Next state - based on input character */
-    int NextState[ ALPHABET_SIZE ];
+    int NextState[ ALPHABET_SIZE ]; // 4
 
     /* Failure state - used while building NFA & DFA  */
-    int FailState;
+    int FailState;                  // 4
 
     /* List of patterns that end here, if any */
-    ACSM3_PATTERN* MatchList;
+    ACSM3_PATTERN* MatchList;       // 4
+
+    uint64_t _padding0;
 };
 
 /*
@@ -67,8 +82,6 @@ struct ACSM3_STRUCT
 
     int numPatterns;
     const MpseAgent* agent;
-
-    char* packet_buffer;
 
     cl::Buffer cl_packet;
     cl::Buffer cl_state_table;

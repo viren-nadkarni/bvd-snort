@@ -1,17 +1,17 @@
 struct ACSM3_USERDATA {
-    void* id;
-    uint ref_count;
+    void* id;                       // 4 bytes
+    uint ref_count;                 // 4 bytes
 };
 
 struct ACSM3_PATTERN {
-    struct ACSM3_PATTERN* next;
-    struct ACSM3_USERDATA* udata;
+    struct ACSM3_PATTERN* next;     // 8
+    struct ACSM3_USERDATA* udata;   // 8
 
-    uchar* patrn;
-    uchar* casepatrn;
+    uchar* patrn;                   // 8
+    uchar* casepatrn;               // 8
 
-    void* rule_option_tree;
-    void* neg_list;
+    void* rule_option_tree;         // 8
+    void* neg_list;                 // 8
 
     int n;
     int nocase;
@@ -38,9 +38,16 @@ void kernel ac_gpu(
 
     int state = 0;
 
+/*
+    printf("sizeof ACSM3_STATETABLE=%d\n", sizeof(struct ACSM3_STATETABLE));
+    printf("sizeof ACSM3_USERDATA=%d\n", sizeof(struct ACSM3_USERDATA));
+    printf("sizeof ACSM3_PATTERN=%d\n", sizeof(struct ACSM3_PATTERN));
+*/
+
     for (; T < Tend; T++)
     {
         state = StateTable[state].NextState[*T];
+
         printf("%c %d %p\n", *T, state, StateTable[state].MatchList);
 
         if ( StateTable[state].MatchList != 0 )
