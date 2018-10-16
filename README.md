@@ -54,10 +54,8 @@ sudo cp ~/libdnet/include/dnet/* /usr/local/include/dnet/
 export LUA_PATH=$build_path/include/snort/lua/\?.lua\;\;
 export SNORT_LUA_PATH=$build_path/etc/snort
 
-$build_path/bin/snort -c ~/bvd-snort/clort.lua -r ~/testbed-12jun_1.pcap -R ~/snort3-community-rules/snort3-community.rules
+$build_path/bin/snort -c ~/bvd-snort/clort.lua -r ~/testbed-12jun_1.pcap -R ~/bvd-snort/snort3-community.rules
 ```
-
-Use appropriate paths. Community rule set is available [here](https://www.snort.org/downloads/community/snort3-community-rules.tar.gz)
 
 ### Other usage examples
 

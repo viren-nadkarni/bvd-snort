@@ -22,6 +22,7 @@
 #endif
 
 #include <time.h>
+#include <iostream>
 
 #include "framework/mpse.h"
 #include "acsmx2.h"
@@ -63,42 +64,37 @@ class AcfMpse : public Mpse
             const uint8_t* T, int n, MpseMatch match,
             void* context, int* current_state) override
         {
-            if(1)                //ADDED - Change to 0 to run default matching
-            {
+            int ncount = 0;
+            /* TODO: find if the use of this block be somehow related to
+             * acsmCompile2(SnortConfig* sc, ACSM_STRUCT2* acsm)
+             * in acsmx2.cc?
+             */
+            if(true) {
+                /*
+                ncount = acsm_search_dfa_full_gpu_singleBuff(
+                        obj, T, n, match, context, current_state);
+                ncount = acsm_search_dfa_full_gpu(
+                        obj, T, n, match, context, current_state);
+                */
+                ncount = acsm_search_dfa_full_cpu(
+                        obj, T, n, match, context, current_state);
+                /*
+                */
+                my_total_matches += ncount;
+                foocount += ncount;
 
-                int temp_matches=0;
-                if(USE_GPU == 1)
-                {
-                    temp_matches = acsm_search_dfa_full_gpu_singleBuff(obj, T, n, match, context, current_state);
-                    my_total_matches += temp_matches;
-                    return temp_matches;
-                }
-                else if(USE_GPU == 2)
-                {
-                    temp_matches = acsm_search_dfa_full_gpu(obj, T, n, match, context, current_state);
-                    my_total_matches += temp_matches;
-                    return temp_matches;
-                }
-                else if(USE_GPU == 3)
-                {
-                    temp_matches = acsm_search_dfa_full(obj, T, n, match, context, current_state);
-                    my_total_matches += temp_matches;
-                    return temp_matches;
-                }
-                else
-                {
-                    temp_matches = acsm_search_dfa_full_cpu(obj, T, n, match, context, current_state);
-                    my_total_matches += temp_matches;
-                    return temp_matches;
-                }
-
+                return ncount;
             }
-            else
-            {
-                if ( obj->dfa_enabled() )
-                    return acsm_search_dfa_full(obj, T, n, match, context, current_state);
-
-                return acsm_search_nfa(obj, T, n, match, context, current_state);
+            else {
+                if ( obj->dfa_enabled() ) {
+                    ncount = acsm_search_dfa_full(
+                            obj, T, n, match, context, current_state);
+                } else {
+                    ncount = acsm_search_nfa(
+                            obj, T, n, match, context, current_state);
+                }
+                foocount += ncount;
+                return ncount;
             }
         }
 

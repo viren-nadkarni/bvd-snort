@@ -75,6 +75,8 @@
 
 //-------------------------------------------------------------------------
 unsigned long my_total_matches = 0;
+unsigned long foocount = 0;
+double stopwatch = 0.0;
 
 static bool exit_requested = false;
 static int main_exit_code = 0;
@@ -793,7 +795,9 @@ static void handle(Pig& pig, unsigned& swine, unsigned& pending_privileges)
 static void main_loop()
 {
     unsigned swine = 0, pending_privileges = 0;
+
     my_total_matches = 0;
+    foocount = 0;
 
     std::cout << "=> Main loop begins\n";
 
@@ -841,7 +845,9 @@ static void main_loop()
     }
 
     std::cout << "=> Main loop ends\n";
-    std::cout << "=> Total matches: " << my_total_matches << "\n";
+    std::cout << "=> Total matches: " << my_total_matches << std::endl;
+    std::cout << "=> foocount: " << foocount << std::endl;
+    std::cout << "=> Stopwatch (total CPU wait): " << stopwatch << std::endl;
 }
 
 static void snort_main()
