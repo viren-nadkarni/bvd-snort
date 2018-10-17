@@ -510,7 +510,7 @@ int acsm3Search(
         *current_state = state;
 
         if(nfound)
-        foocount1 += 1;
+            foocount1 += 1;
 
         return nfound;
     }
@@ -558,7 +558,8 @@ int acsm3Search(
     acsm->queue.enqueueReadBuffer(acsm->cl_nfound, CL_TRUE, 0,
             sizeof(int), &nfound);
 
-    foocount1 += nfound;
+    if(nfound)
+        foocount1 += 1;
 }
 
 /*

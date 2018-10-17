@@ -55,15 +55,17 @@ struct ACSM3_PATTERN
 struct ACSM3_STATETABLE
 {
     /* Next state - based on input character */
-    int NextState[ ALPHABET_SIZE ]; // 4
+    int NextState[ ALPHABET_SIZE ]; // 4*256=1024
 
     /* Failure state - used while building NFA & DFA  */
     int FailState;                  // 4
 
+    uint32_t _padding0;             // 4
+
     /* List of patterns that end here, if any */
     ACSM3_PATTERN* MatchList;       // 4
 
-    uint64_t _padding0;
+    uint32_t _padding1;             // 4
 };
 
 /*
