@@ -44,7 +44,8 @@ static void AC3_FREE(void* p)
  */
 static uint8_t xlatcase[256];
 
-/* Initialises lookup table for case conversion. Called by ac_gpu.c:ac_init()
+/*
+ * Initialises lookup table for case conversion. Called by ac_gpu.c:ac_init()
  * Faster than calling toupper() everytime
  */
 void acsm3_init_xlatcase()
@@ -201,8 +202,8 @@ static void Build_NFA(ACSM3_STRUCT* acsm)
 }
 
 /*
-*   Build Deterministic Finite Automata from NFA
-*/
+ * Build Deterministic Finite Automata from NFA
+ */
 static void Convert_NFA_To_DFA(ACSM3_STRUCT* acsm)
 {
     std::list<int> queue;
@@ -236,8 +237,8 @@ static void Convert_NFA_To_DFA(ACSM3_STRUCT* acsm)
 }
 
 /*
-*
-*/
+ *
+ */
 ACSM3_STRUCT* acsm3New(const MpseAgent* agent)
 {
     ACSM3_STRUCT* p = (ACSM3_STRUCT*)AC3_MALLOC (sizeof (ACSM3_STRUCT));
@@ -300,12 +301,14 @@ ACSM3_STRUCT* acsm3New(const MpseAgent* agent)
         exit(1);
     }
 
+    p->kernel = cl::Kernel(p->program, "ac_gpu");
+
     return p;
 }
 
 /*
-*   Add a pattern to the list of patterns for this state machine
-*/
+ * Add a pattern to the list of patterns for this state machine
+ */
 int acsm3AddPattern(
     ACSM3_STRUCT* p, const uint8_t* pat, unsigned n, bool nocase,
     bool negative, void* user)
@@ -444,7 +447,10 @@ int acsm3Compile(snort::SnortConfig* sc, ACSM3_STRUCT* acsm)
     acsm->cl_nfound = cl::Buffer(
             acsm->context, CL_MEM_READ_WRITE, sizeof(int));
 
-    /* TODO add more info prints */
+    /* Copy state machine to cl buffer. This is done only once per pcap */
+    acsm->queue.enqueueWriteBuffer(acsm->cl_state_table, CL_TRUE, 0,
+            sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates, acsm->acsmStateTable);
+
     std::cout << "States: " << acsm->acsmMaxStates << std::endl;
     //acsm3PrintDetailInfo(acsm);
 
@@ -454,7 +460,7 @@ int acsm3Compile(snort::SnortConfig* sc, ACSM3_STRUCT* acsm)
 static THREAD_LOCAL uint8_t Tc[MAX_PACKET_SIZE];
 
 /*
- *   Search Text or Binary Data for Pattern matches
+ * Search Text or Binary Data for Pattern matches
  */
 int acsm3Search(
     ACSM3_STRUCT* acsm, const uint8_t* Tx, int n, MpseMatch match,
@@ -470,59 +476,11 @@ int acsm3Search(
     ConvertCaseEx(Tc, Tx, n);
     T = Tc;
 
-    /*
-    std::cout << "hostsizeof ACSM3_STATETABLE=" << sizeof(ACSM3_STATETABLE) << std::endl;
-    std::cout << "hostsizeof ACSM3_USERDATA=" << sizeof(ACSM3_USERDATA) << std::endl;
-    std::cout << "hostsizeof ACSM3_PATTERN=" << sizeof(ACSM3_PATTERN) << std::endl;
-    */
-
-    if(false) {
-        ACSM3_PATTERN* mlist;
-        ACSM3_STATETABLE* StateTable = acsm->acsmStateTable;
-
-        const uint8_t* Tend;
-        Tend = T + n;
-
-        if ( !current_state ) {
-            return 0;
-        }
-
-        state = *current_state;
-
-        for (; T < Tend; T++) {
-            state = StateTable[state].NextState[*T];
-
-            //std::cout << *T << " " << state << " " << StateTable[state].MatchList << "\n";
-            if ( StateTable[state].MatchList != nullptr ) {
-                //mlist = StateTable[state].MatchList;
-                //index = T + 1 - Tc;
-                nfound++;
-                /*
-                if (match(mlist->udata->id, mlist->rule_option_tree, index, context,
-                        mlist->neg_list) > 0) {
-                    *current_state = state;
-
-                    return nfound;
-                }
-                */
-            }
-        }
-        *current_state = state;
-
-        if(nfound)
-            foocount1 += 1;
-
-        return nfound;
-    }
-
-    /* Fill up cl buffers with necessary function params */
+    /* Fill up cl buffers with function params */
     acsm->queue.enqueueWriteBuffer(acsm->cl_packet, CL_TRUE, 0, n, T);
 
     acsm->queue.enqueueWriteBuffer(acsm->cl_packet_length, CL_TRUE, 0,
             sizeof(int), &n);
-
-    acsm->queue.enqueueWriteBuffer(acsm->cl_state_table, CL_TRUE, 0,
-            sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates, acsm->acsmStateTable);
 
     /*
     ACSM3_STATETABLE* st = (ACSM3_STATETABLE*) acsm->queue.enqueueMapBuffer(
@@ -532,13 +490,10 @@ int acsm3Search(
     acsm->queue.enqueueUnmapMemObject(acsm->cl_state_table, st);
     */
 
-
-
+    /*
     acsm->queue.enqueueWriteBuffer(acsm->cl_nfound, CL_TRUE, 0,
             sizeof(int), &nfound);
-
-    /* TODO see if global instantiaion of kernel improves perf */
-    acsm->kernel = cl::Kernel(acsm->program, "ac_gpu");
+    */
 
     /* Assign args to pass to kernel */
     acsm->kernel.setArg(0, acsm->cl_packet);
