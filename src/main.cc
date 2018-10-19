@@ -68,7 +68,8 @@
 
 using namespace snort;
 
-unsigned long foocount1 = 0;
+unsigned long match_packets = 0;
+unsigned long match_instances = 0;
 
 static bool exit_requested = false;
 static int main_exit_code = 0;
@@ -274,7 +275,7 @@ static AnalyzerCommand* get_command(AnalyzerCommand* ac, bool from_shell)
 void snort::main_broadcast_command(AnalyzerCommand* ac, bool from_shell)
 {
     unsigned dispatched = 0;
-    
+
     ac = get_command(ac, from_shell);
     trace_logf(snort, "Broadcasting %s command\n", ac->stringify());
 
@@ -929,7 +930,8 @@ int main(int argc, char* argv[])
 
     Snort::cleanup();
 
-    std::cout << "foocount1=" << foocount1 << std::endl;
+    std::cout << "Matched packets: " << match_packets << std::endl;
+    std::cout << "Matched instances: " << match_instances << std::endl;
 
     return main_exit_code;
 }

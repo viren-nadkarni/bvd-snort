@@ -13,11 +13,6 @@
 
 #define MEMASSERT(p,s) if (!(p)) { fprintf(stderr,"ACSM-No Memory: %s\n",s); exit(0); }
 
-#define MAX_PACKET_SIZE 64*1024 /* max theoretical size of packet. can also be set to
-                                   1500, the max eth mtu */
-#define CL_GLOBAL_SIZE 1        /* total number of work-items */
-#define CL_LOCAL_SIZE 1         /* number of work-items in each work-group */
-
 
 void cl_printf_callback(
         const char *buffer, size_t length, size_t final, void *user_data) {
@@ -303,6 +298,17 @@ ACSM3_STRUCT* acsm3New(const MpseAgent* agent)
 
     p->kernel = cl::Kernel(p->program, "ac_gpu");
 
+    /* intialise packet buffer */
+    p->packet_buffer_index = 0;
+
+    p->packet_buffer = (uint8_t*) AC3_MALLOC(
+            PACKET_BUFFER_SIZE * MAX_PACKET_SIZE * sizeof(uint8_t));
+
+    memset(p->packet_buffer, 0,
+            PACKET_BUFFER_SIZE * MAX_PACKET_SIZE * sizeof(uint8_t));
+    memset(p->packet_length_buffer, 0,
+            PACKET_BUFFER_SIZE * sizeof(int));
+
     return p;
 }
 
@@ -435,23 +441,22 @@ int acsm3Compile(snort::SnortConfig* sc, ACSM3_STRUCT* acsm)
 
     /* Create cl buffers */
     acsm->cl_packet = cl::Buffer(
-            acsm->context, CL_MEM_READ_ONLY, MAX_PACKET_SIZE);
+            acsm->context, CL_MEM_READ_ONLY, MAX_PACKET_SIZE * PACKET_BUFFER_SIZE);
 
     acsm->cl_packet_length = cl::Buffer(
-            acsm->context, CL_MEM_READ_ONLY, sizeof(int));
+            acsm->context, CL_MEM_READ_ONLY, sizeof(int) * PACKET_BUFFER_SIZE);
 
     acsm->cl_state_table = cl::Buffer(
             acsm->context, CL_MEM_READ_ONLY,
             sizeof(ACSM3_STATETABLE) * acsm->acsmMaxStates);
 
     acsm->cl_nfound = cl::Buffer(
-            acsm->context, CL_MEM_READ_WRITE, sizeof(int));
+            acsm->context, CL_MEM_READ_WRITE, sizeof(int) * PACKET_BUFFER_SIZE);
 
     /* Copy state machine to cl buffer. This is done only once per pcap */
     acsm->queue.enqueueWriteBuffer(acsm->cl_state_table, CL_TRUE, 0,
             sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates, acsm->acsmStateTable);
 
-    std::cout << "States: " << acsm->acsmMaxStates << std::endl;
     //acsm3PrintDetailInfo(acsm);
 
     return 0;
@@ -463,12 +468,10 @@ static THREAD_LOCAL uint8_t Tc[MAX_PACKET_SIZE];
  * Search Text or Binary Data for Pattern matches
  */
 int acsm3Search(
-    ACSM3_STRUCT* acsm, const uint8_t* Tx, int n, MpseMatch match,
-    void* context, int* current_state)
-{
+        ACSM3_STRUCT* acsm, const uint8_t* Tx, int n, MpseMatch match,
+        void* context, int* current_state) {
     int state = 0;
     int index;
-    int nfound = 0;
 
     const uint8_t* T;
 
@@ -476,11 +479,30 @@ int acsm3Search(
     ConvertCaseEx(Tc, Tx, n);
     T = Tc;
 
+    int packet_space = MAX_PACKET_SIZE * sizeof(uint8_t);
+
+    memcpy(acsm->packet_buffer + packet_space * acsm->packet_buffer_index,
+            T, n);
+
+    acsm->packet_length_buffer[acsm->packet_buffer_index] = n;
+    acsm->packet_buffer_index++;
+
+    if(acsm->packet_buffer_index == PACKET_BUFFER_SIZE) {
+        cl_dispatch(acsm);
+    }
+
+}
+
+void cl_dispatch(ACSM3_STRUCT* acsm) {
+    int nfound[PACKET_BUFFER_SIZE];
+
     /* Fill up cl buffers with function params */
-    acsm->queue.enqueueWriteBuffer(acsm->cl_packet, CL_TRUE, 0, n, T);
+    acsm->queue.enqueueWriteBuffer(acsm->cl_packet, CL_TRUE, 0,
+             sizeof(uint8_t) * MAX_PACKET_SIZE * PACKET_BUFFER_SIZE,
+             acsm->packet_buffer);
 
     acsm->queue.enqueueWriteBuffer(acsm->cl_packet_length, CL_TRUE, 0,
-            sizeof(int), &n);
+            sizeof(int) * PACKET_BUFFER_SIZE, acsm->packet_length_buffer);
 
     /*
     ACSM3_STATETABLE* st = (ACSM3_STATETABLE*) acsm->queue.enqueueMapBuffer(
@@ -490,10 +512,8 @@ int acsm3Search(
     acsm->queue.enqueueUnmapMemObject(acsm->cl_state_table, st);
     */
 
-    /*
     acsm->queue.enqueueWriteBuffer(acsm->cl_nfound, CL_TRUE, 0,
-            sizeof(int), &nfound);
-    */
+            sizeof(int) * PACKET_BUFFER_SIZE, nfound);
 
     /* Assign args to pass to kernel */
     acsm->kernel.setArg(0, acsm->cl_packet);
@@ -511,17 +531,32 @@ int acsm3Search(
 
     /* Fetch results */
     acsm->queue.enqueueReadBuffer(acsm->cl_nfound, CL_TRUE, 0,
-            sizeof(int), &nfound);
+            sizeof(int) * PACKET_BUFFER_SIZE, nfound);
 
-    if(nfound)
-        foocount1 += 1;
+    /* count matches */
+    for(int i = 0; i < PACKET_BUFFER_SIZE; ++i) {
+        match_instances += nfound[i];
+        if(nfound[i]) {
+            match_packets += 1;
+        }
+        //std::cout << i << " " << nfound[i] << "\n";
+    }
+
+    /* reset buffer */
+    memset(acsm->packet_buffer, 0,
+            PACKET_BUFFER_SIZE * MAX_PACKET_SIZE * sizeof(uint8_t));
+    memset(acsm->packet_length_buffer, 0,
+            PACKET_BUFFER_SIZE * sizeof(int));
+    acsm->packet_buffer_index = 0;
 }
 
 /*
  *   Free all memory
  */
-void acsm3Free(ACSM3_STRUCT* acsm)
-{
+void acsm3Free(ACSM3_STRUCT* acsm) {
+    if(acsm->packet_buffer_index)
+        cl_dispatch(acsm);
+
     int i;
     ACSM3_PATTERN* mlist, * ilist;
 
@@ -571,8 +606,7 @@ int acsm3PatternCount(ACSM3_STRUCT* acsm) {
     return acsm->numPatterns;
 }
 
-static void Print_DFA( ACSM3_STRUCT * acsm )
-{
+static void Print_DFA(ACSM3_STRUCT * acsm) {
     int k;
     int i;
     int next;
@@ -593,7 +627,7 @@ static void Print_DFA( ACSM3_STRUCT * acsm )
 }
 
 int acsm3PrintDetailInfo(ACSM3_STRUCT* acsm) {
-    Print_DFA( acsm );
+    Print_DFA(acsm);
     return 0;
 }
 

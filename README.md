@@ -17,14 +17,7 @@ Snort fork with OpenCL/GPGPU-based packet processing engine
 * `apt install -y build-essential pkg-config libhwloc-dev hwloc luajit libluajit-5.1-dev libssl-dev libpcap-dev libpcre3-dev flex bison zlib1g-dev zlibc ocl-icd-dev ocl-icd-opencl-dev clinfo cmake`
 * EnergyMonitor from https://github.com/SimonKinds/EnergyMonitor for power consumption benchmarking
 
-Confirm that OpenCL is detected by the system with `clinfo`. If output is something like:
-
-```
-$ clinfo
-Number of platforms                               0
-```
-
-then setup Mali framebuffer driver and use the vendor ICD file:
+If OpenCL is not detected by the system (check with `clinfo`), then setup Mali driver:
 
 ```
 sudo apt install mali-fbdev
@@ -49,7 +42,7 @@ or
 ./build.sh
 ```
 
-If it fails with `fatal error: dnet/sctp.h: No such file or directory`:
+If build fails with `fatal error: dnet/sctp.h: No such file or directory`:
 
 ```
 sudo cp ~/libdnet/include/dnet/* /usr/local/include/dnet/

@@ -19,38 +19,39 @@ struct ACSM3_PATTERN {
 };
 
 struct ACSM3_STATETABLE {
-    /* Alphabet Size is 256 */
-    int NextState[ 256 ];               // 1024
+    /* Alphabet Size */
+    int NextState[256];                 // 1024
     int FailState;                      // 4
 
     struct ACSM3_PATTERN* MatchList;    // 8
 };
 
 void kernel ac_gpu(
-        __global uchar* T,              // text body
-        __global int* n,                // text length
+        __global uchar* Pbuff,          // text body
+        __global int* Plen,             // text length
         __global struct ACSM3_STATETABLE* StateTable,
-        __global int* nfound            // number of matched bytes
-        ) {
+        __global int* Nfound            // number of matched bytes
+    ) {
 
-    *nfound = 0;
-
-    __global uchar* Tend = T + *n;
-
+    int index = get_global_id(0);
+    int n = Plen[index];
     int state = 0;
 
-    for (; T < Tend; T++)
-    {
+    /* Max Packet Size */
+    __global uchar* T = Pbuff + index * (16 * 1024);
+    __global uchar* Tend = T + n;
+
+    Nfound[index] = 0;
+
+    for(; T < Tend; T++) {
         state = StateTable[state].NextState[*T];
 
         /*
         printf("%c %d %p\n", *T, state, StateTable[state].MatchList);
         */
 
-        if ( StateTable[state].MatchList != 0 )
-        {
-            (*nfound)++;
+        if(StateTable[state].MatchList != 0) {
+            Nfound[index]++;
         }
     }
-    return;
 }

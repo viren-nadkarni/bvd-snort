@@ -17,6 +17,15 @@ struct SnortConfig;
 #define ALPHABET_SIZE    256
 #define ACSM3_FAIL_STATE   (-1)
 
+#define MAX_PACKET_SIZE 16*1024
+#define PACKET_BUFFER_SIZE 512
+
+/* total number of work-items */
+#define CL_GLOBAL_SIZE PACKET_BUFFER_SIZE
+
+/* number of work-items in each work-group */
+#define CL_LOCAL_SIZE 1
+
 struct ACSM3_USERDATA
 {
     void* id;
@@ -85,6 +94,10 @@ struct ACSM3_STRUCT
     int numPatterns;
     const MpseAgent* agent;
 
+    int packet_buffer_index;
+    uint8_t* packet_buffer;
+    int packet_length_buffer[PACKET_BUFFER_SIZE];
+
     cl::Buffer cl_packet;
     cl::Buffer cl_state_table;
     cl::Buffer cl_packet_length;
@@ -124,6 +137,7 @@ int acsm3PrintDetailInfo(ACSM3_STRUCT*);
 
 int acsm3PrintSummaryInfo();
 
+void cl_dispatch(ACSM3_STRUCT*);
 void cl_printf_callback(const char *, size_t, size_t final, void *);
 
 #endif
