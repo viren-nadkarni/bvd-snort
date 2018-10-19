@@ -9,13 +9,14 @@ Snort fork with OpenCL/GPGPU-based packet processing engine
     Version = 3.0.0-a4 build 235
     Base = 2.9.8 build 383
 
+The Aho-Corasick pattern search algorithm has been implemented in OpenCL and can be used by specifying `ac_gpu` as `search_method` in config. The new engine is just a prototype and is not fully integrated into Snort yet. For example, logging and alerts do not work. There are also some issues with false positives when using more complex rulesets.
+
 ## Requirements
 
-* odroid-xu4 with Ubuntu 18.04 LTS
 * daq from https://www.snort.org/downloads/snortplus/daq-2.2.2.tar.gz
 * dnet from https://github.com/dugsong/libdnet.git
-* `apt install -y build-essential pkg-config libhwloc-dev hwloc luajit libluajit-5.1-dev libssl-dev libpcap-dev libpcre3-dev flex bison zlib1g-dev zlibc ocl-icd-dev ocl-icd-opencl-dev clinfo cmake`
-* EnergyMonitor from https://github.com/SimonKinds/EnergyMonitor for power consumption benchmarking
+* `sudo apt install -y build-essential pkg-config libhwloc-dev hwloc luajit libluajit-5.1-dev libssl-dev libpcap-dev libpcre3-dev flex bison zlib1g-dev zlibc ocl-icd-dev ocl-icd-opencl-dev clinfo cmake`
+* Tested on odroid-xu4 with Ubuntu 18.04 LTS
 
 If OpenCL is not detected by the system (check with `clinfo`), then setup Mali driver:
 
@@ -35,7 +36,7 @@ mkdir -p $build_path
 cd build && make -j $(nproc) install
 ```
 
-or
+or simply use the helper scripts:
 
 ```
 . env.sh
@@ -54,41 +55,10 @@ sudo cp ~/libdnet/include/dnet/* /usr/local/include/dnet/
 export LUA_PATH=$build_path/include/snort/lua/\?.lua\;\;
 export SNORT_LUA_PATH=$build_path/etc/snort
 
-$build_path/bin/snort -c ~/bvd-snort/clort.lua -r ~/smallFlows.pcap -R ~/bvd-snort/community.rules
+$build_path/bin/snort -c snort.lua -R test.rules -r ~/smallFlows.pcap
 ```
 
 Use appropriate paths. Sample pcap files are available [here](http://tcpreplay.appneta.com/wiki/captures.html).
-
-### Other usage examples
-
-* help:
-
-    ```shell
-    $build_path/bin/snort --help
-    $build_path/bin/snort --help-module suppress
-    $build_path/bin/snort --help-config | grep thread
-    ```
-
-* Examine and dump a pcap
-
-    ```shell
-    $build_path/bin/snort -r a.pcap
-    $build_path/bin/snort -L dump -d -e -q -r a.pcap
-    ```
-
-* Verify a config, with or w/o rules:
-
-    ```shell
-    $build_path/bin/snort -c $build_path/etc/snort/snort.lua
-    $build_path/bin/snort -c $build_path/etc/snort/snort.lua -R $build_path/etc/snort/sample.rules
-    ```
-
-* Run IDS mode. Replace pcaps/ with a path to a directory pcap files:
-
-    ```shell
-    $build_path/bin/snort -c $build_path/etc/snort/snort.lua -R $build_path/etc/snort/sample.rules \
-        -r a.pcap -A alert_test -n 100000
-    ```
 
 ---
 
