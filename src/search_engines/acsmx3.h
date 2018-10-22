@@ -17,7 +17,11 @@ struct SnortConfig;
 #define ALPHABET_SIZE    256
 #define ACSM3_FAIL_STATE   (-1)
 
+/* max theoretical packet size is 64k, but ethernet MTU is 1.5k
+ * currently set to a safe size */
 #define MAX_PACKET_SIZE 16*1024
+
+/* how many packets can fit into the cache buffer before sent to GPU */
 #define PACKET_BUFFER_SIZE 512
 
 /* total number of work-items */

@@ -52,7 +52,8 @@ void acsm3_init_xlatcase()
     }
 }
 
-/* Convert case using the case lookup table
+/*
+ * Convert case using lookup table
  */
 static inline void ConvertCaseEx(uint8_t* d, const uint8_t* s, int m)
 {
