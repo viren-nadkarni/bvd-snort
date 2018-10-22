@@ -139,27 +139,22 @@ static void Build_NFA(ACSM3_STRUCT* acsm)
     std::list<int> queue;
 
     /* Add the state 0 transitions 1st */
-    for (int i = 0; i < ALPHABET_SIZE; i++)
-    {
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
         int s = acsm->acsmStateTable[0].NextState[i];
 
-        if (s)
-        {
+        if (s) {
             queue.push_back(s);
             acsm->acsmStateTable[s].FailState = 0;
         }
     }
 
     /* Build the fail state transitions for each valid state */
-    for ( auto r : queue )
-    {
+    for ( auto r : queue ) {
         /* Find Final States for any Failure */
-        for (int i = 0; i < ALPHABET_SIZE; i++)
-        {
+        for (int i = 0; i < ALPHABET_SIZE; i++) {
             int s = acsm->acsmStateTable[r].NextState[i];
 
-            if ( s != ACSM3_FAIL_STATE )
-            {
+            if ( s != ACSM3_FAIL_STATE ) {
                 queue.push_back(s);
                 int fs = acsm->acsmStateTable[r].FailState;
                 int next;
@@ -168,8 +163,7 @@ static void Build_NFA(ACSM3_STRUCT* acsm)
                  *  Locate the next valid state for 'i' starting at s
                  */
                 while ((next=acsm->acsmStateTable[fs].NextState[i]) ==
-                    ACSM3_FAIL_STATE)
-                {
+                        ACSM3_FAIL_STATE) {
                     fs = acsm->acsmStateTable[fs].FailState;
                 }
 
@@ -277,10 +271,10 @@ ACSM3_STRUCT* acsm3New(const MpseAgent* agent)
     p->queue = cl::CommandQueue(p->context, p->default_device);
 
     /* Kernel source */
-    /* TODO move src to inline once kernel is stable */
     std::ifstream kernel_file("ac_gpu.cl");
     std::string kernel_code(std::istreambuf_iterator<char>(kernel_file),
             (std::istreambuf_iterator<char>()));
+    /* TODO move abv src to inline once stable */
     /*
     std::string kernel_code = R"SIMONGOBACK(
     )SIMONGOBACK";
@@ -299,14 +293,31 @@ ACSM3_STRUCT* acsm3New(const MpseAgent* agent)
 
     p->kernel = cl::Kernel(p->program, "ac_gpu");
 
-    /* intialise packet buffer */
+    /* Create cl packet buffers */
+    p->cl_packet = cl::Buffer(
+            p->context, CL_MEM_READ_ONLY,
+            sizeof(uint8_t) * MAX_PACKET_SIZE * PACKET_BUFFER_SIZE);
+
+    p->cl_packet_length = cl::Buffer(
+            p->context, CL_MEM_READ_ONLY,
+            sizeof(int) * PACKET_BUFFER_SIZE);
+
+    p->cl_nfound = cl::Buffer(
+            p->context, CL_MEM_READ_WRITE,
+            sizeof(int) * PACKET_BUFFER_SIZE);
+
+    /* map mem to cl packet buffers */
+    p->packet_buffer = (uint8_t*) p->queue.enqueueMapBuffer(
+            p->cl_packet, CL_TRUE, CL_MAP_WRITE, 0,
+            MAX_PACKET_SIZE * PACKET_BUFFER_SIZE * sizeof(uint8_t));
+
+    p->packet_length_buffer = (int*) p->queue.enqueueMapBuffer(
+            p->cl_packet_length, CL_TRUE, CL_MAP_WRITE, 0,
+            PACKET_BUFFER_SIZE * sizeof(int));
+
+    /* initialise to zero */
     p->packet_buffer_index = 0;
 
-    p->packet_buffer = (uint8_t*) AC3_MALLOC(
-            PACKET_BUFFER_SIZE * MAX_PACKET_SIZE * sizeof(uint8_t));
-
-    memset(p->packet_buffer, 0,
-            PACKET_BUFFER_SIZE * MAX_PACKET_SIZE * sizeof(uint8_t));
     memset(p->packet_length_buffer, 0,
             PACKET_BUFFER_SIZE * sizeof(int));
 
@@ -317,9 +328,8 @@ ACSM3_STRUCT* acsm3New(const MpseAgent* agent)
  * Add a pattern to the list of patterns for this state machine
  */
 int acsm3AddPattern(
-    ACSM3_STRUCT* p, const uint8_t* pat, unsigned n, bool nocase,
-    bool negative, void* user)
-{
+        ACSM3_STRUCT* p, const uint8_t* pat, unsigned n, bool nocase,
+        bool negative, void* user) {
     ACSM3_PATTERN* plist;
 
     plist = (ACSM3_PATTERN*)AC3_MALLOC (sizeof (ACSM3_PATTERN));
@@ -440,21 +450,13 @@ int acsm3Compile(snort::SnortConfig* sc, ACSM3_STRUCT* acsm)
     if ( acsm->agent )
         acsmBuildMatchStateTrees(sc, acsm);
 
-    /* Create cl buffers */
-    acsm->cl_packet = cl::Buffer(
-            acsm->context, CL_MEM_READ_ONLY, MAX_PACKET_SIZE * PACKET_BUFFER_SIZE);
-
-    acsm->cl_packet_length = cl::Buffer(
-            acsm->context, CL_MEM_READ_ONLY, sizeof(int) * PACKET_BUFFER_SIZE);
-
+    /* Create State machine buffer. This is not created in acsmNew because
+     * acsmMaxStates is known after building the state mx */
     acsm->cl_state_table = cl::Buffer(
             acsm->context, CL_MEM_READ_ONLY,
             sizeof(ACSM3_STATETABLE) * acsm->acsmMaxStates);
 
-    acsm->cl_nfound = cl::Buffer(
-            acsm->context, CL_MEM_READ_WRITE, sizeof(int) * PACKET_BUFFER_SIZE);
-
-    /* Copy state machine to cl buffer. This is done only once per pcap */
+    /* Copy state machine to cl buffer */
     acsm->queue.enqueueWriteBuffer(acsm->cl_state_table, CL_TRUE, 0,
             sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates, acsm->acsmStateTable);
 
@@ -495,26 +497,10 @@ int acsm3Search(
 }
 
 void cl_dispatch(ACSM3_STRUCT* acsm) {
-    int nfound[PACKET_BUFFER_SIZE];
-
-    /* Fill up cl buffers with function params */
-    acsm->queue.enqueueWriteBuffer(acsm->cl_packet, CL_TRUE, 0,
-             sizeof(uint8_t) * MAX_PACKET_SIZE * PACKET_BUFFER_SIZE,
-             acsm->packet_buffer);
-
-    acsm->queue.enqueueWriteBuffer(acsm->cl_packet_length, CL_TRUE, 0,
-            sizeof(int) * PACKET_BUFFER_SIZE, acsm->packet_length_buffer);
-
-    /*
-    ACSM3_STATETABLE* st = (ACSM3_STATETABLE*) acsm->queue.enqueueMapBuffer(
-            acsm->cl_state_table, CL_TRUE, CL_MAP_WRITE, 0,
-            sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates);
-    memcpy(st, acsm->acsmStateTable, sizeof(ACSM3_STATETABLE)*acsm->acsmMaxStates);
-    acsm->queue.enqueueUnmapMemObject(acsm->cl_state_table, st);
-    */
-
-    acsm->queue.enqueueWriteBuffer(acsm->cl_nfound, CL_TRUE, 0,
-            sizeof(int) * PACKET_BUFFER_SIZE, nfound);
+    /* unmap buffers before invoking kernel */
+    acsm->queue.enqueueUnmapMemObject(acsm->cl_packet, acsm->packet_buffer);
+    acsm->queue.enqueueUnmapMemObject(
+            acsm->cl_packet_length, acsm->packet_length_buffer);
 
     /* Assign args to pass to kernel */
     acsm->kernel.setArg(0, acsm->cl_packet);
@@ -522,7 +508,7 @@ void cl_dispatch(ACSM3_STRUCT* acsm) {
     acsm->kernel.setArg(2, acsm->cl_state_table);
     acsm->kernel.setArg(3, acsm->cl_nfound);
 
-    /* Dispatch job */
+    /* Dispatch to kernel */
     acsm->queue.enqueueNDRangeKernel(
             acsm->kernel,
             cl::NullRange,
@@ -531,8 +517,9 @@ void cl_dispatch(ACSM3_STRUCT* acsm) {
     );
 
     /* Fetch results */
-    acsm->queue.enqueueReadBuffer(acsm->cl_nfound, CL_TRUE, 0,
-            sizeof(int) * PACKET_BUFFER_SIZE, nfound);
+    int* nfound = (int*) acsm->queue.enqueueMapBuffer(
+            acsm->cl_nfound, CL_TRUE, CL_MAP_READ, 0,
+            sizeof(int) * PACKET_BUFFER_SIZE);
 
     /* count matches */
     for(int i = 0; i < PACKET_BUFFER_SIZE; ++i) {
@@ -540,15 +527,26 @@ void cl_dispatch(ACSM3_STRUCT* acsm) {
         if(nfound[i]) {
             match_packets += 1;
         }
-        //std::cout << i << " " << nfound[i] << "\n";
     }
 
-    /* reset buffer */
-    memset(acsm->packet_buffer, 0,
+    /* re-map buffer */
+    acsm->packet_buffer = (uint8_t*) acsm->queue.enqueueMapBuffer(
+            acsm->cl_packet, CL_TRUE, CL_MAP_WRITE, 0,
             PACKET_BUFFER_SIZE * MAX_PACKET_SIZE * sizeof(uint8_t));
+
+    acsm->packet_length_buffer = (int*) acsm->queue.enqueueMapBuffer(
+            acsm->cl_packet_length, CL_TRUE, CL_MAP_WRITE, 0,
+            PACKET_BUFFER_SIZE * sizeof(int));
+
+    /* clear packet lengths */
     memset(acsm->packet_length_buffer, 0,
             PACKET_BUFFER_SIZE * sizeof(int));
+
+    /* reset packets in buffer count */
     acsm->packet_buffer_index = 0;
+
+    /* clean up */
+    acsm->queue.enqueueUnmapMemObject(acsm->cl_nfound, nfound);
 }
 
 /*

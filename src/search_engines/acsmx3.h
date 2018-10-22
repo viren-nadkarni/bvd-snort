@@ -100,7 +100,7 @@ struct ACSM3_STRUCT
 
     int packet_buffer_index;
     uint8_t* packet_buffer;
-    int packet_length_buffer[PACKET_BUFFER_SIZE];
+    int* packet_length_buffer;
 
     cl::Buffer cl_packet;
     cl::Buffer cl_state_table;
